@@ -1,0 +1,75 @@
+/* Similar Notes 컨테이너 스타일 */
+.similar-notes-container {
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* 헤더 스타일 */
+.similar-notes-header {
+    cursor: pointer;
+    padding: 6px 0;
+    font-size: var(--font-adaptive-small);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+}
+
+.similar-notes-title {
+    display: flex;
+    align-items: center;
+}
+
+.similar-notes-title-text {
+    font-weight: 500;
+}
+
+.similar-notes-collapse-icon {
+    margin-left: 4px;
+    font-size: 10px;
+}
+
+/* 콘텐츠 영역 */
+.similar-notes-content {
+    padding-left: 10px;
+    padding-bottom: 10px;
+}
+
+/* 유사 노트 목록 */
+.similar-notes-list {
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+}
+
+/* 유사 노트 항목 */
+.similar-notes-item {
+    padding: 4px 0;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.similar-notes-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.similar-notes-item-title {
+    font-weight: 500;
+    color: var(--text-normal);
+}
+
+.similar-notes-item-preview {
+    font-size: var(--font-smallest);
+    color: var(--text-muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 빈 상태 메시지 */
+.similar-notes-empty {
+    padding: 10px 0;
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: var(--font-smallest);
+}
