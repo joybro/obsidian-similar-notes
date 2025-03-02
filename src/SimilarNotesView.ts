@@ -5,8 +5,7 @@ import { Component } from "obsidian";
 interface SimilarNote {
     file: TFile;
     title: string;
-    preview: string;
-    similarity?: number; // Optional similarity score
+    similarity: number;
 }
 
 export class SimilarNotesView extends Component {
@@ -38,24 +37,24 @@ export class SimilarNotesView extends Component {
 
         // Add section title
         const titleEl = headerEl.createDiv({
-            cls: "similar-notes-title nav-folder-title",
+            cls: "similar-notes-title tree-item-itself is-clickable",
         });
         const titleTextEl = titleEl.createDiv({
-            cls: "similar-notes-title-text nav-folder-title-content",
+            cls: "similar-notes-title-text",
         });
         titleTextEl.setText("Similar notes");
-
-        // Add toggle icon
-        const collapseIconEl = titleTextEl.createDiv({
-            cls: "similar-notes-collapse-icon collapse-icon",
-        });
-        collapseIconEl.innerHTML = this.collapsed ? "▶" : "▼";
 
         // Header click for collapse/expand functionality
         headerEl.addEventListener("click", () => {
             this.collapsed = !this.collapsed;
-            collapseIconEl.innerHTML = this.collapsed ? "▶" : "▼";
             this.contentEl.style.display = this.collapsed ? "none" : "block";
+
+            // Toggle is-collapsed class
+            if (this.collapsed) {
+                titleEl.addClass("is-collapsed");
+            } else {
+                titleEl.removeClass("is-collapsed");
+            }
         });
     }
 
@@ -78,24 +77,23 @@ export class SimilarNotesView extends Component {
         }
 
         // Create similar notes list
-        const listEl = this.contentEl.createEl("ul", {
-            cls: "similar-notes-list",
-        });
-
         for (const note of similarNotes) {
-            const itemEl = listEl.createEl("li", { cls: "similar-notes-item" });
+            const itemEl = this.contentEl.createDiv({
+                cls: "similar-notes-item tree-item-self is-clickable",
+            });
+            itemEl.setAttribute("draggable", "true");
 
             // Note title
-            const titleEl = itemEl.createEl("div", {
-                cls: "similar-notes-item-title",
+            const titleEl = itemEl.createDiv({
+                cls: "tree-item-inner",
             });
             titleEl.setText(note.title);
 
-            // Note preview
-            const previewEl = itemEl.createEl("div", {
-                cls: "similar-notes-item-preview",
+            // Similarity score
+            const similarityEl = itemEl.createDiv({
+                cls: "tree-item-flair-outer",
             });
-            previewEl.setText(note.preview);
+            similarityEl.setText(`${note.similarity.toFixed(2)}`);
 
             // Open note on click
             itemEl.addEventListener("click", () => {

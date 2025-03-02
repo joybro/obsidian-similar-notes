@@ -86,24 +86,11 @@ export default class SimilarNotesPlugin extends Plugin {
             .sort(() => 0.5 - Math.random())
             .slice(0, Math.min(5, allFiles.length));
 
-        // Work to get preview text
         const similarNotes = await Promise.all(
             randomFiles.map(async (f) => {
-                let preview = "";
-                try {
-                    const content = await this.app.vault.read(f);
-                    // Use first 100 characters as preview
-                    preview =
-                        content.slice(0, 100).replace(/\n/g, " ") +
-                        (content.length > 100 ? "..." : "");
-                } catch (e) {
-                    preview = "Preview not available";
-                }
-
                 return {
                     file: f,
                     title: f.basename,
-                    preview: preview,
                     // Dummy similarity score (between 0.6 and 0.95)
                     similarity: 0.6 + Math.random() * 0.35,
                 };

@@ -17,20 +17,17 @@
 .similar-notes-title {
     display: flex;
     align-items: center;
+    color: var(--nav-heading-color);
+    font-weight: var(--nav-heading-weight);
+    font-size: max(var(--font-ui-small), 1em);
 }
 
-.similar-notes-title-text {
-    font-weight: 500;
-}
-
-.similar-notes-collapse-icon {
-    margin-left: 4px;
-    font-size: 10px;
+.similar-notes-title.is-collapsed {
+    color: var(--nav-heading-color-collapsed);
 }
 
 /* Content area */
 .similar-notes-content {
-    padding-left: 10px;
     padding-bottom: 10px;
 }
 
@@ -43,27 +40,7 @@
 
 /* Similar note item */
 .similar-notes-item {
-    padding: 4px 0;
-    cursor: pointer;
-    border-radius: 4px;
-}
-
-.similar-notes-item:hover {
-    background-color: var(--background-modifier-hover);
-}
-
-.similar-notes-item-title {
-    font-weight: 500;
-    color: var(--text-normal);
-}
-
-.similar-notes-item-preview {
-    font-size: var(--font-smallest);
-    color: var(--text-muted);
-    margin-top: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding-left: 0px;
 }
 
 /* Empty state message */
