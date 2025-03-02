@@ -44,26 +44,27 @@ export default class SimilarNotesPlugin extends Plugin {
         }
 
         // Create new view
-        // Find backlinks container (depends on Obsidian's internal structure)
-        const backlinksContainer =
-            leaf.view.containerEl.querySelector(".backlink-pane");
+        // Find embedded backlinks container
+        const embeddedBacklinksContainer = leaf.view.containerEl.querySelector(
+            ".embedded-backlinks"
+        );
 
-        if (backlinksContainer?.parentElement) {
-            // Insert similar notes section before backlinks container
+        if (embeddedBacklinksContainer?.parentElement) {
+            // Insert similar notes section before embedded backlinks container
             const similarNotesView = new SimilarNotesView(
                 this.app,
-                backlinksContainer.parentElement,
+                embeddedBacklinksContainer.parentElement,
                 (file) => this.getSimilarNotes(file)
             );
 
             this.similarNotesViews.set(leaf, similarNotesView);
             await similarNotesView.updateForFile(file);
 
-            // Move similar notes container before backlinks container
+            // Move similar notes container before embedded backlinks container
             const similarNotesContainer = similarNotesView.getContainerEl();
-            backlinksContainer.parentElement.insertBefore(
+            embeddedBacklinksContainer.parentElement.insertBefore(
                 similarNotesContainer,
-                backlinksContainer
+                embeddedBacklinksContainer
             );
         }
     }

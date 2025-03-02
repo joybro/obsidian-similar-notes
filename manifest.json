@@ -4,7 +4,7 @@
     "version": "0.1.0",
     "minAppVersion": "0.15.0",
     "description": "Recommends semantically similar notes to the currently viewed note",
-    "author": "Your Name",
+    "author": "Young Lee",
     "authorUrl": "https://github.com/yourusername",
     "isDesktopOnly": true
 }
