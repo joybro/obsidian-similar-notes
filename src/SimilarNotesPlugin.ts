@@ -1,33 +1,37 @@
-import type { WorkspaceLeaf } from "obsidian";
+import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesView } from "./SimilarNotesView";
 
 export default class SimilarNotesPlugin extends Plugin {
     private similarNotesViews: Map<WorkspaceLeaf, SimilarNotesView> = new Map();
+    private eventRefs: EventRef[] = []; // Use EventRef type instead of any
 
     async onload() {
         console.log("Loading Similar Notes plugin");
 
         // Register event when active leaf changes
-        this.registerEvent(
-            this.app.workspace.on("active-leaf-change", async (leaf) => {
+        const leafChangeRef = this.app.workspace.on(
+            "active-leaf-change",
+            async (leaf) => {
                 if (leaf && leaf.view instanceof MarkdownView) {
                     await this.updateSimilarNotesView(leaf);
                 }
-            })
+            }
         );
+        this.eventRefs.push(leafChangeRef);
+        this.registerEvent(leafChangeRef);
 
         // Register event when current open file changes
-        this.registerEvent(
-            this.app.workspace.on("file-open", async (file) => {
-                if (file && file instanceof TFile) {
-                    const activeLeaf = this.app.workspace.activeLeaf;
-                    if (activeLeaf && activeLeaf.view instanceof MarkdownView) {
-                        await this.updateSimilarNotesView(activeLeaf);
-                    }
+        const fileOpenRef = this.app.workspace.on("file-open", async (file) => {
+            if (file && file instanceof TFile) {
+                const activeLeaf = this.app.workspace.activeLeaf;
+                if (activeLeaf && activeLeaf.view instanceof MarkdownView) {
+                    await this.updateSimilarNotesView(activeLeaf);
                 }
-            })
-        );
+            }
+        });
+        this.eventRefs.push(fileOpenRef);
+        this.registerEvent(fileOpenRef);
     }
 
     // Update Similar Notes view for the active leaf
@@ -115,9 +119,17 @@ export default class SimilarNotesPlugin extends Plugin {
     onunload() {
         console.log("Unloading Similar Notes plugin");
 
+        // Manually unregister events (though this is redundant with this.registerEvent)
+        for (const eventRef of this.eventRefs) {
+            this.app.workspace.offref(eventRef);
+        }
+
         // Clean up all created views
         for (const view of this.similarNotesViews.values()) {
-            view.getContainerEl().remove();
+            const containerEl = view.getContainerEl();
+            if (containerEl?.parentNode) {
+                containerEl.parentNode.removeChild(containerEl);
+            }
             view.unload();
         }
         this.similarNotesViews.clear();
