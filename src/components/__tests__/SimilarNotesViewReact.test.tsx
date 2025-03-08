@@ -1,12 +1,19 @@
-import { jest } from "@jest/globals";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { App, TFile } from "obsidian";
 import React from "react";
+import {
+    type MockedFunction,
+    beforeEach,
+    describe,
+    expect,
+    test,
+    vi,
+} from "vitest";
 import SimilarNotesViewReact from "../SimilarNotesViewReact";
 
-// Jest will automatically use the mock from src/__mocks__/obsidian.ts
-jest.mock("obsidian");
+// Vitest will automatically use the mock from src/__mocks__/obsidian.ts
+vi.mock("obsidian");
 
 // Define the SimilarNote type to match what your component expects
 interface SimilarNote {
@@ -18,15 +25,15 @@ interface SimilarNote {
 describe("SimilarNotesViewReact", () => {
     let mockApp: App;
     let mockCurrentFile: TFile;
-    const mockGetSimilarNotes = jest.fn() as jest.MockedFunction<
+    const mockGetSimilarNotes = vi.fn() as MockedFunction<
         (file: TFile) => Promise<SimilarNote[]>
     >;
 
     beforeEach(() => {
         mockApp = {
             workspace: {
-                getLeaf: jest.fn().mockReturnValue({
-                    openFile: jest.fn(),
+                getLeaf: vi.fn().mockReturnValue({
+                    openFile: vi.fn(),
                 }),
             },
         } as unknown as App;
