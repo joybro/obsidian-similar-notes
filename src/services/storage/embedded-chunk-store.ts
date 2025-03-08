@@ -6,10 +6,8 @@ export interface EmbeddedChunk {
     id: string; // Unique ID (UUID)
     path: string; // Original file path
     title: string; // File title (extracted from filename)
-    contentHash: string; // Hash value of file content
     embedding: number[]; // Embedding vector
     lastUpdated: number; // Last update timestamp
-    fileSize: number; // File size (additional identifier)
     content: string; // Actual embedded text content (full or partial)
     chunkIndex: number; // Chunk index within the same document (when split)
     totalChunks: number; // Total number of chunks (when split)
@@ -21,6 +19,14 @@ export interface SearchResult {
 }
 
 export interface EmbeddedChunkStore {
+    /**
+     * Initialize the store
+     */
+    init(): Promise<void>;
+
+    /**
+     * Clear the store
+     */
     clear(): Promise<void>;
 
     /**
@@ -84,11 +90,7 @@ export interface EmbeddedChunkStore {
     searchSimilar(
         embedding: number[],
         limit: number,
+        minScore?: number,
         excludePaths?: string[]
     ): Promise<SearchResult[]>;
-
-    /**
-     * Get all stored embedded notes
-     */
-    getAll(): Promise<EmbeddedChunk[]>;
 }
