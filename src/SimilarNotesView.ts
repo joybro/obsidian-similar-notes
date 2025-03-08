@@ -1,7 +1,7 @@
 import type { App, TFile } from "obsidian";
 import { Component } from "obsidian";
 import * as React from "react";
-import * as ReactDOM from "react-dom";
+import { type Root, createRoot } from "react-dom/client";
 import SimilarNotesViewReact from "./components/SimilarNotesViewReact";
 
 // Interface for similar note items
@@ -14,6 +14,7 @@ interface SimilarNote {
 export class SimilarNotesView extends Component {
     private containerEl: HTMLElement;
     private currentFile: TFile | null = null;
+    private root: Root;
 
     constructor(
         private app: App,
@@ -24,17 +25,17 @@ export class SimilarNotesView extends Component {
         this.containerEl = parentEl.createDiv({
             cls: "similar-notes-container-wrapper",
         });
+        this.root = createRoot(this.containerEl);
         this.render();
     }
 
     private render(): void {
-        ReactDOM.render(
+        this.root.render(
             React.createElement(SimilarNotesViewReact, {
                 app: this.app,
                 currentFile: this.currentFile,
                 getSimilarNotes: this.getSimilarNotes,
-            }),
-            this.containerEl
+            })
         );
     }
 
@@ -51,6 +52,6 @@ export class SimilarNotesView extends Component {
     }
 
     onunload(): void {
-        ReactDOM.unmountComponentAtNode(this.containerEl);
+        this.root.unmount();
     }
 }
