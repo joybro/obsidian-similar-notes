@@ -1,1 +1,9 @@
+---
+description: Project general rule
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
 - Keep in mind that this project is an Obsidian plugin that will run in an Electron environment.
