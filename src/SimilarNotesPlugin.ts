@@ -1,6 +1,7 @@
 import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesView } from "./SimilarNotesView";
+import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 
 export default class SimilarNotesPlugin extends Plugin {
     private similarNotesViews: Map<WorkspaceLeaf, SimilarNotesView> = new Map();
@@ -8,6 +9,9 @@ export default class SimilarNotesPlugin extends Plugin {
 
     async onload() {
         console.log("Loading Similar Notes plugin");
+
+        // Add settings tab
+        this.addSettingTab(new SimilarNotesSettingTab(this.app, this));
 
         // Register event when active leaf changes
         const leafChangeRef = this.app.workspace.on(
@@ -101,6 +105,19 @@ export default class SimilarNotesPlugin extends Plugin {
         return similarNotes.sort(
             (a, b) => (b.similarity || 0) - (a.similarity || 0)
         );
+    }
+
+    // Handle reindexing of notes
+    async reindexNotes(): Promise<void> {
+        // TODO: Implement actual reindexing logic
+        console.log("Reindexing notes...");
+
+        // Refresh all views after reindexing
+        for (const [leaf, view] of this.similarNotesViews.entries()) {
+            if (leaf.view instanceof MarkdownView && leaf.view.file) {
+                await view.updateForFile(leaf.view.file);
+            }
+        }
     }
 
     onunload() {

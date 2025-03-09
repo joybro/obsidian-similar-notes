@@ -16,5 +16,17 @@ vi.mock("obsidian", () => {
                 this.basename = parts.join(".");
             }
         },
+        PluginSettingTab: class PluginSettingTab {
+            app: any;
+            containerEl: HTMLElement;
+
+            constructor(app: any, plugin: any) {
+                this.app = app;
+                this.containerEl = document.createElement("div");
+            }
+
+            display(): void {}
+            hide(): void {}
+        },
     };
 });

@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EmbeddingModelService } from "../embeddingModelService";
 import type {
     ModelLoadResponse,
