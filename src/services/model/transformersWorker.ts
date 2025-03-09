@@ -1,36 +1,36 @@
 // Types for messages between main thread and worker
-type LoadMessage = {
+export type LoadMessage = {
     type: "load";
     modelId: string;
 };
 
-type CountTokenMessage = {
+export type CountTokenMessage = {
     type: "count_token";
     text: string;
 };
 
-type UnloadMessage = {
+export type UnloadMessage = {
     type: "unload";
 };
 
-type EmbedBatchMessage = {
+export type EmbedBatchMessage = {
     type: "embed_batch";
     texts: string[];
 };
 
-type WorkerMessage =
+export type WorkerMessage =
     | LoadMessage
     | UnloadMessage
     | EmbedBatchMessage
     | CountTokenMessage;
 
-type WorkerResponse = {
+export type WorkerResponse = {
     type: "success" | "error";
     data?: unknown;
     error?: string;
 };
 
-type ModelLoadResponse = {
+export type ModelLoadResponse = {
     message: string;
     vectorSize: number;
     maxTokens: number;
