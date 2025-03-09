@@ -21,6 +21,11 @@ type WorkerResponse = {
     error?: string;
 };
 
+type ModelLoadResponse = {
+    message: string;
+    vectorSize: number;
+};
+
 // Define types for the transformers library
 interface Pipeline {
     (text: string, options: { pooling: string; normalize: boolean }): Promise<
@@ -36,6 +41,7 @@ interface Transformers {
 // Global variables
 let pipeline: Pipeline | null = null;
 let model: unknown | null = null;
+let vectorSize: number | null = null;
 
 // Dynamic import of transformers library
 async function importTransformers(): Promise<Transformers> {
@@ -44,6 +50,7 @@ async function importTransformers(): Promise<Transformers> {
         if (typeof process !== "undefined" && process.versions?.node) {
             const mockPipeline = async (text: string) => new Array(384).fill(0); // Mock embedding size
             mockPipeline.model = {};
+            vectorSize = 384; // Set mock vector size
             return {
                 pipeline: async () => mockPipeline as Pipeline,
             };
@@ -134,10 +141,22 @@ async function handleLoad(message: LoadMessage): Promise<void> {
     );
     model = pipeline.model;
 
-    postMessage({
-        type: "success",
-        data: "Model loaded successfully",
+    // Get vector size by running inference on a test input
+    const testEmbedding = await pipeline("test", {
+        pooling: "mean",
+        normalize: true,
     });
+    vectorSize = testEmbedding.length;
+
+    const response: WorkerResponse = {
+        type: "success",
+        data: {
+            message: "Model loaded successfully",
+            vectorSize,
+        } as ModelLoadResponse,
+    };
+
+    postMessage(response);
 }
 
 async function handleUnload(message: UnloadMessage): Promise<void> {

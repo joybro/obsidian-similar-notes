@@ -36,12 +36,15 @@ describe("TransformersWorker", () => {
         await worker.terminate();
     });
 
-    it("should load the model successfully", async () => {
+    it("should load the model successfully and return vector size", async () => {
         await new Promise<void>((resolve) => {
             worker.on("message", (response) => {
                 expect(response).toEqual({
                     type: "success",
-                    data: "Model loaded successfully",
+                    data: {
+                        message: "Model loaded successfully",
+                        vectorSize: 384, // Mock vector size
+                    },
                 });
                 resolve();
             });
@@ -51,7 +54,7 @@ describe("TransformersWorker", () => {
                 modelId: "sentence-transformers/all-MiniLM-L6-v2",
             });
         });
-    }, 10000); // Increase timeout to 10 seconds
+    });
 
     it("should handle embed_batch after model is loaded", async () => {
         const texts = ["Hello world", "Test sentence"];
@@ -61,6 +64,10 @@ describe("TransformersWorker", () => {
             worker.on("message", (response) => {
                 if (!loadComplete) {
                     loadComplete = true;
+                    expect(response.data).toEqual({
+                        message: "Model loaded successfully",
+                        vectorSize: 384, // Mock vector size
+                    });
                     worker.postMessage({
                         type: "embed_batch",
                         texts,
@@ -69,6 +76,10 @@ describe("TransformersWorker", () => {
                     expect(response.type).toBe("success");
                     expect(Array.isArray(response.data)).toBe(true);
                     expect(response.data.length).toBe(texts.length);
+                    // Verify each embedding has the correct size
+                    for (const embedding of response.data as number[][]) {
+                        expect(embedding.length).toBe(384); // Mock vector size
+                    }
                     resolve();
                 }
             });
