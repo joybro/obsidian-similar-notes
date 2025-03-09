@@ -14,7 +14,7 @@ import type {
     EmbeddedChunk,
     EmbeddedChunkStore,
     SearchResult,
-} from "./embedded-chunk-store";
+} from "./embeddedChunkStore";
 
 type Schema = {
     id: "string";

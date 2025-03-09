@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { TFile, Vault } from "obsidian";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { EmbeddedChunk } from "../embedded-chunk-store";
-import { OramaEmbeddedChunkStore } from "../orama-embedded-chunk-store";
+import type { EmbeddedChunk } from "../embeddedChunkStore";
+import { OramaEmbeddedChunkStore } from "../oramaEmbeddedChunkStore";
 
 // Mock Vault with only the methods we need
 type MockVault = Pick<

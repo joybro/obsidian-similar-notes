@@ -6,4 +6,6 @@ alwaysApply: false
 
 # Your rule content
 
-- Keep in mind that this project is an Obsidian plugin that will run in an Electron environment.
+- Remember that this project is an Obsidian plugin that runs in an Electron environment.
+- Use PascalCase for React component file names (e.g., SimilarNotesView.tsx, RecommendationItem.tsx).
+- Use camelCase for all other file names (e.g., similarNotesUtils.ts, vectorStore.js).
