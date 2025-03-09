@@ -4,6 +4,8 @@ node_modules
 # build
 main.js
 *.js.map
+public
+*.build.js
 
 # obsidian
 data.json

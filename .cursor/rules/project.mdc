@@ -7,5 +7,6 @@ alwaysApply: false
 # Your rule content
 
 - Remember that this project is an Obsidian plugin that runs in an Electron environment.
+- Remember that esbuild is used for bundling and vitest is used for testing.
 - Use PascalCase for React component file names (e.g., SimilarNotesView.tsx, RecommendationItem.tsx).
 - Use camelCase for all other file names (e.g., similarNotesUtils.ts, vectorStore.js).
