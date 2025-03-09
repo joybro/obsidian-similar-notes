@@ -4,6 +4,11 @@ type LoadMessage = {
     modelId: string;
 };
 
+type CountTokenMessage = {
+    type: "count_token";
+    text: string;
+};
+
 type UnloadMessage = {
     type: "unload";
 };
@@ -13,7 +18,11 @@ type EmbedBatchMessage = {
     texts: string[];
 };
 
-type WorkerMessage = LoadMessage | UnloadMessage | EmbedBatchMessage;
+type WorkerMessage =
+    | LoadMessage
+    | UnloadMessage
+    | EmbedBatchMessage
+    | CountTokenMessage;
 
 type WorkerResponse = {
     type: "success" | "error";
@@ -24,6 +33,7 @@ type WorkerResponse = {
 type ModelLoadResponse = {
     message: string;
     vectorSize: number;
+    maxTokens: number;
 };
 
 // Define types for the transformers library
@@ -32,6 +42,12 @@ interface Pipeline {
         number[]
     >;
     model: unknown;
+    tokenizer: {
+        model: {
+            max_position_embeddings?: number;
+        };
+        encode(text: string): { input_ids: number[] };
+    };
 }
 
 interface Transformers {
@@ -42,15 +58,25 @@ interface Transformers {
 let pipeline: Pipeline | null = null;
 let model: unknown | null = null;
 let vectorSize: number | null = null;
+let maxTokens: number | null = null;
 
 // Dynamic import of transformers library
 async function importTransformers(): Promise<Transformers> {
     try {
         // In Node.js environment during testing, return a mock
         if (typeof process !== "undefined" && process.versions?.node) {
-            const mockPipeline = async (text: string) => new Array(384).fill(0); // Mock embedding size
+            const mockPipeline = async (text: string) => new Array(384).fill(0);
             mockPipeline.model = {};
-            vectorSize = 384; // Set mock vector size
+            mockPipeline.tokenizer = {
+                model: {
+                    max_position_embeddings: 512,
+                },
+                encode: (text: string) => ({
+                    input_ids: new Array(Math.ceil(text.length / 4)).fill(0), // Rough mock implementation
+                }),
+            };
+            vectorSize = 384;
+            maxTokens = 512;
             return {
                 pipeline: async () => mockPipeline as Pipeline,
             };
@@ -84,6 +110,9 @@ const setupMessageHandler = () => {
                     break;
                 case "embed_batch":
                     await handleEmbedBatch(message);
+                    break;
+                case "count_token":
+                    await handleCountToken(message);
                     break;
                 default:
                     throw new Error(
@@ -148,11 +177,15 @@ async function handleLoad(message: LoadMessage): Promise<void> {
     });
     vectorSize = testEmbedding.length;
 
+    // Get max tokens from the tokenizer
+    maxTokens = pipeline.tokenizer.model.max_position_embeddings ?? 512;
+
     const response: WorkerResponse = {
         type: "success",
         data: {
             message: "Model loaded successfully",
             vectorSize,
+            maxTokens,
         } as ModelLoadResponse,
     };
 
@@ -188,6 +221,20 @@ async function handleEmbedBatch(message: EmbedBatchMessage): Promise<void> {
     postMessage({
         type: "success",
         data: embeddings,
+    });
+}
+
+// Add new handler for count_token
+async function handleCountToken(message: CountTokenMessage): Promise<void> {
+    if (!pipeline) {
+        throw new Error("Model not loaded");
+    }
+
+    const tokenCount = pipeline.tokenizer.encode(message.text).input_ids.length;
+
+    postMessage({
+        type: "success",
+        data: tokenCount,
     });
 }
 
