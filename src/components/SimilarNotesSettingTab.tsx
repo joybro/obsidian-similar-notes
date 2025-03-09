@@ -21,6 +21,13 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         // Render the React component
         this.root.render(
             <SimilarNotesSetting
+                dbPath={this.plugin.getSettings().dbPath}
+                autoSaveInterval={this.plugin.getSettings().autoSaveInterval}
+                onSettingChange={async (setting, value) => {
+                    await this.plugin.updateSettings({
+                        [setting]: value,
+                    });
+                }}
                 onReindex={async () => {
                     await this.plugin.reindexNotes();
                 }}

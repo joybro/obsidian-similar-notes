@@ -2,13 +2,44 @@ import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
+import type { EmbeddedChunkStore } from "./services/storage/embeddedChunkStore";
+import { OramaEmbeddedChunkStore } from "./services/storage/oramaEmbeddedChunkStore";
+
+// OpenAI embedding dimension
+const VECTOR_SIZE = 1536;
+
+interface SimilarNotesSettings {
+    dbPath: string;
+    autoSaveInterval: number; // in minutes
+}
+
+const DEFAULT_SETTINGS: SimilarNotesSettings = {
+    dbPath: ".obsidian/similar-notes.json",
+    autoSaveInterval: 5,
+};
 
 export default class SimilarNotesPlugin extends Plugin {
     private similarNotesViews: Map<WorkspaceLeaf, SimilarNotesView> = new Map();
-    private eventRefs: EventRef[] = []; // Use EventRef type instead of any
+    private eventRefs: EventRef[] = [];
+    private settings: SimilarNotesSettings;
+    private store: EmbeddedChunkStore;
+    private autoSaveInterval: NodeJS.Timeout;
 
     async onload() {
         console.log("Loading Similar Notes plugin");
+
+        // Load settings
+        this.settings = Object.assign(
+            {},
+            DEFAULT_SETTINGS,
+            await this.loadData()
+        );
+
+        // Initialize store
+        await this.initializeStore();
+
+        // Setup auto-save interval
+        this.setupAutoSave();
 
         // Add settings tab
         this.addSettingTab(new SimilarNotesSettingTab(this.app, this));
@@ -113,15 +144,86 @@ export default class SimilarNotesPlugin extends Plugin {
         console.log("Reindexing notes...");
 
         // Refresh all views after reindexing
-        for (const [leaf, view] of this.similarNotesViews.entries()) {
+        for (const [leaf, view] of Array.from(
+            this.similarNotesViews.entries()
+        )) {
             if (leaf.view instanceof MarkdownView && leaf.view.file) {
                 await view.updateForFile(leaf.view.file);
             }
         }
     }
 
-    onunload() {
+    private async initializeStore() {
+        try {
+            // Create store instance
+            this.store = new OramaEmbeddedChunkStore(
+                this.app.vault,
+                this.settings.dbPath,
+                VECTOR_SIZE
+            );
+
+            // Initialize store
+            await this.store.init();
+
+            // Try to load existing database
+            try {
+                await this.store.load(this.settings.dbPath);
+                console.log(
+                    "Successfully loaded existing database from",
+                    this.settings.dbPath
+                );
+            } catch (e) {
+                console.log(
+                    "No existing database found at",
+                    this.settings.dbPath,
+                    "- starting fresh"
+                );
+            }
+        } catch (e) {
+            console.error("Failed to initialize store:", e);
+            throw e;
+        }
+    }
+
+    private setupAutoSave() {
+        // Clear any existing interval
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+        }
+
+        // Set up new auto-save interval
+        const intervalMs = this.settings.autoSaveInterval * 60 * 1000;
+        this.autoSaveInterval = setInterval(async () => {
+            try {
+                await this.store.save();
+                console.log("Auto-saved database");
+            } catch (e) {
+                console.error("Failed to auto-save database:", e);
+            }
+        }, intervalMs);
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+
+    async onunload() {
         console.log("Unloading Similar Notes plugin");
+
+        // Clear auto-save interval
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+        }
+
+        // Save any pending changes and close store
+        if (this.store) {
+            try {
+                await this.store.save();
+                await this.store.close();
+            } catch (e) {
+                console.error("Error while closing store:", e);
+            }
+        }
 
         // Manually unregister events (though this is redundant with this.registerEvent)
         for (const eventRef of this.eventRefs) {
@@ -129,7 +231,7 @@ export default class SimilarNotesPlugin extends Plugin {
         }
 
         // Clean up all created views
-        for (const view of this.similarNotesViews.values()) {
+        for (const view of Array.from(this.similarNotesViews.values())) {
             const containerEl = view.getContainerEl();
             if (containerEl?.parentNode) {
                 containerEl.parentNode.removeChild(containerEl);
@@ -137,5 +239,22 @@ export default class SimilarNotesPlugin extends Plugin {
             view.unload();
         }
         this.similarNotesViews.clear();
+    }
+
+    // Public methods for settings access
+    getSettings(): SimilarNotesSettings {
+        return { ...this.settings };
+    }
+
+    async updateSettings(
+        updates: Partial<SimilarNotesSettings>
+    ): Promise<void> {
+        this.settings = { ...this.settings, ...updates };
+        await this.saveSettings();
+
+        // If auto-save interval changed, update the interval
+        if (updates.autoSaveInterval !== undefined) {
+            this.setupAutoSave();
+        }
     }
 }
