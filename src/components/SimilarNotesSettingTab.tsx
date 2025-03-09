@@ -1,6 +1,6 @@
 import { type App, PluginSettingTab } from "obsidian";
 import { type Root, createRoot } from "react-dom/client";
-import type SimilarNotesPlugin from "../SimilarNotesPlugin";
+import type SimilarNotesPlugin from "../similarNotesPlugin";
 import SimilarNotesSetting from "./SimilarNotesSetting";
 
 export class SimilarNotesSettingTab extends PluginSettingTab {

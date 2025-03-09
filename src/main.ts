@@ -1,5 +1,5 @@
 import { Plugin } from "obsidian";
-import SimilarNotesPlugin from "./SimilarNotesPlugin";
+import SimilarNotesPlugin from "./similarNotesPlugin";
 
 export default class MainPlugin extends Plugin {
     private similarNotesPlugin: SimilarNotesPlugin;

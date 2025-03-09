@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import type SimilarNotesPlugin from "../../SimilarNotesPlugin";
+import type SimilarNotesPlugin from "../../similarNotesPlugin";
 import { SimilarNotesSettingTab } from "../SimilarNotesSettingTab";
 
 // Mock createRoot from react-dom/client

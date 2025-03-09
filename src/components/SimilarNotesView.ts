@@ -2,7 +2,7 @@ import type { App, TFile } from "obsidian";
 import { Component } from "obsidian";
 import * as React from "react";
 import { type Root, createRoot } from "react-dom/client";
-import SimilarNotesViewReact from "./components/SimilarNotesViewReact";
+import SimilarNotesViewReact from "./SimilarNotesViewReact";
 
 // Interface for similar note items
 interface SimilarNote {

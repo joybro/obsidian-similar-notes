@@ -1,7 +1,7 @@
 import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
-import { SimilarNotesView } from "./SimilarNotesView";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
+import { SimilarNotesView } from "./components/SimilarNotesView";
 
 export default class SimilarNotesPlugin extends Plugin {
     private similarNotesViews: Map<WorkspaceLeaf, SimilarNotesView> = new Map();
