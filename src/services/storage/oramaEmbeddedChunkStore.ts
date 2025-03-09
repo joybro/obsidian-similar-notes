@@ -32,6 +32,7 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
     private vault: Vault;
     private filepath: string;
     private schema: Schema;
+    private hasChanges = false;
 
     constructor(vault: Vault, filepath: string, vectorSize: number) {
         this.vault = vault;
@@ -52,10 +53,12 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
         this.db = await create({
             schema: this.schema,
         });
+        this.hasChanges = false;
     }
 
     async clear(): Promise<void> {
         await this.init();
+        this.hasChanges = true;
     }
 
     async close(): Promise<void> {}
@@ -64,12 +67,16 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
         if (!this.filepath) {
             throw new Error("No filepath specified for saving");
         }
+        if (!this.hasChanges) {
+            return;
+        }
         const JSONIndex = await persist(this.db, "json");
         if (typeof JSONIndex === "string") {
-            this.vault.create(this.filepath, JSONIndex);
+            await this.vault.create(this.filepath, JSONIndex);
         } else {
-            this.vault.createBinary(this.filepath, JSONIndex);
+            await this.vault.createBinary(this.filepath, JSONIndex);
         }
+        this.hasChanges = false;
     }
 
     async load(): Promise<void> {
@@ -80,6 +87,7 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
             }
             const JSONIndex = await this.vault.read(file);
             this.db = await restore("json", JSONIndex);
+            this.hasChanges = false;
         } catch (error) {
             // If loading fails, initialize a new DB
             await this.init();
@@ -88,10 +96,12 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
 
     async add(chunk: EmbeddedChunk): Promise<void> {
         await insert(this.db, chunk as Doc);
+        this.hasChanges = true;
     }
 
     async addMulti(chunks: EmbeddedChunk[]): Promise<void> {
         await insertMultiple(this.db, chunks as Doc[]);
+        this.hasChanges = true;
     }
 
     async update(id: string, updates: Partial<EmbeddedChunk>): Promise<void> {
@@ -127,8 +137,11 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
             (hit) => hit.document.path === path
         );
 
-        for (const hit of filtered) {
-            await remove(this.db, hit.id);
+        if (filtered.length > 0) {
+            for (const hit of filtered) {
+                await remove(this.db, hit.id);
+            }
+            this.hasChanges = true;
         }
     }
 
@@ -140,6 +153,7 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
         });
         if (results.hits.length > 0) {
             await remove(this.db, results.hits[0].id);
+            this.hasChanges = true;
         }
     }
 

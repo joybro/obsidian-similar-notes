@@ -180,4 +180,79 @@ describe("OramaEmbeddedChunkStore", () => {
         const chunks = await store.getByPath("*");
         expect(chunks).toHaveLength(0);
     });
+
+    describe("change tracking", () => {
+        test("should not save when no changes are made", async () => {
+            await store.save();
+            expect(mockVault.create).not.toHaveBeenCalled();
+            expect(mockVault.createBinary).not.toHaveBeenCalled();
+        });
+
+        test("should save when changes are made", async () => {
+            await store.add(testChunk1);
+            await store.save();
+            expect(mockVault.create).toHaveBeenCalledTimes(1);
+        });
+
+        test("should not save again after saving changes", async () => {
+            await store.add(testChunk1);
+            await store.save();
+            vi.clearAllMocks();
+            await store.save();
+            expect(mockVault.create).not.toHaveBeenCalled();
+            expect(mockVault.createBinary).not.toHaveBeenCalled();
+        });
+
+        test("should track changes for all modification operations", async () => {
+            // Test add
+            await store.add(testChunk1);
+            await store.save();
+            expect(mockVault.create).toHaveBeenCalledTimes(1);
+            vi.clearAllMocks();
+
+            // Test addMulti
+            await store.addMulti([testChunk2]);
+            await store.save();
+            expect(mockVault.create).toHaveBeenCalledTimes(1);
+            vi.clearAllMocks();
+
+            // Test removeByPath
+            await store.removeByPath(testChunk1.path);
+            await store.save();
+            expect(mockVault.create).toHaveBeenCalledTimes(1);
+            vi.clearAllMocks();
+
+            // Test removeById
+            await store.removeById(testChunk2.id);
+            await store.save();
+            expect(mockVault.create).toHaveBeenCalledTimes(1);
+            vi.clearAllMocks();
+
+            // Test clear
+            await store.clear();
+            await store.save();
+            expect(mockVault.create).toHaveBeenCalledTimes(1);
+        });
+
+        test("should reset changes flag after loading", async () => {
+            await store.add(testChunk1);
+
+            // Mock the file content for loading
+            const mockFileContent = JSON.stringify({ some: "data" });
+            (
+                mockVault.getFileByPath as ReturnType<typeof vi.fn>
+            ).mockReturnValue({
+                path: testDbPath,
+            } as TFile);
+            (mockVault.read as ReturnType<typeof vi.fn>).mockResolvedValue(
+                mockFileContent
+            );
+
+            await store.load();
+            vi.clearAllMocks();
+            await store.save();
+            expect(mockVault.create).not.toHaveBeenCalled();
+            expect(mockVault.createBinary).not.toHaveBeenCalled();
+        });
+    });
 });
