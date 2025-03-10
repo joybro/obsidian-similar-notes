@@ -3,6 +3,7 @@ import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
 import { JsonFileHashStore } from "./services/jsonFileHashStore";
+import { EmbeddingModelService } from "./services/model/embeddingModelService";
 import { FileChangeQueue } from "./services/obsidianFileChangeQueue";
 import type { EmbeddedChunkStore } from "./services/storage/embeddedChunkStore";
 import { OramaEmbeddedChunkStore } from "./services/storage/oramaEmbeddedChunkStore";
@@ -14,12 +15,14 @@ interface SimilarNotesSettings {
     dbPath: string;
     autoSaveInterval: number; // in minutes
     fileHashStorePath: string;
+    modelId: string; // The model ID to use for embeddings
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
     dbPath: ".obsidian/similar-notes.json",
     autoSaveInterval: 5,
     fileHashStorePath: ".obsidian/similar-notes-file-hashes.json",
+    modelId: "sentence-transformers/all-MiniLM-L6-v2",
 };
 
 export default class MainPlugin extends Plugin {
@@ -30,6 +33,7 @@ export default class MainPlugin extends Plugin {
     private autoSaveInterval: NodeJS.Timeout;
     private fileChangeQueue: FileChangeQueue;
     private fileChangeQueueInterval: NodeJS.Timeout;
+    private modelService: EmbeddingModelService;
 
     async onload() {
         console.log("Loading Similar Notes plugin");
@@ -41,8 +45,21 @@ export default class MainPlugin extends Plugin {
             await this.loadData()
         );
 
+        console.log("==== onload 100");
+
+        // Initialize model service
+        try {
+            this.modelService = new EmbeddingModelService();
+            await this.modelService.loadModel(this.settings.modelId);
+            console.log("Model service initialized successfully");
+        } catch (error) {
+            console.error("Failed to initialize model service:", error);
+        }
+
         // Initialize store
         await this.initializeStore();
+
+        console.log("==== onload 200");
 
         // Setup auto-save interval
         this.setupAutoSave();
@@ -119,6 +136,11 @@ export default class MainPlugin extends Plugin {
         // Clear auto-save interval
         if (this.autoSaveInterval) {
             clearInterval(this.autoSaveInterval);
+        }
+
+        // Dispose of model service
+        if (this.modelService) {
+            this.modelService.dispose();
         }
 
         // Save any pending changes and close store

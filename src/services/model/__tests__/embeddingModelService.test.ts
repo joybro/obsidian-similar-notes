@@ -4,7 +4,7 @@ import type {
     ModelLoadResponse,
     WorkerMessage,
     WorkerResponse,
-} from "../transformersWorker";
+} from "../transformers.worker";
 
 // Mock Worker
 class MockWorker implements Worker {

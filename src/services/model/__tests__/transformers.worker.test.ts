@@ -11,12 +11,12 @@ describe("TransformersWorker", () => {
             const { build } = require("esbuild");
             build({
                 entryPoints: [
-                    path.resolve(__dirname, "../transformersWorker.ts"),
+                    path.resolve(__dirname, "../transformers.worker.ts"),
                 ],
                 bundle: true,
                 outfile: path.resolve(
                     __dirname,
-                    "../transformersWorker.build.js"
+                    "../transformers.worker.build.js"
                 ),
                 format: "cjs",
                 platform: "node",
@@ -28,7 +28,7 @@ describe("TransformersWorker", () => {
 
         // Then create the worker with the built file
         worker = new Worker(
-            path.resolve(__dirname, "../transformersWorker.build.js")
+            path.resolve(__dirname, "../transformers.worker.build.js")
         );
     });
 

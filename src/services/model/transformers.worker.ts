@@ -1,3 +1,9 @@
+import type {
+    FeatureExtractionPipeline,
+    Pipeline,
+    PretrainedOptions,
+} from "@huggingface/transformers";
+
 // Types for messages between main thread and worker
 export type LoadMessage = {
     type: "load";
@@ -36,35 +42,28 @@ export type ModelLoadResponse = {
     maxTokens: number;
 };
 
-// Define types for the transformers library
-interface Pipeline {
-    (text: string, options: { pooling: string; normalize: boolean }): Promise<
-        number[]
-    >;
-    model: unknown;
-    tokenizer: {
-        model: {
-            max_position_embeddings?: number;
-        };
-        encode(text: string): { input_ids: number[] };
-    };
-}
-
 interface Transformers {
-    pipeline(type: string, modelId: string): Promise<Pipeline>;
+    pipeline(
+        type: string,
+        modelId: string,
+        options: PretrainedOptions
+    ): Promise<Pipeline>;
 }
 
 // Global variables
-let pipeline: Pipeline | null = null;
+let extractor: FeatureExtractionPipeline | null = null;
 let model: unknown | null = null;
 let vectorSize: number | null = null;
 let maxTokens: number | null = null;
+
+const isElectron =
+    typeof process !== "undefined" && process.versions?.electron !== undefined;
 
 // Dynamic import of transformers library
 async function importTransformers(): Promise<Transformers> {
     try {
         // In Node.js environment during testing, return a mock
-        if (typeof process !== "undefined" && process.versions?.node) {
+        if (!isElectron) {
             const mockPipeline = async (text: string) => new Array(384).fill(0);
             mockPipeline.model = {};
             mockPipeline.tokenizer = {
@@ -78,16 +77,20 @@ async function importTransformers(): Promise<Transformers> {
             vectorSize = 384;
             maxTokens = 512;
             return {
-                pipeline: async () => mockPipeline as Pipeline,
+                pipeline: async () => mockPipeline as unknown as Pipeline,
             };
         }
 
-        // In browser environment, load the actual library
-        const transformers = (await import(
-            // @ts-expect-error - CDN import will be available at runtime
-            "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3"
-        )) as Transformers;
-        return transformers;
+        // Obsidian's plugin runtime environment(renderer process) has process object
+        // and it makes transformers.js think it's Node.js environment.
+        // So we need to remove it.
+
+        // @ts-ignore
+        // biome-ignore lint:
+        process = undefined;
+
+        // @ts-ignore
+        return await import("@huggingface/transformers");
     } catch (error) {
         throw new Error(
             `Failed to load transformers library: ${
@@ -131,7 +134,7 @@ const setupMessageHandler = () => {
         }
     };
 
-    if (typeof process !== "undefined" && process.versions?.node) {
+    if (!isElectron) {
         // Node.js environment
         try {
             // Using type assertion since we know the module exists in Node.js
@@ -149,7 +152,7 @@ const setupMessageHandler = () => {
 };
 
 function postMessage(response: WorkerResponse): void {
-    if (typeof process !== "undefined" && process.versions?.node) {
+    if (!isElectron) {
         try {
             const nodeWorker =
                 require("node:worker_threads") as typeof import("node:worker_threads");
@@ -164,21 +167,26 @@ function postMessage(response: WorkerResponse): void {
 
 async function handleLoad(message: LoadMessage): Promise<void> {
     const transformers = await importTransformers();
-    pipeline = await transformers.pipeline(
+    extractor = await transformers.pipeline(
         "feature-extraction",
-        message.modelId
+        message.modelId,
+        {
+            // @ts-ignore
+            dtype: "fp32",
+        }
     );
-    model = pipeline.model;
+    model = extractor.model;
 
     // Get vector size by running inference on a test input
-    const testEmbedding = await pipeline("test", {
+    const tensor = await extractor("test", {
         pooling: "mean",
         normalize: true,
     });
-    vectorSize = testEmbedding.length;
+    const testEmbedding = tensor.tolist();
+    vectorSize = testEmbedding[0].length;
 
     // Get max tokens from the tokenizer
-    maxTokens = pipeline.tokenizer.model.max_position_embeddings ?? 512;
+    maxTokens = extractor.tokenizer.model_max_length ?? 512;
 
     const response: WorkerResponse = {
         type: "success",
@@ -196,7 +204,7 @@ async function handleUnload(message: UnloadMessage): Promise<void> {
     if (model) {
         // Clean up model resources
         model = null;
-        pipeline = null;
+        extractor = null;
     }
 
     postMessage({
@@ -206,15 +214,15 @@ async function handleUnload(message: UnloadMessage): Promise<void> {
 }
 
 async function handleEmbedBatch(message: EmbedBatchMessage): Promise<void> {
-    if (!pipeline) {
+    if (!extractor) {
         throw new Error("Model not loaded");
     }
 
     const embeddings = await Promise.all(
         message.texts.map(async (text) => {
             // Ensure pipeline is still available (not unloaded during async operation)
-            if (!pipeline) throw new Error("Model was unloaded");
-            return pipeline(text, { pooling: "mean", normalize: true });
+            if (!extractor) throw new Error("Model was unloaded");
+            return extractor(text, { pooling: "mean", normalize: true });
         })
     );
 
@@ -226,11 +234,12 @@ async function handleEmbedBatch(message: EmbedBatchMessage): Promise<void> {
 
 // Add new handler for count_token
 async function handleCountToken(message: CountTokenMessage): Promise<void> {
-    if (!pipeline) {
+    if (!extractor) {
         throw new Error("Model not loaded");
     }
 
-    const tokenCount = pipeline.tokenizer.encode(message.text).input_ids.length;
+    const tokenCount = extractor.tokenizer.encode(message.text).input_ids
+        .length;
 
     postMessage({
         type: "success",
