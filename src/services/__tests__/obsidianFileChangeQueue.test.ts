@@ -16,6 +16,21 @@ import {
 // Mock Vault with only the methods we need
 type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on">;
 
+class MockHashStore implements FileHashStore {
+    private store: Record<string, string> = {};
+
+    load = () => Promise.resolve(this.store);
+    save = (newStore: Record<string, string>) => {
+        this.store = {
+            ...this.store,
+            ...newStore,
+        };
+        return Promise.resolve();
+    };
+}
+
+const mockHashFunc = (content: string) => Promise.resolve(content);
+
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
     let mockHashStore: FileHashStore;
@@ -82,9 +97,6 @@ describe("FileChangeQueue", () => {
         expect(newState.queue[1].path).toBe("file2.md");
         expect(newState.queue[1].reason).toBe("new");
         expect(newState.queue[1].hash).toBe("content2");
-
-        // Should have saved the new hashes
-        expect(mockHashStore.save).toHaveBeenCalled();
 
         // Should have registered event callbacks
         expect(mockVault.on).toHaveBeenCalledTimes(3);
@@ -227,12 +239,6 @@ describe("FileChangeQueue", () => {
             expect(queueState.queue[0].path).toBe("file3.md");
             expect(queueState.queue[0].reason).toBe("new");
             expect(queueState.queue[0].hash).toBe("new content");
-
-            // Should have updated the file hashes
-            expect(queueState.fileHashes["file3.md"]).toBe("new content");
-
-            // Should have saved the updated hashes
-            expect(mockSave).toHaveBeenCalledWith(queueState.fileHashes);
         });
 
         test("should handle file modification events", async () => {
@@ -254,12 +260,6 @@ describe("FileChangeQueue", () => {
             expect(queueState.queue[0].path).toBe("file1.md");
             expect(queueState.queue[0].reason).toBe("modified");
             expect(queueState.queue[0].hash).toBe("modified content");
-
-            // Should have updated the file hashes
-            expect(queueState.fileHashes["file1.md"]).toBe("modified content");
-
-            // Should have saved the updated hashes
-            expect(mockSave).toHaveBeenCalledWith(queueState.fileHashes);
         });
 
         test("should handle file deletion events", async () => {
@@ -277,12 +277,6 @@ describe("FileChangeQueue", () => {
             expect(queueState.queue).toHaveLength(1);
             expect(queueState.queue[0].path).toBe("file1.md");
             expect(queueState.queue[0].reason).toBe("deleted");
-
-            // Should have removed the file from the hashes
-            expect(queueState.fileHashes["file1.md"]).toBeUndefined();
-
-            // Should have saved the updated hashes
-            expect(mockSave).toHaveBeenCalledWith(queueState.fileHashes);
         });
 
         test("should ignore non-markdown files", async () => {
@@ -419,61 +413,140 @@ describe("FileChangeQueue", () => {
     });
 
     describe("persistence of unprocessed files", () => {
-        test("should keep unprocessed files in queue after reinitialization", async () => {
-            // Mock the hash store load function to return empty hashes initially
-            (
-                mockHashStore.load as ReturnType<typeof vi.fn>
-            ).mockResolvedValueOnce({});
+        let createCallback: (file: TFile) => Promise<void>;
+        let modifyCallback: (file: TFile) => Promise<void>;
+        let deleteCallback: (file: TFile) => Promise<void>;
 
-            // Initialize the queue
-            queueState = await initializeFileChangeQueue(queueState);
+        beforeEach(async () => {
+            // Capture the callbacks when they're registered
+            (mockVault.on as ReturnType<typeof vi.fn>).mockImplementation(
+                (event: string, callback: (file: TFile) => Promise<void>) => {
+                    if (event === "create") createCallback = callback;
+                    if (event === "modify") modifyCallback = callback;
+                    if (event === "delete") deleteCallback = callback;
+                    return () => {};
+                }
+            );
+        });
 
-            // Clear the queue for this test
-            queueState.queue = [];
+        test("should keep unprocessed files in queue after polling", async () => {
+            // Mock the hash store load function to return the current hashes
+            const mockHashStore = new MockHashStore();
+            mockHashStore.save({
+                "file1.md": "content1",
+                "file2.md": "content2",
+            });
+
+            const newContent = "new content";
 
             // Mock the vault read function for the new file
-            const mockRead = vi.fn().mockResolvedValue("new content");
+            const mockRead = vi.fn().mockResolvedValue(newContent);
             (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
                 mockRead
             );
 
-            // Manually add a new file to the queue (simulating a file creation event)
-            const newFileHash = "new content";
-            queueState.fileHashes["file3.md"] = newFileHash;
-            queueState.queue.push({
-                path: "file3.md",
-                reason: "new" as const,
-                hash: newFileHash,
-            });
-
-            // Verify the file was added to the queue
-            expect(queueState.queue).toHaveLength(1);
-            expect(queueState.queue[0].path).toBe("file3.md");
-            expect(queueState.queue[0].reason).toBe("new");
-            expect(queueState.queue[0].hash).toBe("new content");
-
-            // Mock the hash store load function to return the current hashes
-            (
-                mockHashStore.load as ReturnType<typeof vi.fn>
-            ).mockResolvedValueOnce(queueState.fileHashes);
-
-            // Create a new queue state (simulating plugin reload)
-            const newQueueState = createFileChangeQueue({
+            // initialize the queue
+            queueState = createFileChangeQueue({
                 vault: mockVault as unknown as Vault,
                 hashStore: mockHashStore,
-                hashFunc: (content: string) => Promise.resolve(content),
+                hashFunc: mockHashFunc,
             });
+            queueState = await initializeFileChangeQueue(queueState);
 
-            // Initialize the new queue state
-            const reinitializedState = await initializeFileChangeQueue(
-                newQueueState
-            );
+            let result = pollFileChanges(queueState, 5);
+            expect(result.changes).toHaveLength(2);
+            expect(result.changes[0].path).toBe("file1.md");
+            expect(result.changes[0].reason).toBe("modified");
+            expect(result.changes[0].hash).toBe(newContent);
+
+            queueState = result.state;
+
+            // cleanup without marking the file as processed
+            cleanupFileChangeQueue(queueState);
+
+            // initialize the queue again (= plugin reload)
+            queueState = createFileChangeQueue({
+                vault: mockVault as unknown as Vault,
+                hashStore: mockHashStore,
+                hashFunc: mockHashFunc,
+            });
+            queueState = await initializeFileChangeQueue(queueState);
 
             // The file should still be in the queue because it wasn't processed
-            expect(reinitializedState.queue).toHaveLength(1);
-            expect(reinitializedState.queue[0].path).toBe("file3.md");
-            expect(reinitializedState.queue[0].reason).toBe("new");
-            expect(reinitializedState.queue[0].hash).toBe("new content");
+            result = pollFileChanges(queueState, 5);
+            expect(result.changes).toHaveLength(2);
+            expect(result.changes[0].path).toBe("file1.md");
+            expect(result.changes[0].reason).toBe("modified");
+            expect(result.changes[0].hash).toBe(newContent);
+        });
+
+        test("should keep unprocessed files in queue after modify callback", async () => {
+            // Mock the hash store load function to return the current hashes
+            const mockHashStore = new MockHashStore();
+            mockHashStore.save({
+                "file1.md": "content1",
+                "file2.md": "content2",
+            });
+
+            const newContent = "new content";
+
+            // Mock the vault read function for the new file
+            let mockRead: (file: TFile) => string = (file: TFile) => {
+                if (file.path === "file1.md") return "content1";
+                if (file.path === "file2.md") return "content2";
+                return "";
+            };
+            (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
+                mockRead
+            );
+
+            // initialize the queue
+            queueState = createFileChangeQueue({
+                vault: mockVault as unknown as Vault,
+                hashStore: mockHashStore,
+                hashFunc: mockHashFunc,
+            });
+            queueState = await initializeFileChangeQueue(queueState);
+
+            let result = pollFileChanges(queueState, 5);
+            expect(result.changes).toHaveLength(0);
+
+            // emit modify event
+            mockRead = (file: TFile) => {
+                if (file.path === "file1.md") return newContent;
+                if (file.path === "file2.md") return "content2";
+                return "";
+            };
+            (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
+                mockRead
+            );
+            await modifyCallback(testFile1);
+
+            result = pollFileChanges(queueState, 5);
+            expect(result.changes).toHaveLength(1);
+            expect(result.changes[0].path).toBe("file1.md");
+            expect(result.changes[0].reason).toBe("modified");
+            expect(result.changes[0].hash).toBe(newContent);
+
+            queueState = result.state;
+
+            // cleanup without marking the file as processed
+            cleanupFileChangeQueue(queueState);
+
+            // initialize the queue again (= plugin reload)
+            queueState = createFileChangeQueue({
+                vault: mockVault as unknown as Vault,
+                hashStore: mockHashStore,
+                hashFunc: mockHashFunc,
+            });
+            queueState = await initializeFileChangeQueue(queueState);
+
+            // The file should still be in the queue because it wasn't processed
+            result = pollFileChanges(queueState, 5);
+            expect(result.changes).toHaveLength(1);
+            expect(result.changes[0].path).toBe("file1.md");
+            expect(result.changes[0].reason).toBe("modified");
+            expect(result.changes[0].hash).toBe(newContent);
         });
     });
 });

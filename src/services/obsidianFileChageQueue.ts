@@ -105,9 +105,6 @@ export const initializeFileChangeQueue = async (
         }
     }
 
-    // Save current hashes
-    await hashStore.save(currentHashes);
-
     // Update state in place
     state.queue = newQueue;
     state.fileHashes = currentHashes;
@@ -143,14 +140,8 @@ const registerFileChangeCallbacks = (
             const hashFunc = state.options.hashFunc ?? calculateFileHash;
             const hash = await hashFunc(content);
 
-            // Update file hashes
-            state.fileHashes[file.path] = hash;
-
             // Add to queue with hash
             state.queue.push({ path: file.path, reason: "new" as const, hash });
-
-            // Save updated hashes
-            await state.options.hashStore.save(state.fileHashes);
         }
     });
     eventRefs.push(createRef);
@@ -162,18 +153,12 @@ const registerFileChangeCallbacks = (
             const hashFunc = state.options.hashFunc ?? calculateFileHash;
             const hash = await hashFunc(content);
 
-            // Update file hashes
-            state.fileHashes[file.path] = hash;
-
             // Add to queue with hash
             state.queue.push({
                 path: file.path,
                 reason: "modified" as const,
                 hash,
             });
-
-            // Save updated hashes
-            await state.options.hashStore.save(state.fileHashes);
         }
     });
     eventRefs.push(modifyRef);
@@ -181,9 +166,6 @@ const registerFileChangeCallbacks = (
     // Register callback for file deletion
     const deleteRef = vault.on("delete", (file: TFile) => {
         if (file.extension === "md") {
-            // Remove from file hashes
-            delete state.fileHashes[file.path];
-
             // Add to queue (no hash for deleted files)
             state.queue.push({ path: file.path, reason: "deleted" as const });
 
