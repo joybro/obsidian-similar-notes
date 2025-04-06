@@ -107,20 +107,21 @@ export const initializeFileChangeQueue = async (
     // Save current hashes
     await hashStore.save(currentHashes);
 
-    // Register file change event callbacks
-    const newState = {
-        ...state,
-        queue: newQueue,
-        fileHashes: currentHashes,
-    };
+    // Update state in place
+    state.queue = newQueue;
+    state.fileHashes = currentHashes;
 
-    return registerFileChangeCallbacks(newState);
+    // Register file change event callbacks
+    const { eventRefs } = registerFileChangeCallbacks(state);
+    state.eventRefs = eventRefs;
+
+    return state;
 };
 
 /**
  * Registers callbacks for file change events in the Vault
  */
-export const registerFileChangeCallbacks = (
+const registerFileChangeCallbacks = (
     state: FileChangeQueueState
 ): FileChangeQueueState => {
     const { vault } = state.options;
@@ -145,7 +146,7 @@ export const registerFileChangeCallbacks = (
             state.fileHashes[file.path] = hash;
 
             // Add to queue
-            state.queue.push({ path: file.path, reason: "new" });
+            state.queue.push({ path: file.path, reason: "new" as const });
 
             // Save updated hashes
             await state.options.hashStore.save(state.fileHashes);
@@ -164,7 +165,7 @@ export const registerFileChangeCallbacks = (
             state.fileHashes[file.path] = hash;
 
             // Add to queue
-            state.queue.push({ path: file.path, reason: "modified" });
+            state.queue.push({ path: file.path, reason: "modified" as const });
 
             // Save updated hashes
             await state.options.hashStore.save(state.fileHashes);
@@ -179,7 +180,7 @@ export const registerFileChangeCallbacks = (
             delete state.fileHashes[file.path];
 
             // Add to queue
-            state.queue.push({ path: file.path, reason: "deleted" });
+            state.queue.push({ path: file.path, reason: "deleted" as const });
 
             // Save updated hashes
             state.options.hashStore.save(state.fileHashes);
@@ -196,7 +197,7 @@ export const registerFileChangeCallbacks = (
 /**
  * Unregisters all file change callbacks
  */
-export const unregisterFileChangeCallbacks = (
+const unregisterFileChangeCallbacks = (
     state: FileChangeQueueState
 ): FileChangeQueueState => {
     // Clear all event refs
@@ -210,6 +211,16 @@ export const unregisterFileChangeCallbacks = (
         ...state,
         eventRefs: [],
     };
+};
+
+/**
+ * Cleans up the file change queue by unregistering all callbacks
+ * This should be called when the queue is no longer needed
+ */
+export const cleanupFileChangeQueue = (
+    state: FileChangeQueueState
+): FileChangeQueueState => {
+    return unregisterFileChangeCallbacks(state);
 };
 
 /**

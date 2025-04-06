@@ -4,13 +4,12 @@ import {
     type FileChangeQueueState,
     type FileHashStore,
     calculateFileHash,
+    cleanupFileChangeQueue,
     createFileChangeQueue,
     enqueueAllFiles,
     getFileChangeCount,
     initializeFileChangeQueue,
     pollFileChanges,
-    registerFileChangeCallbacks,
-    unregisterFileChangeCallbacks,
 } from "../obsidianFileChageQueue";
 
 // Mock Vault with only the methods we need
@@ -180,14 +179,14 @@ describe("FileChangeQueue", () => {
     });
 
     describe("file change event callbacks", () => {
-        let createCallback: (file: TFile) => void;
-        let modifyCallback: (file: TFile) => void;
-        let deleteCallback: (file: TFile) => void;
+        let createCallback: (file: TFile) => Promise<void>;
+        let modifyCallback: (file: TFile) => Promise<void>;
+        let deleteCallback: (file: TFile) => Promise<void>;
 
-        beforeEach(() => {
+        beforeEach(async () => {
             // Capture the callbacks when they're registered
             (mockVault.on as ReturnType<typeof vi.fn>).mockImplementation(
-                (event: string, callback: (file: TFile) => void) => {
+                (event: string, callback: (file: TFile) => Promise<void>) => {
                     if (event === "create") createCallback = callback;
                     if (event === "modify") modifyCallback = callback;
                     if (event === "delete") deleteCallback = callback;
@@ -196,7 +195,10 @@ describe("FileChangeQueue", () => {
             );
 
             // Initialize the queue to register the callbacks
-            queueState = registerFileChangeCallbacks(queueState);
+            queueState = await initializeFileChangeQueue(queueState);
+
+            // Clear the queue for each test
+            queueState.queue = [];
         });
 
         test("should handle file creation events", async () => {
@@ -284,7 +286,7 @@ describe("FileChangeQueue", () => {
             expect(queueState.queue).toHaveLength(0);
         });
 
-        test("should unregister callbacks", () => {
+        test("should unregister callbacks on cleanup", async () => {
             // Mock the unregister functions
             const unregisterCreate = vi.fn();
             const unregisterModify = vi.fn();
@@ -297,8 +299,8 @@ describe("FileChangeQueue", () => {
                 unregisterDelete,
             ];
 
-            // Unregister the callbacks
-            const newState = unregisterFileChangeCallbacks(queueState);
+            // Clean up the queue
+            const newState = cleanupFileChangeQueue(queueState);
 
             // Should have called all unregister functions
             expect(unregisterCreate).toHaveBeenCalled();
