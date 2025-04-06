@@ -262,6 +262,40 @@ describe("FileChangeQueue", () => {
             expect(queueState.queue[0].hash).toBe("modified content");
         });
 
+        test("should handle multiple modify events for the same file", async () => {
+            // Mock the hash store save function
+            const mockSave = vi.fn().mockResolvedValue(undefined);
+            queueState.options.hashStore.save = mockSave;
+
+            // Mock the vault read function 1
+            (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
+                (file: TFile) => {
+                    if (file.path === "file1.md") return "modified content 1";
+                    return "";
+                }
+            );
+
+            // Simulate a file modification event
+            await modifyCallback(testFile1);
+
+            // Mock the vault read function 2
+            (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
+                (file: TFile) => {
+                    if (file.path === "file1.md") return "modified content 2";
+                    return "";
+                }
+            );
+
+            // Simulate a file modification event
+            await modifyCallback(testFile1);
+
+            // Should have added the file to the queue
+            expect(queueState.queue).toHaveLength(1);
+            expect(queueState.queue[0].path).toBe("file1.md");
+            expect(queueState.queue[0].reason).toBe("modified");
+            expect(queueState.queue[0].hash).toBe("modified content 2");
+        });
+
         test("should handle file deletion events", async () => {
             // Mock the hash store save function
             const mockSave = vi.fn().mockResolvedValue(undefined);

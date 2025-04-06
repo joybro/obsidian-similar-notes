@@ -153,6 +153,11 @@ const registerFileChangeCallbacks = (
             const hashFunc = state.options.hashFunc ?? calculateFileHash;
             const hash = await hashFunc(content);
 
+            // Remove the file from the queue if it exists
+            state.queue = state.queue.filter(
+                (change) => change.path !== file.path
+            );
+
             // Add to queue with hash
             state.queue.push({
                 path: file.path,
