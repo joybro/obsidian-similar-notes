@@ -266,16 +266,21 @@ export const getFileChangeCount = (state: FileChangeQueueState): number => {
 };
 
 /**
- * Helper function to calculate a hash for a file's content
+ * Helper function to calculate a SHA-256 hash for a file's content
  */
-const calculateFileHash = async (content: string): Promise<string> => {
-    // Simple hash function for demonstration
-    // In a real implementation, you might want to use a more robust hashing algorithm
-    let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-        const char = content.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return hash.toString(16);
+export const calculateFileHash = async (content: string): Promise<string> => {
+    // Convert the string to a Uint8Array
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+
+    // Calculate SHA-256 hash
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+
+    // Convert the hash to a hex string
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+    return hashHex;
 };

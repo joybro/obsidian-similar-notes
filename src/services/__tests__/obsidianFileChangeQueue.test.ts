@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
     type FileChangeQueueState,
     type FileHashStore,
+    calculateFileHash,
     createFileChangeQueue,
     enqueueAllFiles,
     getFileChangeCount,
@@ -306,6 +307,27 @@ describe("FileChangeQueue", () => {
 
             // Should have cleared the event refs
             expect(newState.eventRefs).toHaveLength(0);
+        });
+    });
+
+    describe("hash function", () => {
+        test("should produce consistent SHA-256 hashes", async () => {
+            const content = "test content";
+            const hash1 = await calculateFileHash(content);
+            const hash2 = await calculateFileHash(content);
+
+            // Hashes should be consistent
+            expect(hash1).toBe(hash2);
+
+            // Hash should be 64 characters (32 bytes in hex)
+            expect(hash1).toHaveLength(64);
+
+            // Different content should produce different hashes
+            const differentHash = await calculateFileHash("different content");
+            expect(hash1).not.toBe(differentHash);
+
+            // Hash should be hexadecimal
+            expect(hash1).toMatch(/^[0-9a-f]{64}$/);
         });
     });
 });
