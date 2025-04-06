@@ -8,19 +8,22 @@ import {
     getFileChangeCount,
     initializeFileChangeQueue,
     pollFileChanges,
+    registerFileChangeCallbacks,
+    unregisterFileChangeCallbacks,
 } from "../obsidianFileChageQueue";
 
 // Mock Vault with only the methods we need
-type MockVault = Pick<Vault, "getMarkdownFiles" | "read">;
+type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on">;
 
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
     let mockHashStore: FileHashStore;
     let queueState: FileChangeQueueState;
 
-    const testFile1 = { path: "file1.md" } as TFile;
-    const testFile2 = { path: "file2.md" } as TFile;
-    const testFile3 = { path: "file3.md" } as TFile;
+    const testFile1 = { path: "file1.md", extension: "md" } as TFile;
+    const testFile2 = { path: "file2.md", extension: "md" } as TFile;
+    const testFile3 = { path: "file3.md", extension: "md" } as TFile;
+    const nonMarkdownFile = { path: "image.png", extension: "png" } as TFile;
 
     beforeEach(() => {
         // Reset mocks
@@ -30,6 +33,10 @@ describe("FileChangeQueue", () => {
                 if (file.path === "file1.md") return "content1";
                 if (file.path === "file2.md") return "content2";
                 return "";
+            }),
+            on: vi.fn().mockImplementation((event, callback) => {
+                // Return a function that can be called to unregister the event
+                return () => {};
             }),
         };
 
@@ -55,6 +62,7 @@ describe("FileChangeQueue", () => {
         expect(queueState.fileHashes).toEqual({});
         expect(queueState.options.vault).toBe(mockVault);
         expect(queueState.options.hashStore).toBe(mockHashStore);
+        expect(queueState.eventRefs).toHaveLength(0);
     });
 
     test("should initialize queue with new files", async () => {
@@ -74,6 +82,21 @@ describe("FileChangeQueue", () => {
 
         // Should have saved the new hashes
         expect(mockHashStore.save).toHaveBeenCalled();
+
+        // Should have registered event callbacks
+        expect(mockVault.on).toHaveBeenCalledTimes(3);
+        expect(mockVault.on).toHaveBeenCalledWith(
+            "create",
+            expect.any(Function)
+        );
+        expect(mockVault.on).toHaveBeenCalledWith(
+            "modify",
+            expect.any(Function)
+        );
+        expect(mockVault.on).toHaveBeenCalledWith(
+            "delete",
+            expect.any(Function)
+        );
     });
 
     test("should detect modified files", async () => {
@@ -153,5 +176,136 @@ describe("FileChangeQueue", () => {
 
         // Should have 3 changes
         expect(count).toBe(3);
+    });
+
+    describe("file change event callbacks", () => {
+        let createCallback: (file: TFile) => void;
+        let modifyCallback: (file: TFile) => void;
+        let deleteCallback: (file: TFile) => void;
+
+        beforeEach(() => {
+            // Capture the callbacks when they're registered
+            (mockVault.on as ReturnType<typeof vi.fn>).mockImplementation(
+                (event: string, callback: (file: TFile) => void) => {
+                    if (event === "create") createCallback = callback;
+                    if (event === "modify") modifyCallback = callback;
+                    if (event === "delete") deleteCallback = callback;
+                    return () => {};
+                }
+            );
+
+            // Initialize the queue to register the callbacks
+            queueState = registerFileChangeCallbacks(queueState);
+        });
+
+        test("should handle file creation events", async () => {
+            // Mock the hash store save function
+            const mockSave = vi.fn().mockResolvedValue(undefined);
+            queueState.options.hashStore.save = mockSave;
+
+            // Mock the vault read function
+            const mockRead = vi.fn().mockResolvedValue("new content");
+            (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
+                mockRead
+            );
+
+            // Simulate a file creation event
+            await createCallback(testFile3);
+
+            // Should have added the file to the queue
+            expect(queueState.queue).toHaveLength(1);
+            expect(queueState.queue[0].path).toBe("file3.md");
+            expect(queueState.queue[0].reason).toBe("new");
+
+            // Should have updated the file hashes
+            expect(queueState.fileHashes["file3.md"]).toBe("new content");
+
+            // Should have saved the updated hashes
+            expect(mockSave).toHaveBeenCalledWith(queueState.fileHashes);
+        });
+
+        test("should handle file modification events", async () => {
+            // Mock the hash store save function
+            const mockSave = vi.fn().mockResolvedValue(undefined);
+            queueState.options.hashStore.save = mockSave;
+
+            // Mock the vault read function
+            const mockRead = vi.fn().mockResolvedValue("modified content");
+            (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
+                mockRead
+            );
+
+            // Simulate a file modification event
+            await modifyCallback(testFile1);
+
+            // Should have added the file to the queue
+            expect(queueState.queue).toHaveLength(1);
+            expect(queueState.queue[0].path).toBe("file1.md");
+            expect(queueState.queue[0].reason).toBe("modified");
+
+            // Should have updated the file hashes
+            expect(queueState.fileHashes["file1.md"]).toBe("modified content");
+
+            // Should have saved the updated hashes
+            expect(mockSave).toHaveBeenCalledWith(queueState.fileHashes);
+        });
+
+        test("should handle file deletion events", async () => {
+            // Mock the hash store save function
+            const mockSave = vi.fn().mockResolvedValue(undefined);
+            queueState.options.hashStore.save = mockSave;
+
+            // Add the file to the hashes first
+            queueState.fileHashes["file1.md"] = "content1";
+
+            // Simulate a file deletion event
+            await deleteCallback(testFile1);
+
+            // Should have added the file to the queue
+            expect(queueState.queue).toHaveLength(1);
+            expect(queueState.queue[0].path).toBe("file1.md");
+            expect(queueState.queue[0].reason).toBe("deleted");
+
+            // Should have removed the file from the hashes
+            expect(queueState.fileHashes["file1.md"]).toBeUndefined();
+
+            // Should have saved the updated hashes
+            expect(mockSave).toHaveBeenCalledWith(queueState.fileHashes);
+        });
+
+        test("should ignore non-markdown files", async () => {
+            // Simulate events for a non-markdown file
+            await createCallback(nonMarkdownFile);
+            await modifyCallback(nonMarkdownFile);
+            await deleteCallback(nonMarkdownFile);
+
+            // Should not have added anything to the queue
+            expect(queueState.queue).toHaveLength(0);
+        });
+
+        test("should unregister callbacks", () => {
+            // Mock the unregister functions
+            const unregisterCreate = vi.fn();
+            const unregisterModify = vi.fn();
+            const unregisterDelete = vi.fn();
+
+            // Set up the event refs
+            queueState.eventRefs = [
+                unregisterCreate,
+                unregisterModify,
+                unregisterDelete,
+            ];
+
+            // Unregister the callbacks
+            const newState = unregisterFileChangeCallbacks(queueState);
+
+            // Should have called all unregister functions
+            expect(unregisterCreate).toHaveBeenCalled();
+            expect(unregisterModify).toHaveBeenCalled();
+            expect(unregisterDelete).toHaveBeenCalled();
+
+            // Should have cleared the event refs
+            expect(newState.eventRefs).toHaveLength(0);
+        });
     });
 });

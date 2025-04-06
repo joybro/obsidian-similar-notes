@@ -1,4 +1,4 @@
-import type { Vault } from "obsidian";
+import type { EventRef, TFile, Vault } from "obsidian";
 
 export type FileChange = {
     path: string;
@@ -42,6 +42,11 @@ export type FileChangeQueueState = {
      * Options for the queue
      */
     options: FileChangeQueueOptions;
+
+    /**
+     * Event references for cleanup
+     */
+    eventRefs: EventRef[];
 };
 
 /**
@@ -54,6 +59,7 @@ export const createFileChangeQueue = (
         queue: [],
         fileHashes: {},
         options,
+        eventRefs: [],
     };
 };
 
@@ -101,10 +107,108 @@ export const initializeFileChangeQueue = async (
     // Save current hashes
     await hashStore.save(currentHashes);
 
-    return {
+    // Register file change event callbacks
+    const newState = {
         ...state,
         queue: newQueue,
         fileHashes: currentHashes,
+    };
+
+    return registerFileChangeCallbacks(newState);
+};
+
+/**
+ * Registers callbacks for file change events in the Vault
+ */
+export const registerFileChangeCallbacks = (
+    state: FileChangeQueueState
+): FileChangeQueueState => {
+    const { vault } = state.options;
+
+    // Clear any existing event refs
+    for (const ref of state.eventRefs) {
+        if (typeof ref === "function") {
+            ref();
+        }
+    }
+
+    const eventRefs: EventRef[] = [];
+
+    // Register callback for file creation
+    const createRef = vault.on("create", async (file: TFile) => {
+        if (file.extension === "md") {
+            const content = await vault.read(file);
+            const hashFunc = state.options.hashFunc ?? calculateFileHash;
+            const hash = await hashFunc(content);
+
+            // Update file hashes
+            state.fileHashes[file.path] = hash;
+
+            // Add to queue
+            state.queue.push({ path: file.path, reason: "new" });
+
+            // Save updated hashes
+            await state.options.hashStore.save(state.fileHashes);
+        }
+    });
+    eventRefs.push(createRef);
+
+    // Register callback for file modification
+    const modifyRef = vault.on("modify", async (file: TFile) => {
+        if (file.extension === "md") {
+            const content = await vault.read(file);
+            const hashFunc = state.options.hashFunc ?? calculateFileHash;
+            const hash = await hashFunc(content);
+
+            // Update file hashes
+            state.fileHashes[file.path] = hash;
+
+            // Add to queue
+            state.queue.push({ path: file.path, reason: "modified" });
+
+            // Save updated hashes
+            await state.options.hashStore.save(state.fileHashes);
+        }
+    });
+    eventRefs.push(modifyRef);
+
+    // Register callback for file deletion
+    const deleteRef = vault.on("delete", (file: TFile) => {
+        if (file.extension === "md") {
+            // Remove from file hashes
+            delete state.fileHashes[file.path];
+
+            // Add to queue
+            state.queue.push({ path: file.path, reason: "deleted" });
+
+            // Save updated hashes
+            state.options.hashStore.save(state.fileHashes);
+        }
+    });
+    eventRefs.push(deleteRef);
+
+    return {
+        ...state,
+        eventRefs,
+    };
+};
+
+/**
+ * Unregisters all file change callbacks
+ */
+export const unregisterFileChangeCallbacks = (
+    state: FileChangeQueueState
+): FileChangeQueueState => {
+    // Clear all event refs
+    for (const ref of state.eventRefs) {
+        if (typeof ref === "function") {
+            ref();
+        }
+    }
+
+    return {
+        ...state,
+        eventRefs: [],
     };
 };
 
