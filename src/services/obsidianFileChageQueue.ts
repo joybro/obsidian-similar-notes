@@ -3,6 +3,7 @@ import type { EventRef, TFile, Vault } from "obsidian";
 export type FileChange = {
     path: string;
     reason: "new" | "modified" | "deleted";
+    hash?: string;
 };
 
 export type FileHashStore = {
@@ -91,9 +92,9 @@ export const initializeFileChangeQueue = async (
 
         // Check if file is new or modified
         if (!previousHashes[file.path]) {
-            newQueue.push({ path: file.path, reason: "new" });
+            newQueue.push({ path: file.path, reason: "new", hash });
         } else if (previousHashes[file.path] !== hash) {
-            newQueue.push({ path: file.path, reason: "modified" });
+            newQueue.push({ path: file.path, reason: "modified", hash });
         }
     }
 
@@ -145,8 +146,8 @@ const registerFileChangeCallbacks = (
             // Update file hashes
             state.fileHashes[file.path] = hash;
 
-            // Add to queue
-            state.queue.push({ path: file.path, reason: "new" as const });
+            // Add to queue with hash
+            state.queue.push({ path: file.path, reason: "new" as const, hash });
 
             // Save updated hashes
             await state.options.hashStore.save(state.fileHashes);
@@ -164,8 +165,12 @@ const registerFileChangeCallbacks = (
             // Update file hashes
             state.fileHashes[file.path] = hash;
 
-            // Add to queue
-            state.queue.push({ path: file.path, reason: "modified" as const });
+            // Add to queue with hash
+            state.queue.push({
+                path: file.path,
+                reason: "modified" as const,
+                hash,
+            });
 
             // Save updated hashes
             await state.options.hashStore.save(state.fileHashes);
@@ -179,7 +184,7 @@ const registerFileChangeCallbacks = (
             // Remove from file hashes
             delete state.fileHashes[file.path];
 
-            // Add to queue
+            // Add to queue (no hash for deleted files)
             state.queue.push({ path: file.path, reason: "deleted" as const });
 
             // Save updated hashes
@@ -234,11 +239,23 @@ export const enqueueAllFiles = async (
     // Get all markdown files in the vault
     const files = vault.getMarkdownFiles();
 
-    // Add all files to the queue
-    const newQueue: FileChange[] = files.map((file) => ({
-        path: file.path,
-        reason: "modified",
-    }));
+    // Add all files to the queue with their current hashes
+    const newQueue: FileChange[] = [];
+
+    for (const file of files) {
+        const content = await vault.read(file);
+        const hashFunc = state.options.hashFunc ?? calculateFileHash;
+        const hash = await hashFunc(content);
+
+        // Update file hashes
+        state.fileHashes[file.path] = hash;
+
+        newQueue.push({
+            path: file.path,
+            reason: "modified",
+            hash,
+        });
+    }
 
     return {
         ...state,
@@ -249,6 +266,10 @@ export const enqueueAllFiles = async (
 /**
  * Polls up to maxCount items from the queue
  * Items removed from the queue are considered processed
+ *
+ * Note: After processing each change, you should call markFileChangeProcessed
+ * to ensure the hash store is updated, preventing reprocessing if the application
+ * restarts before the hash store is updated.
  */
 export const pollFileChanges = (
     state: FileChangeQueueState,
@@ -294,4 +315,23 @@ export const calculateFileHash = async (content: string): Promise<string> => {
         .join("");
 
     return hashHex;
+};
+
+/**
+ * Marks a file change as processed by updating the hash store
+ * This should be called after processing a file change to ensure it's not reprocessed
+ * if the application restarts before the hash store is updated
+ */
+export const markFileChangeProcessed = async (
+    state: FileChangeQueueState,
+    change: FileChange
+): Promise<FileChangeQueueState> => {
+    // Only update hash for new or modified files, not deleted ones
+    if (change.reason !== "deleted" && change.hash) {
+        // Update the hash store with the processed hash
+        state.fileHashes[change.path] = change.hash;
+        await state.options.hashStore.save(state.fileHashes);
+    }
+
+    return state;
 };
