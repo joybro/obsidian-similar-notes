@@ -1,6 +1,9 @@
 import type { TFile, Vault } from "obsidian";
-import { beforeEach, describe, expect, test, vi } from "vitest";
-import { FileChangeQueue, type FileHashStore } from "../obsidianFileChageQueue";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import {
+    FileChangeQueue,
+    type FileHashStore,
+} from "../obsidianFileChangeQueue";
 
 // Mock Vault with only the methods we need
 type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on">;
@@ -59,6 +62,7 @@ describe("FileChangeQueue", () => {
             vault: mockVault as unknown as Vault,
             hashStore: mockHashStore,
             hashFunc: (content: string) => Promise.resolve(content),
+            hashStoreUpdateInterval: 0,
         });
     });
 
@@ -432,6 +436,7 @@ describe("FileChangeQueue", () => {
                 vault: mockVault as unknown as Vault,
                 hashStore: mockHashStore,
                 hashFunc: mockHashFunc,
+                hashStoreUpdateInterval: 0,
             });
             await fileChangeQueue.initialize();
 
@@ -449,6 +454,7 @@ describe("FileChangeQueue", () => {
                 vault: mockVault as unknown as Vault,
                 hashStore: mockHashStore,
                 hashFunc: mockHashFunc,
+                hashStoreUpdateInterval: 0,
             });
             await fileChangeQueue.initialize();
 
@@ -485,6 +491,7 @@ describe("FileChangeQueue", () => {
                 vault: mockVault as unknown as Vault,
                 hashStore: mockHashStore,
                 hashFunc: mockHashFunc,
+                hashStoreUpdateInterval: 0,
             });
             await fileChangeQueue.initialize();
 
@@ -516,6 +523,7 @@ describe("FileChangeQueue", () => {
                 vault: mockVault as unknown as Vault,
                 hashStore: mockHashStore,
                 hashFunc: mockHashFunc,
+                hashStoreUpdateInterval: 0,
             });
             await fileChangeQueue.initialize();
 
@@ -525,6 +533,143 @@ describe("FileChangeQueue", () => {
             expect(changes[0].path).toBe("file1.md");
             expect(changes[0].reason).toBe("modified");
             expect(changes[0].hash).toBe(newContent);
+        });
+    });
+
+    describe("hash store update batching", () => {
+        let mockSave: ReturnType<typeof vi.fn>;
+
+        beforeEach(() => {
+            vi.useFakeTimers();
+            mockSave = vi.fn().mockResolvedValue(undefined);
+            mockHashStore = {
+                load: vi.fn().mockResolvedValue({}),
+                save: mockSave,
+            };
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        test("should batch updates when interval is positive", async () => {
+            const updateInterval = 1000;
+            fileChangeQueue = new FileChangeQueue({
+                vault: mockVault as unknown as Vault,
+                hashStore: mockHashStore,
+                hashStoreUpdateInterval: updateInterval,
+                hashFunc: mockHashFunc,
+            });
+
+            await fileChangeQueue.initialize();
+            await fileChangeQueue.markFileChangeProcessed({
+                path: "file1.md",
+                reason: "modified",
+                hash: "hash1",
+            });
+            await fileChangeQueue.markFileChangeProcessed({
+                path: "file2.md",
+                reason: "modified",
+                hash: "hash2",
+            });
+
+            // No immediate save
+            expect(mockSave).toHaveBeenCalledTimes(0);
+
+            // Advance timer
+            await vi.advanceTimersByTimeAsync(updateInterval);
+
+            // Should have saved once with both changes
+            expect(mockSave).toHaveBeenCalledTimes(1);
+            expect(mockSave).toHaveBeenCalledWith({
+                "file1.md": "hash1",
+                "file2.md": "hash2",
+            });
+        });
+
+        test("should save immediately when interval is 0", async () => {
+            fileChangeQueue = new FileChangeQueue({
+                vault: mockVault as unknown as Vault,
+                hashStore: mockHashStore,
+                hashStoreUpdateInterval: 0,
+                hashFunc: mockHashFunc,
+            });
+
+            await fileChangeQueue.initialize();
+            await fileChangeQueue.markFileChangeProcessed({
+                path: "file1.md",
+                reason: "modified",
+                hash: "hash1",
+            });
+
+            // Should save immediately
+            expect(mockSave).toHaveBeenCalledTimes(1);
+            expect(mockSave).toHaveBeenCalledWith({
+                "file1.md": "hash1",
+                "file2.md": "content2", // non-processed file. It saves all files
+            });
+        });
+
+        test("should save pending changes on cleanup", async () => {
+            const updateInterval = 100000;
+            fileChangeQueue = new FileChangeQueue({
+                vault: mockVault as unknown as Vault,
+                hashStore: mockHashStore,
+                hashStoreUpdateInterval: updateInterval,
+                hashFunc: mockHashFunc,
+            });
+
+            await fileChangeQueue.initialize();
+            await fileChangeQueue.markFileChangeProcessed({
+                path: "file1.md",
+                reason: "modified",
+                hash: "hash1",
+            });
+
+            // No immediate save
+            expect(mockSave).toHaveBeenCalledTimes(0);
+
+            // Cleanup should save pending changes
+            fileChangeQueue.cleanup();
+
+            expect(mockSave).toHaveBeenCalledTimes(1);
+            expect(mockSave).toHaveBeenCalledWith({
+                "file1.md": "hash1",
+                "file2.md": "content2", // non-processed file. It saves all files
+            });
+        });
+
+        test("should handle deleted files in batched updates", async () => {
+            const updateInterval = 1000;
+            fileChangeQueue = new FileChangeQueue({
+                vault: mockVault as unknown as Vault,
+                hashStore: mockHashStore,
+                hashStoreUpdateInterval: updateInterval,
+                hashFunc: mockHashFunc,
+            });
+
+            await fileChangeQueue.initialize();
+            await fileChangeQueue.markFileChangeProcessed({
+                path: "file1.md",
+                reason: "modified",
+                hash: "hash1",
+            });
+            await fileChangeQueue.markFileChangeProcessed({
+                path: "file1.md",
+                reason: "deleted",
+            });
+
+            // No immediate save
+            expect(mockSave).toHaveBeenCalledTimes(0);
+
+            // Advance timer
+            await vi.advanceTimersByTimeAsync(updateInterval);
+
+            // Should have saved once with file1.md deleted
+            expect(mockSave).toHaveBeenCalledTimes(1);
+            expect(mockSave).toHaveBeenCalledWith({
+                "file2.md": "content2", // non-processed file. It saves all files
+            });
         });
     });
 });

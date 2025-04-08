@@ -22,6 +22,7 @@ export type FileHashStore = {
 export type FileChangeQueueOptions = {
     vault: Vault;
     hashStore: FileHashStore;
+    hashStoreUpdateInterval?: number;
     hashFunc?: (content: string) => Promise<string>;
 };
 
@@ -50,10 +51,23 @@ export class FileChangeQueue {
     private eventRefs: EventRef[] = [];
 
     /**
+     * Timer for batched hash store updates
+     */
+    private updateTimer: NodeJS.Timeout | null = null;
+
+    /**
+     * Flag to track if there are pending changes to save
+     */
+    private hasChangesToSave = false;
+
+    /**
      * Creates a new file change queue
      */
     constructor(options: FileChangeQueueOptions) {
-        this.options = options;
+        this.options = {
+            ...options,
+            hashStoreUpdateInterval: options.hashStoreUpdateInterval ?? 10000,
+        };
     }
 
     /**
@@ -102,6 +116,9 @@ export class FileChangeQueue {
 
         // Register file change event callbacks
         this.registerFileChangeCallbacks();
+
+        // Start the save timer
+        this.scheduleSave();
     }
 
     /**
@@ -190,6 +207,14 @@ export class FileChangeQueue {
      */
     public cleanup(): void {
         this.unregisterFileChangeCallbacks();
+
+        if (this.updateTimer) {
+            clearInterval(this.updateTimer);
+            this.updateTimer = null;
+        }
+
+        // Save any pending changes before cleanup
+        this.saveChanges().catch(console.error);
     }
 
     /**
@@ -265,6 +290,30 @@ export class FileChangeQueue {
     }
 
     /**
+     * Saves pending changes to the hash store if there are any
+     */
+    private async saveChanges(): Promise<void> {
+        if (this.hasChangesToSave) {
+            await this.options.hashStore.save(this.fileHashes);
+            this.hasChangesToSave = false;
+        }
+    }
+
+    /**
+     * Schedules a save of the hash store
+     */
+    private scheduleSave(): void {
+        if (
+            !this.updateTimer &&
+            (this.options.hashStoreUpdateInterval as number) > 0
+        ) {
+            this.updateTimer = setInterval(async () => {
+                await this.saveChanges();
+            }, this.options.hashStoreUpdateInterval);
+        }
+    }
+
+    /**
      * Marks a file change as processed by updating the hash store
      * This should be called after processing a file change to ensure it's not reprocessed
      * if the application restarts before the hash store is updated
@@ -272,11 +321,16 @@ export class FileChangeQueue {
     public async markFileChangeProcessed(change: FileChange): Promise<void> {
         if (change.reason === "deleted") {
             delete this.fileHashes[change.path];
-            await this.options.hashStore.save(this.fileHashes);
+            this.hasChangesToSave = true;
         } else if (change.hash) {
             // Update the hash store with the processed hash
             this.fileHashes[change.path] = change.hash;
-            await this.options.hashStore.save(this.fileHashes);
+            this.hasChangesToSave = true;
+        }
+
+        // If interval is 0 or negative, save immediately
+        if ((this.options.hashStoreUpdateInterval as number) <= 0) {
+            await this.saveChanges();
         }
     }
 }
