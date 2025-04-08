@@ -2,6 +2,8 @@ import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
+import { JsonFileHashStore } from "./services/jsonFileHashStore";
+import { FileChangeQueue } from "./services/obsidianFileChangeQueue";
 import type { EmbeddedChunkStore } from "./services/storage/embeddedChunkStore";
 import { OramaEmbeddedChunkStore } from "./services/storage/oramaEmbeddedChunkStore";
 
@@ -11,11 +13,13 @@ const VECTOR_SIZE = 1536;
 interface SimilarNotesSettings {
     dbPath: string;
     autoSaveInterval: number; // in minutes
+    fileHashStorePath: string;
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
     dbPath: ".obsidian/similar-notes.json",
     autoSaveInterval: 5,
+    fileHashStorePath: ".obsidian/similar-notes-file-hashes.json",
 };
 
 export default class MainPlugin extends Plugin {
@@ -24,6 +28,8 @@ export default class MainPlugin extends Plugin {
     private settings: SimilarNotesSettings;
     private store: EmbeddedChunkStore;
     private autoSaveInterval: NodeJS.Timeout;
+    private fileChangeQueue: FileChangeQueue;
+    private fileChangeQueueInterval: NodeJS.Timeout;
 
     async onload() {
         console.log("Loading Similar Notes plugin");
@@ -67,10 +73,36 @@ export default class MainPlugin extends Plugin {
         });
         this.eventRefs.push(fileOpenRef);
         this.registerEvent(fileOpenRef);
+
+        // Initialize file change queue
+        this.app.workspace.onLayoutReady(async () => {
+            const hashStore = new JsonFileHashStore(
+                this.settings.fileHashStorePath,
+                this.app
+            );
+            this.fileChangeQueue = new FileChangeQueue({
+                vault: this.app.vault,
+                hashStore,
+            });
+            await this.fileChangeQueue.initialize();
+
+            // Set up file change queue interval
+            this.fileChangeQueueInterval = setInterval(async () => {
+                console.log(this.fileChangeQueue.getFileChangeCount());
+            }, 1000);
+        });
     }
 
     async onunload() {
         console.log("Unloading Similar Notes plugin");
+
+        // Cleanup file change queue
+        if (this.fileChangeQueue) {
+            this.fileChangeQueue.cleanup();
+        }
+        if (this.fileChangeQueueInterval) {
+            clearInterval(this.fileChangeQueueInterval);
+        }
 
         // Clear auto-save interval
         if (this.autoSaveInterval) {
