@@ -86,8 +86,18 @@ export default class MainPlugin extends Plugin {
             });
             await this.fileChangeQueue.initialize();
 
+            const statusBarItem = this.addStatusBarItem();
+
             // Set up file change queue interval
             this.fileChangeQueueInterval = setInterval(async () => {
+                const count = this.fileChangeQueue.getFileChangeCount();
+                if (count > 10) {
+                    statusBarItem.setText(`${count} to index`);
+                    statusBarItem.show();
+                } else {
+                    statusBarItem.hide();
+                }
+
                 const changes = await this.fileChangeQueue.pollFileChanges(100);
                 for (const change of changes) {
                     console.log("processing change", change.path);
@@ -98,8 +108,6 @@ export default class MainPlugin extends Plugin {
     }
 
     async onunload() {
-        console.log("Unloading Similar Notes plugin");
-
         // Cleanup file change queue
         if (this.fileChangeQueue) {
             this.fileChangeQueue.cleanup();
@@ -210,9 +218,6 @@ export default class MainPlugin extends Plugin {
 
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
-        // TODO: Implement actual reindexing logic
-        console.log("Reindexing notes...");
-
         this.fileChangeQueue.enqueueAllFiles();
 
         // Refresh all views after reindexing
