@@ -1,32 +1,26 @@
-import type { App } from "obsidian";
-import { TFile } from "obsidian";
+import type { Vault } from "obsidian";
 import type { FileHashStore } from "./obsidianFileChangeQueue";
 
 export class JsonFileHashStore implements FileHashStore {
     private filepath: string;
-    private app: App;
+    private vault: Vault;
 
-    constructor(filepath: string, app: App) {
+    constructor(filepath: string, vault: Vault) {
         this.filepath = filepath;
-        this.app = app;
+        this.vault = vault;
     }
 
     async load(): Promise<Record<string, string>> {
-        const file = this.app.vault.getAbstractFileByPath(this.filepath);
-        if (!(file instanceof TFile)) {
+        const exist = await this.vault.adapter.exists(this.filepath);
+        console.log("load file", exist);
+        if (!exist) {
             return {};
         }
-        const content = await this.app.vault.read(file);
+        const content = await this.vault.adapter.read(this.filepath);
         return JSON.parse(content);
     }
 
     async save(data: Record<string, string>): Promise<void> {
-        const file = this.app.vault.getAbstractFileByPath(this.filepath);
-        if (!(file instanceof TFile)) {
-            // Create the file if it doesn't exist
-            await this.app.vault.create(this.filepath, JSON.stringify(data));
-            return;
-        }
-        await this.app.vault.modify(file, JSON.stringify(data));
+        await this.vault.adapter.write(this.filepath, JSON.stringify(data));
     }
 }

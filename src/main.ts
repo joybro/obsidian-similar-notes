@@ -78,7 +78,7 @@ export default class MainPlugin extends Plugin {
         this.app.workspace.onLayoutReady(async () => {
             const hashStore = new JsonFileHashStore(
                 this.settings.fileHashStorePath,
-                this.app
+                this.app.vault
             );
             this.fileChangeQueue = new FileChangeQueue({
                 vault: this.app.vault,
@@ -88,7 +88,11 @@ export default class MainPlugin extends Plugin {
 
             // Set up file change queue interval
             this.fileChangeQueueInterval = setInterval(async () => {
-                console.log(this.fileChangeQueue.getFileChangeCount());
+                const changes = await this.fileChangeQueue.pollFileChanges(100);
+                for (const change of changes) {
+                    console.log("processing change", change.path);
+                    await this.fileChangeQueue.markFileChangeProcessed(change);
+                }
             }, 1000);
         });
     }
