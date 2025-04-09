@@ -1,35 +1,111 @@
 import type { App } from "obsidian";
+import { Setting } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import type SimilarNotesPlugin from "../../similarNotesPlugin";
+import type MainPlugin from "../../main";
 import { SimilarNotesSettingTab } from "../SimilarNotesSettingTab";
 
-// Mock must be defined before any imports
-vi.mock("react-dom/client", () => {
-    const mockRender = vi.fn();
-    const mockUnmount = vi.fn();
-    const mockCreateRoot = vi.fn(() => ({
-        render: mockRender,
-        unmount: mockUnmount,
-    }));
+// Define the MockSetting type
+interface MockSetting {
+    containerEl: HTMLElement;
+    setName: ReturnType<typeof vi.fn>;
+    setDesc: ReturnType<typeof vi.fn>;
+    setHeading: ReturnType<typeof vi.fn>;
+    addText: ReturnType<typeof vi.fn>;
+    addButton: ReturnType<typeof vi.fn>;
+}
+
+// Define the MockSettingImpl class
+class MockSettingImpl {
+    constructor(containerEl: HTMLElement) {
+        this.containerEl = containerEl;
+    }
+
+    containerEl: HTMLElement;
+
+    setName(name: string) {
+        return this;
+    }
+
+    setDesc(desc: string) {
+        return this;
+    }
+
+    setHeading() {
+        return this;
+    }
+
+    addText(
+        callback: (text: {
+            setValue: (value: string) => void;
+            onChange: (value: string) => void;
+        }) => void
+    ) {
+        const mockText = {
+            setValue: vi.fn().mockReturnThis(),
+            onChange: vi.fn(),
+        };
+        callback(mockText);
+        return this;
+    }
+
+    addButton(
+        callback: (button: {
+            setButtonText: (text: string) => void;
+            onClick: () => void;
+        }) => void
+    ) {
+        const mockButton = {
+            setButtonText: vi.fn().mockReturnThis(),
+            onClick: vi.fn(),
+        };
+        callback(mockButton);
+        return this;
+    }
+}
+
+// Mock the Obsidian module
+vi.mock("obsidian", async () => {
+    const actual = await vi.importActual("obsidian");
+
+    const MockSettingClass = vi
+        .fn()
+        .mockImplementation((containerEl: HTMLElement) => {
+            const instance = new MockSettingImpl(containerEl);
+            vi.spyOn(instance, "setName");
+            vi.spyOn(instance, "setDesc");
+            vi.spyOn(instance, "setHeading");
+            vi.spyOn(instance, "addText");
+            vi.spyOn(instance, "addButton");
+            return instance as unknown as MockSetting;
+        });
 
     return {
-        createRoot: mockCreateRoot,
-        mockRender,
-        mockUnmount,
+        ...actual,
+        Setting: MockSettingClass,
+        PluginSettingTab: class {
+            constructor(app: App, plugin: MainPlugin) {
+                this.app = app;
+                this.plugin = plugin;
+            }
+            app: App;
+            plugin: MainPlugin;
+            containerEl: HTMLElement;
+            display(): void {}
+            hide(): void {}
+        },
     };
 });
 
-// Import the mocked functions
-const { mockRender, mockUnmount } = vi.mocked(await import("react-dom/client"));
-
 describe("SimilarNotesSettingTab", () => {
     let app: App;
-    let plugin: SimilarNotesPlugin;
+    let plugin: MainPlugin;
     let settingTab: SimilarNotesSettingTab;
+    let mockSettingInstances: MockSetting[];
 
     beforeEach(() => {
         // Clear all mocks before each test
         vi.clearAllMocks();
+        mockSettingInstances = [];
 
         // Mock App
         app = {
@@ -44,7 +120,7 @@ describe("SimilarNotesSettingTab", () => {
             }),
             updateSettings: vi.fn(),
             reindexNotes: vi.fn(),
-        } as unknown as SimilarNotesPlugin;
+        } as unknown as MainPlugin;
 
         settingTab = new SimilarNotesSettingTab(app, plugin);
 
@@ -53,47 +129,86 @@ describe("SimilarNotesSettingTab", () => {
         settingTab.containerEl = {
             ...mockDiv,
             empty: vi.fn(),
-            createDiv: vi.fn(() => document.createElement("div")),
         } as unknown as HTMLElement;
+
+        // Store mock Setting instances
+        const originalSetting = Setting as unknown as ReturnType<typeof vi.fn>;
+        originalSetting.mockImplementation((containerEl: HTMLElement) => {
+            const instance = new MockSettingImpl(containerEl);
+            const spiedInstance = {
+                ...instance,
+                setName: vi.fn().mockReturnThis(),
+                setDesc: vi.fn().mockReturnThis(),
+                setHeading: vi.fn().mockReturnThis(),
+                addText: vi
+                    .fn()
+                    .mockImplementation(instance.addText.bind(instance)),
+                addButton: vi
+                    .fn()
+                    .mockImplementation(instance.addButton.bind(instance)),
+            } as MockSetting;
+            mockSettingInstances.push(spiedInstance);
+            return spiedInstance;
+        });
     });
 
-    test("display() clears container and creates React root", () => {
+    test("display() clears container and creates settings", () => {
         settingTab.display();
 
-        const containerEl = settingTab.containerEl as unknown as {
-            empty: () => void;
-            createDiv: () => HTMLElement;
-        };
-        expect(containerEl.empty).toHaveBeenCalled();
-        expect(containerEl.createDiv).toHaveBeenCalled();
-        expect(mockRender).toHaveBeenCalled();
-    });
+        // Verify container was cleared
+        expect(settingTab.containerEl.empty).toHaveBeenCalled();
 
-    test("hide() unmounts React root", () => {
-        // First display to create root
-        settingTab.display();
-
-        // Then hide
-        settingTab.hide();
-
-        // Root should be null after hiding
-        expect(mockUnmount).toHaveBeenCalled();
-        expect((settingTab as unknown as { root: unknown }).root).toBeNull();
+        // Verify Setting was called for each setting
+        expect(Setting).toHaveBeenCalledTimes(4); // 3 settings + 1 heading
     });
 
     test("settings changes are propagated to plugin", async () => {
         settingTab.display();
 
-        // Get the onSettingChange callback from the most recent render call
-        const lastRenderCall = mockRender.mock.lastCall?.[0];
-        const onSettingChange = lastRenderCall?.props?.onSettingChange;
+        // Get the first Setting instance
+        const mockSetting = mockSettingInstances[0];
 
-        // Call onSettingChange with test values
-        await onSettingChange("dbPath", "/new/path.json");
+        // Get the mock text component from addText call
+        const mockText = {
+            setValue: vi.fn().mockReturnThis(),
+            onChange: vi.fn(),
+        };
+
+        // Get the onChange callback that was passed to addText
+        const onChangeCallback = mockSetting.addText.mock.calls[0][0];
+        onChangeCallback(mockText);
+
+        // Simulate text change
+        const onChangeHandler = mockText.onChange.mock.calls[0][0];
+        await onChangeHandler("/new/path.json");
 
         // Verify updateSettings was called with correct value
         expect(plugin.updateSettings).toHaveBeenCalledWith({
             dbPath: "/new/path.json",
         });
+    });
+
+    test("reindex button triggers reindexNotes", async () => {
+        settingTab.display();
+
+        // Get the last Setting instance
+        const mockSetting = mockSettingInstances[3];
+
+        // Get the mock button component from addButton call
+        const mockButton = {
+            setButtonText: vi.fn().mockReturnThis(),
+            onClick: vi.fn(),
+        };
+
+        // Get the onClick callback that was passed to addButton
+        const onClickCallback = mockSetting.addButton.mock.calls[0][0];
+        onClickCallback(mockButton);
+
+        // Simulate button click
+        const onClickHandler = mockButton.onClick.mock.calls[0][0];
+        await onClickHandler();
+
+        // Verify reindexNotes was called
+        expect(plugin.reindexNotes).toHaveBeenCalled();
     });
 });

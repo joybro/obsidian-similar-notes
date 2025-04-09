@@ -1,11 +1,7 @@
-import { type App, PluginSettingTab } from "obsidian";
-import { type Root, createRoot } from "react-dom/client";
+import { type App, PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
-import SimilarNotesSetting from "./SimilarNotesSetting";
 
 export class SimilarNotesSettingTab extends PluginSettingTab {
-    private root: Root | null = null;
-
     constructor(app: App, private plugin: MainPlugin) {
         super(app, plugin);
     }
@@ -14,31 +10,39 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        // Create container for React component
-        const settingContainer = containerEl.createDiv();
-        this.root = createRoot(settingContainer);
+        new Setting(containerEl)
+            .setName("Database path")
+            .setDesc("Path where the similarity database will be stored")
+            .addText((text) => {
+                text.setValue(this.plugin.getSettings().dbPath).onChange(
+                    async (value) => {
+                        await this.plugin.updateSettings({ dbPath: value });
+                    }
+                );
+            });
 
-        // Render the React component
-        this.root.render(
-            <SimilarNotesSetting
-                dbPath={this.plugin.getSettings().dbPath}
-                autoSaveInterval={this.plugin.getSettings().autoSaveInterval}
-                onSettingChange={async (setting, value) => {
+        new Setting(containerEl)
+            .setName("Auto-save interval")
+            .setDesc("How often to save changes to disk (in minutes)")
+            .addText((text) => {
+                text.setValue(
+                    this.plugin.getSettings().autoSaveInterval.toString()
+                ).onChange(async (value) => {
                     await this.plugin.updateSettings({
-                        [setting]: value,
+                        autoSaveInterval: Number.parseInt(value, 10),
                     });
-                }}
-                onReindex={async () => {
-                    await this.plugin.reindexNotes();
-                }}
-            />
-        );
-    }
+                });
+            });
 
-    hide(): void {
-        if (this.root) {
-            this.root.unmount();
-            this.root = null;
-        }
+        new Setting(containerEl).setName("Index").setHeading();
+
+        new Setting(containerEl)
+            .setName("Reindex notes")
+            .setDesc("Rebuild the similarity index for all notes")
+            .addButton((button) => {
+                button.setButtonText("Reindex").onClick(async () => {
+                    await this.plugin.reindexNotes();
+                });
+            });
     }
 }

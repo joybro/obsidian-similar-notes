@@ -213,6 +213,8 @@ export default class MainPlugin extends Plugin {
         // TODO: Implement actual reindexing logic
         console.log("Reindexing notes...");
 
+        this.fileChangeQueue.enqueueAllFiles();
+
         // Refresh all views after reindexing
         for (const [leaf, view] of Array.from(
             this.similarNotesViews.entries()
