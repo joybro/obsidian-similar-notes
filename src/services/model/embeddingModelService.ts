@@ -1,3 +1,4 @@
+import log from "loglevel";
 import type {
     ModelLoadResponse,
     WorkerMessage,
@@ -22,7 +23,7 @@ export class EmbeddingModelService {
 
         if (this.worker) {
             this.worker.onerror = (e) => {
-                console.error(
+                log.error(
                     "[Worker Error]",
                     e.message,
                     "at",
@@ -129,6 +130,7 @@ export class EmbeddingModelService {
 
             const handleMessage = (event: MessageEvent<WorkerResponse>) => {
                 this.worker?.removeEventListener("message", handleMessage);
+                log.info("Received message from worker", event.data);
                 resolve(event.data);
             };
 

@@ -12,7 +12,6 @@ export class JsonFileHashStore implements FileHashStore {
 
     async load(): Promise<Record<string, string>> {
         const exist = await this.vault.adapter.exists(this.filepath);
-        console.log("load file", exist);
         if (!exist) {
             return {};
         }

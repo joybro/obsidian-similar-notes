@@ -1,3 +1,4 @@
+import log from "loglevel";
 import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
@@ -36,7 +37,8 @@ export default class MainPlugin extends Plugin {
     private modelService: EmbeddingModelService;
 
     async onload() {
-        console.log("Loading Similar Notes plugin");
+        log.setDefaultLevel(log.levels.INFO);
+        log.info("Loading Similar Notes plugin");
 
         // Load settings
         this.settings = Object.assign(
@@ -49,9 +51,9 @@ export default class MainPlugin extends Plugin {
         try {
             this.modelService = new EmbeddingModelService();
             await this.modelService.loadModel(this.settings.modelId);
-            console.log("Model service initialized successfully");
+            log.info("Model service initialized successfully");
         } catch (error) {
-            console.error("Failed to initialize model service:", error);
+            log.error("Failed to initialize model service:", error);
         }
 
         // Initialize store
@@ -113,7 +115,7 @@ export default class MainPlugin extends Plugin {
 
                 const changes = await this.fileChangeQueue.pollFileChanges(100);
                 for (const change of changes) {
-                    console.log("processing change", change.path);
+                    log.info("processing change", change.path);
                     await this.fileChangeQueue.markFileChangeProcessed(change);
                 }
             }, 1000);
@@ -145,7 +147,7 @@ export default class MainPlugin extends Plugin {
                 await this.store.save();
                 await this.store.close();
             } catch (e) {
-                console.error("Error while closing store:", e);
+                log.error("Error while closing store:", e);
             }
         }
 
@@ -263,19 +265,19 @@ export default class MainPlugin extends Plugin {
             // Try to load existing database
             try {
                 await this.store.load(this.settings.dbPath);
-                console.log(
+                log.info(
                     "Successfully loaded existing database from",
                     this.settings.dbPath
                 );
             } catch (e) {
-                console.log(
+                log.info(
                     "No existing database found at",
                     this.settings.dbPath,
                     "- starting fresh"
                 );
             }
         } catch (e) {
-            console.error("Failed to initialize store:", e);
+            log.error("Failed to initialize store:", e);
             throw e;
         }
     }
@@ -291,9 +293,9 @@ export default class MainPlugin extends Plugin {
         this.autoSaveInterval = setInterval(async () => {
             try {
                 await this.store.save();
-                console.log("Auto-saved database");
+                log.info("Auto-saved database");
             } catch (e) {
-                console.error("Failed to auto-save database:", e);
+                log.error("Failed to auto-save database:", e);
             }
         }, intervalMs);
     }
