@@ -1,3 +1,4 @@
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import log from "loglevel";
 import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
@@ -33,9 +34,9 @@ export default class MainPlugin extends Plugin {
     private store: EmbeddedChunkStore;
     private autoSaveInterval: NodeJS.Timeout;
     private fileChangeQueue: FileChangeQueue;
-    private fileChangeQueueInterval: NodeJS.Timeout;
     private modelService: EmbeddingModelService;
-
+    private fileChangeLoop: () => Promise<void>;
+    private fileChangeLoopTimer: NodeJS.Timeout;
     async onload() {
         log.setDefaultLevel(log.levels.INFO);
         log.info("Loading Similar Notes plugin");
@@ -51,6 +52,7 @@ export default class MainPlugin extends Plugin {
         try {
             this.modelService = new EmbeddingModelService();
             await this.modelService.loadModel(this.settings.modelId);
+
             log.info("Model service initialized successfully");
         } catch (error) {
             log.error("Failed to initialize model service:", error);
@@ -103,8 +105,36 @@ export default class MainPlugin extends Plugin {
 
             const statusBarItem = this.addStatusBarItem();
 
-            // Set up file change queue interval
-            this.fileChangeQueueInterval = setInterval(async () => {
+            const splitter = RecursiveCharacterTextSplitter.fromLanguage(
+                "markdown",
+                {
+                    chunkSize: this.modelService.getMaxTokens(),
+                    chunkOverlap: 100,
+                    lengthFunction: (text) =>
+                        this.modelService.countTokens(text),
+                }
+            );
+
+            const processOneNote = async (path: string) => {
+                const file = this.app.vault.getFileByPath(path);
+                if (!file) {
+                    log.error("file not found", path);
+                    return;
+                }
+
+                const content = await this.app.vault.cachedRead(file);
+                if (content.length === 0) {
+                    return;
+                }
+
+                const chunks = await splitter.splitText(content);
+                log.info("chunks", chunks);
+
+                const embeddings = await this.modelService.embedTexts(chunks);
+                log.info("embeddings", embeddings);
+            };
+
+            this.fileChangeLoop = async () => {
                 const count = this.fileChangeQueue.getFileChangeCount();
                 if (count > 10) {
                     statusBarItem.setText(`${count} to index`);
@@ -113,12 +143,25 @@ export default class MainPlugin extends Plugin {
                     statusBarItem.hide();
                 }
 
-                const changes = await this.fileChangeQueue.pollFileChanges(100);
-                for (const change of changes) {
-                    log.info("processing change", change.path);
-                    await this.fileChangeQueue.markFileChangeProcessed(change);
+                const changes = await this.fileChangeQueue.pollFileChanges(1);
+                if (changes.length === 0) {
+                    this.fileChangeLoopTimer = setTimeout(
+                        this.fileChangeLoop,
+                        1000
+                    );
+                    return;
                 }
-            }, 1000);
+
+                const change = changes[0];
+                log.info("processing change", change.path);
+
+                await processOneNote(change.path);
+                await this.fileChangeQueue.markFileChangeProcessed(change);
+
+                this.fileChangeLoop();
+            };
+
+            this.fileChangeLoop();
         });
     }
 
@@ -127,8 +170,9 @@ export default class MainPlugin extends Plugin {
         if (this.fileChangeQueue) {
             this.fileChangeQueue.cleanup();
         }
-        if (this.fileChangeQueueInterval) {
-            clearInterval(this.fileChangeQueueInterval);
+
+        if (this.fileChangeLoopTimer) {
+            clearTimeout(this.fileChangeLoopTimer);
         }
 
         // Clear auto-save interval
