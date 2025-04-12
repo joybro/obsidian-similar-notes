@@ -64,15 +64,26 @@ async function importTransformers(): Promise<Transformers> {
     try {
         // In Node.js environment during testing, return a mock
         if (!isElectron) {
-            const mockPipeline = async (text: string) => new Array(384).fill(0);
+            const mockPipeline = async (text: string | string[]) => {
+                let texts: string[];
+                if (typeof text === "string") {
+                    texts = [text];
+                } else {
+                    texts = text;
+                }
+
+                const embeddings = texts.map(() => new Array(384).fill(0));
+                return {
+                    tolist: () => embeddings,
+                };
+            };
             mockPipeline.model = {};
             mockPipeline.tokenizer = {
                 model: {
                     max_position_embeddings: 512,
                 },
-                encode: (text: string) => ({
-                    input_ids: new Array(Math.ceil(text.length / 4)).fill(0), // Rough mock implementation
-                }),
+                encode: (text: string) =>
+                    new Array(Math.ceil(text.length / 4)).fill(0), // Rough mock implementation
             };
             vectorSize = 384;
             maxTokens = 512;
@@ -159,6 +170,7 @@ function postMessage(response: WorkerResponse): void {
             nodeWorker.parentPort?.postMessage(response);
         } catch (e) {
             // Ignore error in browser environment
+            console.error("postMessage error", e);
         }
     } else {
         self.postMessage(response);
@@ -218,13 +230,11 @@ async function handleEmbedBatch(message: EmbedBatchMessage): Promise<void> {
         throw new Error("Model not loaded");
     }
 
-    const embeddings = await Promise.all(
-        message.texts.map(async (text) => {
-            // Ensure pipeline is still available (not unloaded during async operation)
-            if (!extractor) throw new Error("Model was unloaded");
-            return extractor(text, { pooling: "mean", normalize: true });
-        })
-    );
+    const tensor = await extractor(message.texts, {
+        pooling: "mean",
+        normalize: true,
+    });
+    const embeddings = tensor.tolist();
 
     postMessage({
         type: "success",
@@ -238,8 +248,7 @@ async function handleCountToken(message: CountTokenMessage): Promise<void> {
         throw new Error("Model not loaded");
     }
 
-    const tokenCount = extractor.tokenizer.encode(message.text).input_ids
-        .length;
+    const tokenCount = extractor.tokenizer.encode(message.text).length;
 
     postMessage({
         type: "success",

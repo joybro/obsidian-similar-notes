@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { TextEncoder } from "node:util";
 import { vi } from "vitest";
 
 // Setup any global test configurations here
@@ -30,3 +31,6 @@ vi.mock("obsidian", () => {
         },
     };
 });
+
+// Add TextEncoder to the global scope
+global.TextEncoder = TextEncoder;

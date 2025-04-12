@@ -6,34 +6,19 @@ describe("TransformersWorker", () => {
     let worker: Worker;
 
     beforeEach(async () => {
-        // First build the worker
-        await new Promise<void>((resolve, reject) => {
-            const { build } = require("esbuild");
-            build({
-                entryPoints: [
-                    path.resolve(__dirname, "../transformers.worker.ts"),
-                ],
-                bundle: true,
-                outfile: path.resolve(
-                    __dirname,
-                    "../transformers.worker.build.js"
-                ),
-                format: "cjs",
-                platform: "node",
-                target: "node16",
-            })
-                .then(() => resolve())
-                .catch(reject);
-        });
-
-        // Then create the worker with the built file
+        // Create the worker directly with the source file
         worker = new Worker(
-            path.resolve(__dirname, "../transformers.worker.build.js")
+            path.resolve(__dirname, "../../../../public/transformers.worker.js")
         );
+        worker.on("error", (error) => {
+            console.error("Worker error:", error);
+        });
     });
 
     afterEach(async () => {
-        await worker.terminate();
+        if (worker) {
+            await worker.terminate();
+        }
     });
 
     it("should load the model successfully and return vector size and max tokens", async () => {
@@ -91,7 +76,7 @@ describe("TransformersWorker", () => {
                 modelId: "sentence-transformers/all-MiniLM-L6-v2",
             });
         });
-    }, 10000); // Increase timeout to 10 seconds
+    });
 
     it("should handle unload successfully", async () => {
         await new Promise<void>((resolve) => {

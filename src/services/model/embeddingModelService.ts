@@ -13,24 +13,13 @@ export class EmbeddingModelService {
     private maxTokens: number | null = null;
 
     constructor() {
-        // if (typeof window !== "undefined") {
-        //     const workerUrl = resolveWorkerUrl("transformersWorker.js");
-        //     console.log("-- workerUrl", workerUrl);
+        if (process.env.NODE_ENV === "test") {
+            // for testing
+            this.worker = new Worker("");
+        } else {
+            this.worker = new InlineWorker();
+        }
 
-        //     try {
-        //         this.worker = new Worker(workerUrl, { type: "module" });
-
-        //         this.worker.onerror = (event) => {
-        //             console.error("Worker internal error:", event);
-        //         };
-        //     } catch (err) {
-        //         console.error("Failed to create Worker", err.message);
-        //     }
-
-        //     console.log("-- worker", this.worker);
-        // }
-
-        this.worker = new InlineWorker();
         if (this.worker) {
             this.worker.onerror = (e) => {
                 console.error(
@@ -52,8 +41,6 @@ export class EmbeddingModelService {
             type: "load",
             modelId,
         });
-
-        console.log("-- loadModel 200", response);
 
         if (response.type === "error") {
             throw new Error(response.error);
