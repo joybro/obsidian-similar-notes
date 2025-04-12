@@ -45,8 +45,6 @@ export default class MainPlugin extends Plugin {
             await this.loadData()
         );
 
-        console.log("==== onload 100");
-
         // Initialize model service
         try {
             this.modelService = new EmbeddingModelService();
@@ -58,8 +56,6 @@ export default class MainPlugin extends Plugin {
 
         // Initialize store
         await this.initializeStore();
-
-        console.log("==== onload 200");
 
         // Setup auto-save interval
         this.setupAutoSave();

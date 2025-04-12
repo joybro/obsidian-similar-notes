@@ -52,44 +52,45 @@ interface Transformers {
 
 // Global variables
 let extractor: FeatureExtractionPipeline | null = null;
-let model: unknown | null = null;
 let vectorSize: number | null = null;
 let maxTokens: number | null = null;
 
-const isElectron =
-    typeof process !== "undefined" && process.versions?.electron !== undefined;
+const isTest =
+    typeof process === "undefined" || process.versions?.electron === undefined;
+
+const createMockPipeline = () => {
+    const mockPipeline = async (text: string | string[]) => {
+        let texts: string[];
+        if (typeof text === "string") {
+            texts = [text];
+        } else {
+            texts = text;
+        }
+
+        const embeddings = texts.map(() => new Array(384).fill(0));
+        return {
+            tolist: () => embeddings,
+        };
+    };
+    mockPipeline.tokenizer = {
+        model: {
+            max_position_embeddings: 512,
+        },
+        encode: (text: string) => new Array(Math.ceil(text.length / 4)).fill(0), // Rough mock implementation
+    };
+    vectorSize = 384;
+    maxTokens = 512;
+    return {
+        pipeline: async () => mockPipeline as unknown as Pipeline,
+    };
+};
 
 // Dynamic import of transformers library
 async function importTransformers(): Promise<Transformers> {
     try {
         // In Node.js environment during testing, return a mock
-        if (!isElectron) {
-            const mockPipeline = async (text: string | string[]) => {
-                let texts: string[];
-                if (typeof text === "string") {
-                    texts = [text];
-                } else {
-                    texts = text;
-                }
-
-                const embeddings = texts.map(() => new Array(384).fill(0));
-                return {
-                    tolist: () => embeddings,
-                };
-            };
-            mockPipeline.model = {};
-            mockPipeline.tokenizer = {
-                model: {
-                    max_position_embeddings: 512,
-                },
-                encode: (text: string) =>
-                    new Array(Math.ceil(text.length / 4)).fill(0), // Rough mock implementation
-            };
-            vectorSize = 384;
-            maxTokens = 512;
-            return {
-                pipeline: async () => mockPipeline as unknown as Pipeline,
-            };
+        if (isTest) {
+            return createMockPipeline();
         }
 
         // Obsidian's plugin runtime environment(renderer process) has process object
@@ -145,7 +146,7 @@ const setupMessageHandler = () => {
         }
     };
 
-    if (!isElectron) {
+    if (isTest) {
         // Node.js environment
         try {
             // Using type assertion since we know the module exists in Node.js
@@ -163,7 +164,7 @@ const setupMessageHandler = () => {
 };
 
 function postMessage(response: WorkerResponse): void {
-    if (!isElectron) {
+    if (isTest) {
         try {
             const nodeWorker =
                 require("node:worker_threads") as typeof import("node:worker_threads");
@@ -187,7 +188,6 @@ async function handleLoad(message: LoadMessage): Promise<void> {
             dtype: "fp32",
         }
     );
-    model = extractor.model;
 
     // Get vector size by running inference on a test input
     const tensor = await extractor("test", {
@@ -213,11 +213,7 @@ async function handleLoad(message: LoadMessage): Promise<void> {
 }
 
 async function handleUnload(message: UnloadMessage): Promise<void> {
-    if (model) {
-        // Clean up model resources
-        model = null;
-        extractor = null;
-    }
+    extractor = null;
 
     postMessage({
         type: "success",
