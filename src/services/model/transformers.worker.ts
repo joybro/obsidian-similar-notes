@@ -95,10 +95,10 @@ async function importTransformers(): Promise<Transformers> {
         // Obsidian's plugin runtime environment(renderer process) has process object
         // and it makes transformers.js think it's Node.js environment.
         // So we need to remove it.
-
-        // @ts-ignore
-        // biome-ignore lint:
-        process = undefined;
+        Object.defineProperty(globalThis, "process", {
+            get: () => undefined,
+            configurable: true,
+        });
 
         // @ts-ignore
         return await import("@huggingface/transformers");
