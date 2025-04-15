@@ -186,6 +186,7 @@ async function handleLoad(message: LoadMessage): Promise<void> {
         {
             // @ts-ignore
             dtype: "fp32",
+            device: "webgpu",
         }
     );
 
