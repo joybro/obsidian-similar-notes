@@ -174,14 +174,16 @@ export class FileChangeQueue {
         // Register callback for file deletion
         const deleteRef = vault.on("delete", (file: TFile) => {
             if (file.extension === "md") {
+                // Remove the file from the queue if it exists
+                this.queue = this.queue.filter(
+                    (change) => change.path !== file.path
+                );
+
                 // Add to queue (no hash for deleted files)
                 this.queue.push({
                     path: file.path,
                     reason: "deleted" as const,
                 });
-
-                // Save updated hashes
-                this.options.hashStore.save(this.fileHashes);
             }
         });
         this.eventRefs.push(deleteRef);
