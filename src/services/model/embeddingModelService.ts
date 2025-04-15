@@ -128,9 +128,17 @@ export class EmbeddingModelService {
                 return;
             }
 
+            const startTime = performance.now();
             const handleMessage = (event: MessageEvent<WorkerResponse>) => {
                 this.worker?.removeEventListener("message", handleMessage);
-                log.info("Received message from worker", event.data);
+                const endTime = performance.now();
+                const duration = endTime - startTime;
+                log.info(
+                    `Received message from worker (took ${duration.toFixed(
+                        2
+                    )}ms)`,
+                    event.data
+                );
                 resolve(event.data);
             };
 
