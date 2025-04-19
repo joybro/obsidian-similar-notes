@@ -336,7 +336,7 @@ export default class MainPlugin extends Plugin {
 
             // Try to load existing database
             try {
-                await this.embeddingStore.load(this.settings.dbPath);
+                await this.embeddingStore.load();
                 const count = this.embeddingStore.count();
                 log.info(
                     "Successfully loaded existing database from",
@@ -368,7 +368,7 @@ export default class MainPlugin extends Plugin {
         const intervalMs = this.settings.autoSaveInterval * 60 * 1000;
         this.autoSaveInterval = setInterval(async () => {
             try {
-                await this.embeddingStore.load(this.settings.dbPath);
+                await this.embeddingStore.save();
                 await this.saveQueueMetadataToDisk();
                 log.info("Auto-saved databases");
             } catch (e) {

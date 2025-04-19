@@ -41,7 +41,7 @@ export interface EmbeddedChunkStore {
     /**
      * Load data from disk
      */
-    load(filepath: string): Promise<void>;
+    load(): Promise<void>;
 
     /**
      * Add a new note embedding
