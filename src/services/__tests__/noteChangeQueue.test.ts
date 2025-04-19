@@ -1,6 +1,6 @@
 import type { TFile, Vault } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { FileChangeQueue } from "../obsidianFileChangeQueue";
+import { NoteChangeQueue } from "../noteChangeQueue";
 
 // Mock Vault with only the methods we need
 type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on">;
@@ -9,7 +9,7 @@ const mockHashFunc = (content: string) => Promise.resolve(content);
 
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
-    let fileChangeQueue: FileChangeQueue;
+    let fileChangeQueue: NoteChangeQueue;
 
     const testFile1 = { path: "file1.md", extension: "md" } as TFile;
     const testFile2 = { path: "file2.md", extension: "md" } as TFile;
@@ -32,7 +32,7 @@ describe("FileChangeQueue", () => {
         };
 
         // Create a new file change queue
-        fileChangeQueue = new FileChangeQueue({
+        fileChangeQueue = new NoteChangeQueue({
             vault: mockVault as unknown as Vault,
             hashFunc: (content: string) => Promise.resolve(content),
         });
@@ -107,7 +107,7 @@ describe("FileChangeQueue", () => {
 
     test("should enqueue all files", async () => {
         await fileChangeQueue.initialize({});
-        await fileChangeQueue.enqueueAllFiles();
+        await fileChangeQueue.enqueueAllNotes();
 
         // Should have all files in the queue
         expect(fileChangeQueue.getFileChangeCount()).toBe(2);
@@ -286,8 +286,8 @@ describe("FileChangeQueue", () => {
     describe("hash function", () => {
         test("should produce consistent SHA-256 hashes", async () => {
             const content = "test content";
-            const hash1 = await FileChangeQueue.calculateFileHash(content);
-            const hash2 = await FileChangeQueue.calculateFileHash(content);
+            const hash1 = await NoteChangeQueue.calculateNoteHash(content);
+            const hash2 = await NoteChangeQueue.calculateNoteHash(content);
 
             // Hashes should be consistent
             expect(hash1).toBe(hash2);
@@ -296,7 +296,7 @@ describe("FileChangeQueue", () => {
             expect(hash1).toHaveLength(64);
 
             // Different content should produce different hashes
-            const differentHash = await FileChangeQueue.calculateFileHash(
+            const differentHash = await NoteChangeQueue.calculateNoteHash(
                 "different content"
             );
             expect(hash1).not.toBe(differentHash);
@@ -316,7 +316,7 @@ describe("FileChangeQueue", () => {
             };
 
             // Mark the change as processed
-            await fileChangeQueue.markFileChangeProcessed(change);
+            await fileChangeQueue.markNoteChangeProcessed(change);
 
             const metadata = await fileChangeQueue.getMetadata();
             expect(metadata["file1.md"]).toBe("newhash");
@@ -331,7 +331,7 @@ describe("FileChangeQueue", () => {
             };
 
             // Mark the change as processed
-            await fileChangeQueue.markFileChangeProcessed(change);
+            await fileChangeQueue.markNoteChangeProcessed(change);
 
             const metadata = await fileChangeQueue.getMetadata();
             expect(metadata["file1.md"]).toBe("modifiedhash");
@@ -342,7 +342,7 @@ describe("FileChangeQueue", () => {
             const change = { path: "file1.md", reason: "deleted" as const };
 
             // Mark the change as processed
-            await fileChangeQueue.markFileChangeProcessed(change);
+            await fileChangeQueue.markNoteChangeProcessed(change);
 
             // Should not have saved the updated hashes
             const metadata = await fileChangeQueue.getMetadata();
@@ -377,7 +377,7 @@ describe("FileChangeQueue", () => {
             );
 
             // initialize the queue
-            fileChangeQueue = new FileChangeQueue({
+            fileChangeQueue = new NoteChangeQueue({
                 vault: mockVault as unknown as Vault,
                 hashFunc: mockHashFunc,
             });
@@ -397,7 +397,7 @@ describe("FileChangeQueue", () => {
             fileChangeQueue.cleanup();
 
             // initialize the queue again (= plugin reload)
-            fileChangeQueue = new FileChangeQueue({
+            fileChangeQueue = new NoteChangeQueue({
                 vault: mockVault as unknown as Vault,
                 hashFunc: mockHashFunc,
             });
@@ -425,7 +425,7 @@ describe("FileChangeQueue", () => {
             );
 
             // initialize the queue
-            fileChangeQueue = new FileChangeQueue({
+            fileChangeQueue = new NoteChangeQueue({
                 vault: mockVault as unknown as Vault,
                 hashFunc: mockHashFunc,
             });
@@ -458,7 +458,7 @@ describe("FileChangeQueue", () => {
             fileChangeQueue.cleanup();
 
             // initialize the queue again (= plugin reload)
-            fileChangeQueue = new FileChangeQueue({
+            fileChangeQueue = new NoteChangeQueue({
                 vault: mockVault as unknown as Vault,
                 hashFunc: mockHashFunc,
             });

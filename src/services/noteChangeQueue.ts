@@ -1,12 +1,12 @@
 import type { EventRef, TFile, Vault } from "obsidian";
 
-export type FileChange = {
+export type NoteChange = {
     path: string;
     reason: "new" | "modified" | "deleted";
     hash?: string;
 };
 
-export type FileChangeQueueOptions = {
+export type NoteChangeQueueOptions = {
     vault: Vault;
     hashFunc?: (content: string) => Promise<string>;
 };
@@ -14,21 +14,21 @@ export type FileChangeQueueOptions = {
 /**
  * Class for managing file changes in an Obsidian vault
  */
-export class FileChangeQueue {
+export class NoteChangeQueue {
     /**
      * Queue of file changes to be processed
      */
-    private queue: FileChange[] = [];
+    private queue: NoteChange[] = [];
 
     /**
      * Current file hash map
      */
-    private fileHashes: Record<string, string> = {};
+    private noteHashes: Record<string, string> = {};
 
     /**
      * Options for the queue
      */
-    private options: FileChangeQueueOptions;
+    private options: NoteChangeQueueOptions;
 
     /**
      * Event references for cleanup
@@ -38,7 +38,7 @@ export class FileChangeQueue {
     /**
      * Creates a new file change queue
      */
-    constructor(options: FileChangeQueueOptions) {
+    constructor(options: NoteChangeQueueOptions) {
         this.options = options;
     }
 
@@ -47,7 +47,7 @@ export class FileChangeQueue {
      * and adding changed files to the queue
      */
     public async initialize(metadata: Record<string, string>): Promise<void> {
-        this.fileHashes = metadata;
+        this.noteHashes = metadata;
 
         const { vault } = this.options;
 
@@ -56,26 +56,26 @@ export class FileChangeQueue {
 
         // Calculate current hashes and detect changes
         const currentHashes: Record<string, string> = {};
-        const newQueue: FileChange[] = [];
+        const newQueue: NoteChange[] = [];
 
         // Process existing files
         for (const file of files) {
             const content = await vault.read(file);
             const hashFunc =
-                this.options.hashFunc ?? FileChangeQueue.calculateFileHash;
+                this.options.hashFunc ?? NoteChangeQueue.calculateNoteHash;
             const hash = await hashFunc(content);
             currentHashes[file.path] = hash;
 
             // Check if file is new or modified
-            if (!this.fileHashes[file.path]) {
+            if (!this.noteHashes[file.path]) {
                 newQueue.push({ path: file.path, reason: "new", hash });
-            } else if (this.fileHashes[file.path] !== hash) {
+            } else if (this.noteHashes[file.path] !== hash) {
                 newQueue.push({ path: file.path, reason: "modified", hash });
             }
         }
 
         // Check for deleted files
-        for (const path in this.fileHashes) {
+        for (const path in this.noteHashes) {
             if (!currentHashes[path]) {
                 newQueue.push({ path, reason: "deleted" });
             }
@@ -102,7 +102,7 @@ export class FileChangeQueue {
             if (file.extension === "md") {
                 const content = await vault.read(file);
                 const hashFunc =
-                    this.options.hashFunc ?? FileChangeQueue.calculateFileHash;
+                    this.options.hashFunc ?? NoteChangeQueue.calculateNoteHash;
                 const hash = await hashFunc(content);
 
                 // Add to queue with hash
@@ -120,7 +120,7 @@ export class FileChangeQueue {
             if (file.extension === "md") {
                 const content = await vault.read(file);
                 const hashFunc =
-                    this.options.hashFunc ?? FileChangeQueue.calculateFileHash;
+                    this.options.hashFunc ?? NoteChangeQueue.calculateNoteHash;
                 const hash = await hashFunc(content);
 
                 // Remove the file from the queue if it exists
@@ -181,19 +181,19 @@ export class FileChangeQueue {
     /**
      * Adds all files to the queue regardless of whether they've changed
      */
-    public async enqueueAllFiles(): Promise<void> {
+    public async enqueueAllNotes(): Promise<void> {
         const { vault } = this.options;
 
         // Get all markdown files in the vault
         const files = vault.getMarkdownFiles();
 
         // Add all files to the queue with their current hashes
-        const newQueue: FileChange[] = [];
+        const newQueue: NoteChange[] = [];
 
         for (const file of files) {
             const content = await vault.read(file);
             const hashFunc =
-                this.options.hashFunc ?? FileChangeQueue.calculateFileHash;
+                this.options.hashFunc ?? NoteChangeQueue.calculateNoteHash;
             const hash = await hashFunc(content);
 
             newQueue.push({
@@ -214,7 +214,7 @@ export class FileChangeQueue {
      * to ensure the hash store is updated, preventing reprocessing if the application
      * restarts before the hash store is updated.
      */
-    public pollFileChanges(maxCount: number): FileChange[] {
+    public pollFileChanges(maxCount: number): NoteChange[] {
         const changes = this.queue.slice(0, maxCount);
         this.queue = this.queue.slice(maxCount);
         return changes;
@@ -230,7 +230,7 @@ export class FileChangeQueue {
     /**
      * Helper function to calculate a SHA-256 hash for a file's content
      */
-    public static async calculateFileHash(content: string): Promise<string> {
+    public static async calculateNoteHash(content: string): Promise<string> {
         // Convert the string to a Uint8Array
         const encoder = new TextEncoder();
         const data = encoder.encode(content);
@@ -252,16 +252,16 @@ export class FileChangeQueue {
      * This should be called after processing a file change to ensure it's not reprocessed
      * if the application restarts before the hash store is updated
      */
-    public async markFileChangeProcessed(change: FileChange): Promise<void> {
+    public async markNoteChangeProcessed(change: NoteChange): Promise<void> {
         if (change.reason === "deleted") {
-            delete this.fileHashes[change.path];
+            delete this.noteHashes[change.path];
         } else if (change.hash) {
             // Update the hash store with the processed hash
-            this.fileHashes[change.path] = change.hash;
+            this.noteHashes[change.path] = change.hash;
         }
     }
 
     public getMetadata(): Record<string, string> {
-        return this.fileHashes;
+        return this.noteHashes;
     }
 }

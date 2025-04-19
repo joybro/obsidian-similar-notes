@@ -5,7 +5,7 @@ import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
 import { EmbeddingModelService } from "./services/model/embeddingModelService";
-import { FileChangeQueue } from "./services/obsidianFileChangeQueue";
+import { NoteChangeQueue } from "./services/noteChangeQueue";
 import type {
     EmbeddedChunk,
     EmbeddedChunkStore,
@@ -32,7 +32,7 @@ export default class MainPlugin extends Plugin {
     private settings: SimilarNotesSettings;
     private embeddingStore: EmbeddedChunkStore;
     private autoSaveInterval: NodeJS.Timeout;
-    private fileChangeQueue: FileChangeQueue;
+    private fileChangeQueue: NoteChangeQueue;
     private modelService: EmbeddingModelService;
     private fileChangeLoop: () => Promise<void>;
     private fileChangeLoopTimer: NodeJS.Timeout;
@@ -92,7 +92,7 @@ export default class MainPlugin extends Plugin {
 
         // Initialize file change queue
         this.app.workspace.onLayoutReady(async () => {
-            this.fileChangeQueue = new FileChangeQueue({
+            this.fileChangeQueue = new NoteChangeQueue({
                 vault: this.app.vault,
             });
             const queueMetadata = await this.loadQueueMetadataFromDisk();
@@ -180,7 +180,7 @@ export default class MainPlugin extends Plugin {
                     await processUpdatedNote(change.path);
                 }
 
-                await this.fileChangeQueue.markFileChangeProcessed(change);
+                await this.fileChangeQueue.markNoteChangeProcessed(change);
 
                 this.fileChangeLoop();
             };
@@ -310,7 +310,7 @@ export default class MainPlugin extends Plugin {
 
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
-        this.fileChangeQueue.enqueueAllFiles();
+        this.fileChangeQueue.enqueueAllNotes();
 
         // Refresh all views after reindexing
         for (const [leaf, view] of Array.from(
