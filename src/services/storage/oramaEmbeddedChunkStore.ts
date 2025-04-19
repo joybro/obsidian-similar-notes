@@ -17,7 +17,6 @@ import type {
 } from "./embeddedChunkStore";
 
 type Schema = {
-    id: "string";
     path: "string";
     title: "string";
     embedding: `vector[${number}]`;
@@ -38,7 +37,6 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
         this.vault = vault;
         this.filepath = filepath;
         this.schema = {
-            id: "string",
             path: "string",
             title: "string",
             embedding: `vector[${vectorSize}]`,
@@ -71,21 +69,34 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
             return;
         }
         const JSONIndex = await persist(this.db, "json");
+        const adapter = this.vault.adapter;
+
         if (typeof JSONIndex === "string") {
-            await this.vault.create(this.filepath, JSONIndex);
+            const exists = await adapter.exists(this.filepath);
+            if (exists) {
+                await adapter.write(this.filepath, JSONIndex);
+            } else {
+                await adapter.write(this.filepath, JSONIndex);
+            }
         } else {
-            await this.vault.createBinary(this.filepath, JSONIndex);
+            const exists = await adapter.exists(this.filepath);
+            if (exists) {
+                await adapter.writeBinary(this.filepath, JSONIndex);
+            } else {
+                await adapter.writeBinary(this.filepath, JSONIndex);
+            }
         }
         this.hasChanges = false;
     }
 
     async load(): Promise<void> {
         try {
-            const file = this.vault.getFileByPath(this.filepath);
-            if (!file) {
+            const adapter = this.vault.adapter;
+            const exists = await adapter.exists(this.filepath);
+            if (!exists) {
                 throw new Error("File not found");
             }
-            const JSONIndex = await this.vault.read(file);
+            const JSONIndex = await adapter.read(this.filepath);
             this.db = await restore("json", JSONIndex);
             this.hasChanges = false;
         } catch (error) {
@@ -141,18 +152,6 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
             for (const hit of filtered) {
                 await remove(this.db, hit.id);
             }
-            this.hasChanges = true;
-        }
-    }
-
-    async removeById(id: string): Promise<void> {
-        const results = await search(this.db, {
-            term: id,
-            properties: ["id"],
-            exact: true,
-        });
-        if (results.hits.length > 0) {
-            await remove(this.db, results.hits[0].id);
             this.hasChanges = true;
         }
     }

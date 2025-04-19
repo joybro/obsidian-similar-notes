@@ -6,7 +6,10 @@ import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
 import { EmbeddingModelService } from "./services/model/embeddingModelService";
 import { FileChangeQueue } from "./services/obsidianFileChangeQueue";
-import type { EmbeddedChunkStore } from "./services/storage/embeddedChunkStore";
+import type {
+    EmbeddedChunk,
+    EmbeddedChunkStore,
+} from "./services/storage/embeddedChunkStore";
 import { OramaEmbeddedChunkStore } from "./services/storage/oramaEmbeddedChunkStore";
 
 interface SimilarNotesSettings {
@@ -107,7 +110,11 @@ export default class MainPlugin extends Plugin {
                 }
             );
 
-            const processOneNote = async (path: string) => {
+            const processDeletedNote = async (path: string) => {
+                await this.embeddingStore.removeByPath(path);
+            };
+
+            const processUpdatedNote = async (path: string) => {
                 const file = this.app.vault.getFileByPath(path);
                 if (!file) {
                     log.error("file not found", path);
@@ -124,6 +131,22 @@ export default class MainPlugin extends Plugin {
 
                 const embeddings = await this.modelService.embedTexts(chunks);
                 log.info("embeddings", embeddings);
+
+                const embeddedChunks: EmbeddedChunk[] = embeddings.map(
+                    (embedding, index) => ({
+                        path: file.path,
+                        title: file.name,
+                        embedding,
+                        content: chunks[index],
+                        chunkIndex: index,
+                        totalChunks: chunks.length,
+                        lastUpdated: Date.now(),
+                    })
+                );
+
+                log.info("embeddedChunks", embeddedChunks);
+                await this.embeddingStore.removeByPath(file.path);
+                await this.embeddingStore.addMulti(embeddedChunks);
             };
 
             this.fileChangeLoop = async () => {
@@ -147,7 +170,12 @@ export default class MainPlugin extends Plugin {
                 const change = changes[0];
                 log.info("processing change", change.path);
 
-                await processOneNote(change.path);
+                if (change.reason === "deleted") {
+                    await processDeletedNote(change.path);
+                } else {
+                    await processUpdatedNote(change.path);
+                }
+
                 await this.fileChangeQueue.markFileChangeProcessed(change);
 
                 this.fileChangeLoop();
@@ -178,14 +206,17 @@ export default class MainPlugin extends Plugin {
                 await this.embeddingStore.save();
                 await this.embeddingStore.close();
             } catch (e) {
-                log.error("Error while closing store:", e);
+                log.error("Error while closing embedding store:", e);
             }
         }
-
         // Cleanup file change queue
         if (this.fileChangeQueue) {
-            await this.saveQueueMetadataToDisk();
-            this.fileChangeQueue.cleanup();
+            try {
+                await this.saveQueueMetadataToDisk();
+                this.fileChangeQueue.cleanup();
+            } catch (e) {
+                log.error("Error while closing file change queue:", e);
+            }
         }
 
         // Manually unregister events (though this is redundant with this.registerEvent)

@@ -1,22 +1,29 @@
 import fs from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { TFile, Vault } from "obsidian";
+import type { Vault } from "obsidian";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EmbeddedChunk } from "../embeddedChunkStore";
 import { OramaEmbeddedChunkStore } from "../oramaEmbeddedChunkStore";
 
-// Mock Vault with only the methods we need
-type MockVault = Pick<
-    Vault,
-    "create" | "createBinary" | "read" | "getFileByPath"
->;
-const mockVault = {
-    create: vi.fn(),
-    createBinary: vi.fn(),
+// Mock Vault with adapter
+type MockAdapter = {
+    exists: ReturnType<typeof vi.fn>;
+    read: ReturnType<typeof vi.fn>;
+    write: ReturnType<typeof vi.fn>;
+    writeBinary: ReturnType<typeof vi.fn>;
+};
+
+const mockAdapter = {
+    exists: vi.fn(),
     read: vi.fn(),
-    getFileByPath: vi.fn(),
-} as MockVault as Vault;
+    write: vi.fn(),
+    writeBinary: vi.fn(),
+};
+
+const mockVault = {
+    adapter: mockAdapter,
+} as unknown as Vault;
 
 const vectorSize = 10;
 
@@ -30,7 +37,6 @@ describe("OramaEmbeddedChunkStore", () => {
     // So we need to prepare sample chunks before running tests.
     const prepareSampleChunks = () => {
         const sampleChunk1: EmbeddedChunk = {
-            id: "test-id-1",
             path: "/test/path/note1.md",
             title: "Test Note 1",
             embedding: Array(vectorSize).fill(0.1), // OpenAI embedding dimension
@@ -42,7 +48,6 @@ describe("OramaEmbeddedChunkStore", () => {
 
         const sampleChunk2: EmbeddedChunk = {
             ...sampleChunk1,
-            id: "test-id-2",
             path: "/test/path/note2.md",
             title: "Test Note 2",
             embedding: Array(vectorSize).fill(0.2),
@@ -112,16 +117,6 @@ describe("OramaEmbeddedChunkStore", () => {
         expect(chunks2[0]).toEqual(testChunk2);
     });
 
-    test("should remove chunk by id", async () => {
-        await store.addMulti([testChunk1, testChunk2]);
-        await store.removeById(testChunk1.id);
-        const chunks1 = await store.getByPath(testChunk1.path);
-        const chunks2 = await store.getByPath(testChunk2.path);
-        expect(chunks1).toHaveLength(0);
-        expect(chunks2).toHaveLength(1);
-        expect(chunks2[0]).toEqual(testChunk2);
-    });
-
     test("should search similar chunks", async () => {
         await store.addMulti([testChunk1, testChunk2]);
         const results = await store.searchSimilar(testChunk1.embedding, 10);
@@ -150,12 +145,8 @@ describe("OramaEmbeddedChunkStore", () => {
 
         // Mock the file content for loading
         const mockFileContent = JSON.stringify({ some: "data" });
-        (mockVault.getFileByPath as ReturnType<typeof vi.fn>).mockReturnValue({
-            path: testDbPath,
-        } as TFile);
-        (mockVault.read as ReturnType<typeof vi.fn>).mockResolvedValue(
-            mockFileContent
-        );
+        mockAdapter.exists.mockResolvedValue(true);
+        mockAdapter.read.mockResolvedValue(mockFileContent);
 
         await store.save();
 
@@ -168,8 +159,8 @@ describe("OramaEmbeddedChunkStore", () => {
         await newStore.load();
 
         // Verify that the mock functions were called
-        expect(mockVault.getFileByPath).toHaveBeenCalledWith(testDbPath);
-        expect(mockVault.read).toHaveBeenCalled();
+        expect(mockAdapter.exists).toHaveBeenCalledWith(testDbPath);
+        expect(mockAdapter.read).toHaveBeenCalledWith(testDbPath);
 
         await newStore.close();
     });
@@ -184,14 +175,22 @@ describe("OramaEmbeddedChunkStore", () => {
     describe("change tracking", () => {
         test("should not save when no changes are made", async () => {
             await store.save();
-            expect(mockVault.create).not.toHaveBeenCalled();
-            expect(mockVault.createBinary).not.toHaveBeenCalled();
+            expect(mockAdapter.write).not.toHaveBeenCalled();
+            expect(mockAdapter.writeBinary).not.toHaveBeenCalled();
         });
 
         test("should save when changes are made", async () => {
+            mockAdapter.exists.mockResolvedValue(false);
             await store.add(testChunk1);
             await store.save();
-            expect(mockVault.create).toHaveBeenCalledTimes(1);
+            expect(mockAdapter.write).toHaveBeenCalledTimes(1);
+        });
+
+        test("should write when file exists", async () => {
+            mockAdapter.exists.mockResolvedValue(true);
+            await store.add(testChunk1);
+            await store.save();
+            expect(mockAdapter.write).toHaveBeenCalledTimes(1);
         });
 
         test("should not save again after saving changes", async () => {
@@ -199,60 +198,51 @@ describe("OramaEmbeddedChunkStore", () => {
             await store.save();
             vi.clearAllMocks();
             await store.save();
-            expect(mockVault.create).not.toHaveBeenCalled();
-            expect(mockVault.createBinary).not.toHaveBeenCalled();
+            expect(mockAdapter.write).not.toHaveBeenCalled();
+            expect(mockAdapter.writeBinary).not.toHaveBeenCalled();
         });
 
         test("should track changes for all modification operations", async () => {
+            mockAdapter.exists.mockResolvedValue(false);
+
             // Test add
             await store.add(testChunk1);
             await store.save();
-            expect(mockVault.create).toHaveBeenCalledTimes(1);
+            expect(mockAdapter.write).toHaveBeenCalledTimes(1);
             vi.clearAllMocks();
 
             // Test addMulti
             await store.addMulti([testChunk2]);
             await store.save();
-            expect(mockVault.create).toHaveBeenCalledTimes(1);
+            expect(mockAdapter.write).toHaveBeenCalledTimes(1);
             vi.clearAllMocks();
 
             // Test removeByPath
             await store.removeByPath(testChunk1.path);
             await store.save();
-            expect(mockVault.create).toHaveBeenCalledTimes(1);
-            vi.clearAllMocks();
-
-            // Test removeById
-            await store.removeById(testChunk2.id);
-            await store.save();
-            expect(mockVault.create).toHaveBeenCalledTimes(1);
+            expect(mockAdapter.write).toHaveBeenCalledTimes(1);
             vi.clearAllMocks();
 
             // Test clear
             await store.clear();
             await store.save();
-            expect(mockVault.create).toHaveBeenCalledTimes(1);
+            expect(mockAdapter.write).toHaveBeenCalledTimes(1);
         });
 
         test("should reset changes flag after loading", async () => {
             await store.add(testChunk1);
 
             // Mock the file content for loading
-            const mockFileContent = JSON.stringify({ some: "data" });
-            (
-                mockVault.getFileByPath as ReturnType<typeof vi.fn>
-            ).mockReturnValue({
-                path: testDbPath,
-            } as TFile);
-            (mockVault.read as ReturnType<typeof vi.fn>).mockResolvedValue(
-                mockFileContent
+            mockAdapter.exists.mockResolvedValue(true);
+            mockAdapter.read.mockResolvedValue(
+                JSON.stringify({ some: "data" })
             );
 
             await store.load();
             vi.clearAllMocks();
             await store.save();
-            expect(mockVault.create).not.toHaveBeenCalled();
-            expect(mockVault.createBinary).not.toHaveBeenCalled();
+            expect(mockAdapter.write).not.toHaveBeenCalled();
+            expect(mockAdapter.writeBinary).not.toHaveBeenCalled();
         });
     });
 });

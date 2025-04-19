@@ -3,7 +3,6 @@
  * A single Obsidian note can be split into multiple EmbeddedChunks
  */
 export interface EmbeddedChunk {
-    id: string; // Unique ID (UUID)
     path: string; // Original file path
     title: string; // File title (extracted from filename)
     embedding: number[]; // Embedding vector
@@ -57,13 +56,6 @@ export interface EmbeddedChunkStore {
     addMulti(chunks: EmbeddedChunk[]): Promise<void>;
 
     /**
-     * Update note embedding
-     * @param id Note ID
-     * @param updates Fields to update
-     */
-    update(id: string, updates: Partial<EmbeddedChunk>): Promise<void>;
-
-    /**
      * Search notes by file path (returns all chunks for the given path)
      * @param path File path
      */
@@ -74,12 +66,6 @@ export interface EmbeddedChunkStore {
      * @param path File path
      */
     removeByPath(path: string): Promise<void>;
-
-    /**
-     * Delete embedding by note ID
-     * @param id Note ID
-     */
-    removeById(id: string): Promise<void>;
 
     /**
      * Search embeddings (similarity-based)
