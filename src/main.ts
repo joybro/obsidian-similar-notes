@@ -4,14 +4,10 @@ import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
-import { JsonFileHashStore } from "./services/jsonFileHashStore";
 import { EmbeddingModelService } from "./services/model/embeddingModelService";
 import { FileChangeQueue } from "./services/obsidianFileChangeQueue";
 import type { EmbeddedChunkStore } from "./services/storage/embeddedChunkStore";
 import { OramaEmbeddedChunkStore } from "./services/storage/oramaEmbeddedChunkStore";
-
-// OpenAI embedding dimension
-const VECTOR_SIZE = 1536;
 
 interface SimilarNotesSettings {
     dbPath: string;
@@ -31,7 +27,7 @@ export default class MainPlugin extends Plugin {
     private similarNotesViews: Map<WorkspaceLeaf, SimilarNotesView> = new Map();
     private eventRefs: EventRef[] = [];
     private settings: SimilarNotesSettings;
-    private store: EmbeddedChunkStore;
+    private embeddingStore: EmbeddedChunkStore;
     private autoSaveInterval: NodeJS.Timeout;
     private fileChangeQueue: FileChangeQueue;
     private modelService: EmbeddingModelService;
@@ -59,7 +55,7 @@ export default class MainPlugin extends Plugin {
         }
 
         // Initialize store
-        await this.initializeStore();
+        await this.initializeStore(this.modelService.getVectorSize());
 
         // Setup auto-save interval
         this.setupAutoSave();
@@ -93,15 +89,11 @@ export default class MainPlugin extends Plugin {
 
         // Initialize file change queue
         this.app.workspace.onLayoutReady(async () => {
-            const hashStore = new JsonFileHashStore(
-                this.settings.fileHashStorePath,
-                this.app.vault
-            );
             this.fileChangeQueue = new FileChangeQueue({
                 vault: this.app.vault,
-                hashStore,
             });
-            await this.fileChangeQueue.initialize();
+            const queueMetadata = await this.loadQueueMetadataFromDisk();
+            await this.fileChangeQueue.initialize(queueMetadata);
 
             const statusBarItem = this.addStatusBarItem();
 
@@ -166,11 +158,6 @@ export default class MainPlugin extends Plugin {
     }
 
     async onunload() {
-        // Cleanup file change queue
-        if (this.fileChangeQueue) {
-            this.fileChangeQueue.cleanup();
-        }
-
         if (this.fileChangeLoopTimer) {
             clearTimeout(this.fileChangeLoopTimer);
         }
@@ -186,13 +173,19 @@ export default class MainPlugin extends Plugin {
         }
 
         // Save any pending changes and close store
-        if (this.store) {
+        if (this.embeddingStore) {
             try {
-                await this.store.save();
-                await this.store.close();
+                await this.embeddingStore.save();
+                await this.embeddingStore.close();
             } catch (e) {
                 log.error("Error while closing store:", e);
             }
+        }
+
+        // Cleanup file change queue
+        if (this.fileChangeQueue) {
+            await this.saveQueueMetadataToDisk();
+            this.fileChangeQueue.cleanup();
         }
 
         // Manually unregister events (though this is redundant with this.registerEvent)
@@ -294,21 +287,21 @@ export default class MainPlugin extends Plugin {
         }
     }
 
-    private async initializeStore() {
+    private async initializeStore(vectorSize: number) {
         try {
             // Create store instance
-            this.store = new OramaEmbeddedChunkStore(
+            this.embeddingStore = new OramaEmbeddedChunkStore(
                 this.app.vault,
                 this.settings.dbPath,
-                VECTOR_SIZE
+                vectorSize
             );
 
             // Initialize store
-            await this.store.init();
+            await this.embeddingStore.init();
 
             // Try to load existing database
             try {
-                await this.store.load(this.settings.dbPath);
+                await this.embeddingStore.load(this.settings.dbPath);
                 log.info(
                     "Successfully loaded existing database from",
                     this.settings.dbPath
@@ -336,8 +329,9 @@ export default class MainPlugin extends Plugin {
         const intervalMs = this.settings.autoSaveInterval * 60 * 1000;
         this.autoSaveInterval = setInterval(async () => {
             try {
-                await this.store.save();
-                log.info("Auto-saved database");
+                await this.embeddingStore.load(this.settings.dbPath);
+                await this.saveQueueMetadataToDisk();
+                log.info("Auto-saved databases");
             } catch (e) {
                 log.error("Failed to auto-save database:", e);
             }
@@ -363,5 +357,27 @@ export default class MainPlugin extends Plugin {
         if (updates.autoSaveInterval !== undefined) {
             this.setupAutoSave();
         }
+    }
+
+    private async saveQueueMetadataToDisk(): Promise<void> {
+        const metadata = await this.fileChangeQueue.getMetadata();
+        this.app.vault.adapter.write(
+            this.settings.fileHashStorePath,
+            JSON.stringify(metadata)
+        );
+    }
+
+    private async loadQueueMetadataFromDisk(): Promise<Record<string, string>> {
+        const exist = await this.app.vault.adapter.exists(
+            this.settings.fileHashStorePath
+        );
+
+        if (!exist) {
+            return {};
+        }
+        const content = await this.app.vault.adapter.read(
+            this.settings.fileHashStorePath
+        );
+        return JSON.parse(content);
     }
 }

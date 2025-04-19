@@ -6,23 +6,8 @@ export type FileChange = {
     hash?: string;
 };
 
-export type FileHashStore = {
-    /**
-     * Loads the previous state of file hash map
-     * Example: { "path/to/file.md": "abc123" }
-     */
-    load(): Promise<Record<string, string>>;
-
-    /**
-     * Saves the updated hash map
-     */
-    save(data: Record<string, string>): Promise<void>;
-};
-
 export type FileChangeQueueOptions = {
     vault: Vault;
-    hashStore: FileHashStore;
-    hashStoreUpdateInterval?: number;
     hashFunc?: (content: string) => Promise<string>;
 };
 
@@ -51,34 +36,20 @@ export class FileChangeQueue {
     private eventRefs: EventRef[] = [];
 
     /**
-     * Timer for batched hash store updates
-     */
-    private updateTimer: NodeJS.Timeout | null = null;
-
-    /**
-     * Flag to track if there are pending changes to save
-     */
-    private hasChangesToSave = false;
-
-    /**
      * Creates a new file change queue
      */
     constructor(options: FileChangeQueueOptions) {
-        this.options = {
-            ...options,
-            hashStoreUpdateInterval: options.hashStoreUpdateInterval ?? 10000,
-        };
+        this.options = options;
     }
 
     /**
      * Initializes the file change queue by comparing the vault with the previous state
      * and adding changed files to the queue
      */
-    public async initialize(): Promise<void> {
-        const { vault, hashStore } = this.options;
+    public async initialize(metadata: Record<string, string>): Promise<void> {
+        this.fileHashes = metadata;
 
-        // Load previous file hashes
-        const previousHashes = await hashStore.load();
+        const { vault } = this.options;
 
         // Get all markdown files in the vault
         const files = vault.getMarkdownFiles();
@@ -96,15 +67,15 @@ export class FileChangeQueue {
             currentHashes[file.path] = hash;
 
             // Check if file is new or modified
-            if (!previousHashes[file.path]) {
+            if (!this.fileHashes[file.path]) {
                 newQueue.push({ path: file.path, reason: "new", hash });
-            } else if (previousHashes[file.path] !== hash) {
+            } else if (this.fileHashes[file.path] !== hash) {
                 newQueue.push({ path: file.path, reason: "modified", hash });
             }
         }
 
         // Check for deleted files
-        for (const path in previousHashes) {
+        for (const path in this.fileHashes) {
             if (!currentHashes[path]) {
                 newQueue.push({ path, reason: "deleted" });
             }
@@ -112,13 +83,9 @@ export class FileChangeQueue {
 
         // Update state
         this.queue = newQueue;
-        this.fileHashes = currentHashes;
 
         // Register file change event callbacks
         this.registerFileChangeCallbacks();
-
-        // Start the save timer
-        this.scheduleSave();
     }
 
     /**
@@ -209,14 +176,6 @@ export class FileChangeQueue {
      */
     public cleanup(): void {
         this.unregisterFileChangeCallbacks();
-
-        if (this.updateTimer) {
-            clearInterval(this.updateTimer);
-            this.updateTimer = null;
-        }
-
-        // Save any pending changes before cleanup
-        this.saveChanges().catch(console.error);
     }
 
     /**
@@ -236,9 +195,6 @@ export class FileChangeQueue {
             const hashFunc =
                 this.options.hashFunc ?? FileChangeQueue.calculateFileHash;
             const hash = await hashFunc(content);
-
-            // Update file hashes
-            this.fileHashes[file.path] = hash;
 
             newQueue.push({
                 path: file.path,
@@ -292,30 +248,6 @@ export class FileChangeQueue {
     }
 
     /**
-     * Saves pending changes to the hash store if there are any
-     */
-    private async saveChanges(): Promise<void> {
-        if (this.hasChangesToSave) {
-            await this.options.hashStore.save(this.fileHashes);
-            this.hasChangesToSave = false;
-        }
-    }
-
-    /**
-     * Schedules a save of the hash store
-     */
-    private scheduleSave(): void {
-        if (
-            !this.updateTimer &&
-            (this.options.hashStoreUpdateInterval as number) > 0
-        ) {
-            this.updateTimer = setInterval(async () => {
-                await this.saveChanges();
-            }, this.options.hashStoreUpdateInterval);
-        }
-    }
-
-    /**
      * Marks a file change as processed by updating the hash store
      * This should be called after processing a file change to ensure it's not reprocessed
      * if the application restarts before the hash store is updated
@@ -323,16 +255,13 @@ export class FileChangeQueue {
     public async markFileChangeProcessed(change: FileChange): Promise<void> {
         if (change.reason === "deleted") {
             delete this.fileHashes[change.path];
-            this.hasChangesToSave = true;
         } else if (change.hash) {
             // Update the hash store with the processed hash
             this.fileHashes[change.path] = change.hash;
-            this.hasChangesToSave = true;
         }
+    }
 
-        // If interval is 0 or negative, save immediately
-        if ((this.options.hashStoreUpdateInterval as number) <= 0) {
-            await this.saveChanges();
-        }
+    public getMetadata(): Record<string, string> {
+        return this.fileHashes;
     }
 }
