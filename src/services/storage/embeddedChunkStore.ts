@@ -68,6 +68,11 @@ export interface EmbeddedChunkStore {
     removeByPath(path: string): Promise<void>;
 
     /**
+     * Count the number of chunks in the store
+     */
+    count(): number;
+
+    /**
      * Search embeddings (similarity-based)
      * @param embedding Search embedding vector
      * @param limit Maximum number of results

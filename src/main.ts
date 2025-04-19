@@ -144,9 +144,13 @@ export default class MainPlugin extends Plugin {
                     })
                 );
 
-                log.info("embeddedChunks", embeddedChunks);
                 await this.embeddingStore.removeByPath(file.path);
                 await this.embeddingStore.addMulti(embeddedChunks);
+
+                log.info(
+                    "count of chunks in embedding store",
+                    this.embeddingStore.count()
+                );
             };
 
             this.fileChangeLoop = async () => {
@@ -333,9 +337,13 @@ export default class MainPlugin extends Plugin {
             // Try to load existing database
             try {
                 await this.embeddingStore.load(this.settings.dbPath);
+                const count = this.embeddingStore.count();
                 log.info(
                     "Successfully loaded existing database from",
-                    this.settings.dbPath
+                    this.settings.dbPath,
+                    "with",
+                    count,
+                    "chunks"
                 );
             } catch (e) {
                 log.info(

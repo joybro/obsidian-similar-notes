@@ -2,6 +2,7 @@ import {
     type Orama,
     type SearchParams,
     type TypedDocument,
+    count,
     create,
     insert,
     insertMultiple,
@@ -212,5 +213,9 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
         }
 
         return allResults;
+    }
+
+    count(): number {
+        return count(this.db);
     }
 }
