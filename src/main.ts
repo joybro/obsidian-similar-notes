@@ -9,8 +9,16 @@ import { NoteChangeQueue } from "./services/noteChangeQueue";
 import type {
     EmbeddedChunk,
     EmbeddedChunkStore,
+    SearchResult,
 } from "./services/storage/embeddedChunkStore";
 import { OramaEmbeddedChunkStore } from "./services/storage/oramaEmbeddedChunkStore";
+
+// Define the SimilarNote interface
+interface SimilarNote {
+    file: TFile;
+    title: string;
+    similarity: number;
+}
 
 interface SimilarNotesSettings {
     dbPath: string;
@@ -36,6 +44,7 @@ export default class MainPlugin extends Plugin {
     private modelService: EmbeddingModelService;
     private fileChangeLoop: () => Promise<void>;
     private fileChangeLoopTimer: NodeJS.Timeout;
+    private splitter: RecursiveCharacterTextSplitter;
     async onload() {
         log.setDefaultLevel(log.levels.INFO);
         log.info("Loading Similar Notes plugin");
@@ -100,7 +109,7 @@ export default class MainPlugin extends Plugin {
 
             const statusBarItem = this.addStatusBarItem();
 
-            const splitter = RecursiveCharacterTextSplitter.fromLanguage(
+            this.splitter = RecursiveCharacterTextSplitter.fromLanguage(
                 "markdown",
                 {
                     chunkSize: this.modelService.getMaxTokens(),
@@ -126,7 +135,7 @@ export default class MainPlugin extends Plugin {
                     return;
                 }
 
-                const chunks = await splitter.splitText(content);
+                const chunks = await this.splitter.splitText(content);
                 log.info("chunks", chunks);
 
                 const embeddings = await this.modelService.embedTexts(chunks);
@@ -279,33 +288,56 @@ export default class MainPlugin extends Plugin {
     }
 
     // Get similar notes (dummy data)
-    private async getSimilarNotes(file: TFile) {
-        // Currently returns dummy data
-        // Will be replaced with actual embedding and similarity search later
-        const allFiles = this.app.vault
-            .getMarkdownFiles()
-            .filter((f) => f.path !== file.path);
+    private async getSimilarNotes(file: TFile): Promise<SimilarNote[]> {
+        const content = await this.app.vault.cachedRead(file);
+        if (content.length === 0) {
+            return [];
+        }
 
-        // Randomly select up to 5 files
-        const randomFiles = allFiles
-            .sort(() => 0.5 - Math.random())
-            .slice(0, Math.min(5, allFiles.length));
+        const chunks = await this.splitter.splitText(content);
+        const embeddings = await this.modelService.embedTexts(chunks);
 
-        const similarNotes = await Promise.all(
-            randomFiles.map(async (f) => {
-                return {
-                    file: f,
-                    title: f.basename,
-                    // Dummy similarity score (between 0.6 and 0.95)
-                    similarity: 0.6 + Math.random() * 0.35,
-                };
-            })
+        console.log("embeddings", embeddings);
+
+        // Get search results for each embedding and flatten them into a single array
+        const searchResultsArrays = await Promise.all(
+            embeddings.map((embedding) =>
+                this.embeddingStore.searchSimilar(embedding, 10)
+            )
         );
 
-        // Sort by similarity score in descending order
-        return similarNotes.sort(
-            (a, b) => (b.similarity || 0) - (a.similarity || 0)
-        );
+        // Flatten the array of arrays into a single array of SearchResult objects
+        const results = searchResultsArrays.flat();
+
+        // Reduce results to unique paths
+        const uniqueResults = results.reduce((acc, result) => {
+            if (
+                acc[result.chunk.path] === undefined ||
+                acc[result.chunk.path].score < result.score
+            ) {
+                acc[result.chunk.path] = result;
+            }
+            return acc;
+        }, {} as Record<string, SearchResult>);
+
+        // Convert uniqueResults object to array
+        const uniqueResultsArray = Object.values(uniqueResults);
+
+        // Sort by score in descending order
+        uniqueResultsArray.sort((a, b) => b.score - a.score);
+
+        console.log("uniqueResultsArray", uniqueResultsArray);
+
+        // Convert to SimilarNote format
+        const similarNotes = uniqueResultsArray
+            .map((result) => ({
+                file: this.app.vault.getFileByPath(result.chunk.path),
+                title: result.chunk.title,
+                similarity: result.score,
+            }))
+            .filter((note) => note.file !== null) as SimilarNote[];
+
+        return similarNotes.slice(0, 5);
     }
 
     // Handle reindexing of notes
