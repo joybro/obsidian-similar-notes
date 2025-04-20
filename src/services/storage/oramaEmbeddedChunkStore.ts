@@ -35,11 +35,6 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
     private hasChanges = false;
 
     constructor(vault: Vault, filepath: string, vectorSize: number) {
-        console.log(
-            "OramaEmbeddedChunkStore constructor",
-            filepath,
-            vectorSize
-        );
         this.vault = vault;
         this.filepath = filepath;
         this.schema = {

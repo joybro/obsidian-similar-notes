@@ -7,11 +7,20 @@ import type {
 // @ts-ignore
 import InlineWorker from "./transformers.worker";
 
+interface PendingRequest {
+    resolve: (value: WorkerResponse) => void;
+    reject: (reason?: Error) => void;
+    message: WorkerMessage;
+    startTime: number;
+}
+
 export class EmbeddingModelService {
     private worker: Worker | null = null;
     private modelId: string | null = null;
     private vectorSize: number | null = null;
     private maxTokens: number | null = null;
+    private pendingRequests = new Map<string, PendingRequest>();
+    private requestCounter = 0;
 
     constructor() {
         if (process.env.NODE_ENV === "test") {
@@ -30,7 +39,40 @@ export class EmbeddingModelService {
                     `${e.filename}:${e.lineno}:${e.colno}`
                 );
             };
+
+            this.worker.onmessage = this.handleWorkerMessage.bind(this);
         }
+    }
+
+    private handleWorkerMessage(
+        event: MessageEvent<WorkerResponse & { requestId: string }>
+    ) {
+        const { requestId, ...response } = event.data;
+        const pendingRequest = this.pendingRequests.get(requestId);
+
+        if (!pendingRequest) {
+            log.error(`Received response for unknown request ID: ${requestId}`);
+            return;
+        }
+
+        this.pendingRequests.delete(requestId);
+        const endTime = performance.now();
+        log.info(
+            `Received message from worker for request ${requestId} (took ${(
+                endTime - pendingRequest.startTime
+            ).toFixed(2)}ms)`,
+            response
+        );
+
+        if (response.type === "error") {
+            pendingRequest.reject(new Error(response.error));
+        } else {
+            pendingRequest.resolve(response);
+        }
+    }
+
+    private generateRequestId(): string {
+        return `req_${++this.requestCounter}`;
     }
 
     public async loadModel(modelId: string): Promise<ModelLoadResponse> {
@@ -128,22 +170,17 @@ export class EmbeddingModelService {
                 return;
             }
 
+            const requestId = this.generateRequestId();
             const startTime = performance.now();
-            const handleMessage = (event: MessageEvent<WorkerResponse>) => {
-                this.worker?.removeEventListener("message", handleMessage);
-                const endTime = performance.now();
-                const duration = endTime - startTime;
-                log.info(
-                    `Received message from worker (took ${duration.toFixed(
-                        2
-                    )}ms)`,
-                    event.data
-                );
-                resolve(event.data);
-            };
 
-            this.worker.addEventListener("message", handleMessage);
-            this.worker.postMessage(message);
+            this.pendingRequests.set(requestId, {
+                resolve,
+                reject,
+                message,
+                startTime,
+            });
+
+            this.worker.postMessage({ ...message, requestId });
         });
     }
 
@@ -155,5 +192,6 @@ export class EmbeddingModelService {
         this.modelId = null;
         this.vectorSize = null;
         this.maxTokens = null;
+        this.pendingRequests.clear();
     }
 }

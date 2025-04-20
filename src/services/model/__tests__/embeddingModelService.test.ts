@@ -6,15 +6,17 @@ import type {
     WorkerResponse,
 } from "../transformers.worker";
 
+type WorkerResponseWithId = WorkerResponse & { requestId: string };
+
 // Mock Worker
 class MockWorker implements Worker {
     private listeners: Map<
         string,
-        Array<(event: MessageEvent<WorkerResponse>) => void>
+        Array<(event: MessageEvent<WorkerResponseWithId>) => void>
     > = new Map();
 
     onmessage:
-        | ((this: Worker, ev: MessageEvent<WorkerResponse>) => void)
+        | ((this: Worker, ev: MessageEvent<WorkerResponseWithId>) => void)
         | null = null;
     onmessageerror: ((this: Worker, ev: MessageEvent<unknown>) => void) | null =
         null;
@@ -22,7 +24,7 @@ class MockWorker implements Worker {
 
     addEventListener(
         type: string,
-        listener: (event: MessageEvent<WorkerResponse>) => void
+        listener: (event: MessageEvent<WorkerResponseWithId>) => void
     ): void {
         if (!this.listeners.has(type)) {
             this.listeners.set(type, []);
@@ -32,7 +34,7 @@ class MockWorker implements Worker {
 
     removeEventListener(
         type: string,
-        listener: (event: MessageEvent<WorkerResponse>) => void
+        listener: (event: MessageEvent<WorkerResponseWithId>) => void
     ): void {
         const listeners = this.listeners.get(type);
         if (listeners) {
@@ -47,7 +49,7 @@ class MockWorker implements Worker {
         return true;
     }
 
-    postMessage(message: WorkerMessage): void {
+    postMessage(message: WorkerMessage & { requestId: string }): void {
         // Simulate async behavior
         setTimeout(() => {
             let response: WorkerResponse;
@@ -88,7 +90,9 @@ class MockWorker implements Worker {
                     };
             }
 
-            const event = new MessageEvent("message", { data: response });
+            const event = new MessageEvent("message", {
+                data: { ...response, requestId: message.requestId },
+            });
 
             // Call all registered message listeners
             if (this.onmessage) {
@@ -161,6 +165,36 @@ describe("EmbeddingModelService", () => {
             await service.loadModel("test-model");
             const tokenCount = await service.countTokens("test text");
             expect(tokenCount).toBe(3); // Math.ceil(9 / 4) = 3
+        });
+    });
+
+    describe("concurrent requests", () => {
+        it("should handle concurrent embedTexts and countTokens requests correctly", async () => {
+            await service.loadModel("test-model");
+
+            const [embeddings, tokenCount] = await Promise.all([
+                service.embedTexts(["test1", "test2"]),
+                service.countTokens("test text"),
+            ]);
+
+            expect(embeddings).toHaveLength(2);
+            expect(embeddings[0]).toHaveLength(384);
+            expect(embeddings[1]).toHaveLength(384);
+            expect(tokenCount).toBe(3);
+        });
+
+        it("should maintain request order and response matching", async () => {
+            await service.loadModel("test-model");
+
+            const results = await Promise.all([
+                service.countTokens("short"),
+                service.countTokens("medium length text"),
+                service.countTokens("very long text for testing"),
+            ]);
+
+            expect(results[0]).toBe(2); // Math.ceil(5 / 4) = 2
+            expect(results[1]).toBe(5); // Math.ceil(18 / 4) = 5
+            expect(results[2]).toBe(7); // Math.ceil(27 / 4) = 7
         });
     });
 

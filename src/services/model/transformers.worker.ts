@@ -114,7 +114,9 @@ async function importTransformers(): Promise<Transformers> {
 
 // Message handler setup for both browser and Node.js environments
 const setupMessageHandler = () => {
-    const handleMessage = async (message: WorkerMessage) => {
+    const handleMessage = async (
+        message: WorkerMessage & { requestId: string }
+    ) => {
         try {
             switch (message.type) {
                 case "load":
@@ -142,7 +144,7 @@ const setupMessageHandler = () => {
                 error: error instanceof Error ? error.message : String(error),
             };
 
-            postMessage(response);
+            postMessage({ ...response, requestId: message.requestId });
         }
     };
 
@@ -158,12 +160,13 @@ const setupMessageHandler = () => {
         }
     } else {
         // Browser environment
-        self.onmessage = (event: MessageEvent<WorkerMessage>) =>
-            handleMessage(event.data);
+        self.onmessage = (
+            event: MessageEvent<WorkerMessage & { requestId: string }>
+        ) => handleMessage(event.data);
     }
 };
 
-function postMessage(response: WorkerResponse): void {
+function postMessage(response: WorkerResponse & { requestId: string }): void {
     if (isTest) {
         try {
             const nodeWorker =
@@ -178,7 +181,9 @@ function postMessage(response: WorkerResponse): void {
     }
 }
 
-async function handleLoad(message: LoadMessage): Promise<void> {
+async function handleLoad(
+    message: LoadMessage & { requestId: string }
+): Promise<void> {
     const transformers = await importTransformers();
     extractor = await transformers.pipeline(
         "feature-extraction",
@@ -210,19 +215,24 @@ async function handleLoad(message: LoadMessage): Promise<void> {
         } as ModelLoadResponse,
     };
 
-    postMessage(response);
+    postMessage({ ...response, requestId: message.requestId });
 }
 
-async function handleUnload(message: UnloadMessage): Promise<void> {
+async function handleUnload(
+    message: UnloadMessage & { requestId: string }
+): Promise<void> {
     extractor = null;
 
     postMessage({
         type: "success",
         data: "Model unloaded successfully",
+        requestId: message.requestId,
     });
 }
 
-async function handleEmbedBatch(message: EmbedBatchMessage): Promise<void> {
+async function handleEmbedBatch(
+    message: EmbedBatchMessage & { requestId: string }
+): Promise<void> {
     if (!extractor) {
         throw new Error("Model not loaded");
     }
@@ -236,11 +246,14 @@ async function handleEmbedBatch(message: EmbedBatchMessage): Promise<void> {
     postMessage({
         type: "success",
         data: embeddings,
+        requestId: message.requestId,
     });
 }
 
 // Add new handler for count_token
-async function handleCountToken(message: CountTokenMessage): Promise<void> {
+async function handleCountToken(
+    message: CountTokenMessage & { requestId: string }
+): Promise<void> {
     if (!extractor) {
         throw new Error("Model not loaded");
     }
@@ -250,7 +263,9 @@ async function handleCountToken(message: CountTokenMessage): Promise<void> {
     postMessage({
         type: "success",
         data: tokenCount,
+        requestId: message.requestId,
     });
+    console.log("handleCountToken end");
 }
 
 // Initialize message handler
