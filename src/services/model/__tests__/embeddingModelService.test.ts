@@ -1,121 +1,43 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EmbeddingModelService } from "../embeddingModelService";
-import type {
-    ModelLoadResponse,
-    WorkerMessage,
-    WorkerResponse,
-} from "../transformers.worker";
 
-type WorkerResponseWithId = WorkerResponse & { requestId: string };
+// Mock Comlink.wrap
+vi.mock("comlink", async () => {
+    const actual = await vi.importActual("comlink");
 
-// Mock Worker
-class MockWorker implements Worker {
-    private listeners: Map<
-        string,
-        Array<(event: MessageEvent<WorkerResponseWithId>) => void>
-    > = new Map();
-
-    onmessage:
-        | ((this: Worker, ev: MessageEvent<WorkerResponseWithId>) => void)
-        | null = null;
-    onmessageerror: ((this: Worker, ev: MessageEvent<unknown>) => void) | null =
-        null;
-    onerror: ((this: Worker, ev: ErrorEvent) => void) | null = null;
-
-    addEventListener(
-        type: string,
-        listener: (event: MessageEvent<WorkerResponseWithId>) => void
-    ): void {
-        if (!this.listeners.has(type)) {
-            this.listeners.set(type, []);
-        }
-        this.listeners.get(type)?.push(listener);
-    }
-
-    removeEventListener(
-        type: string,
-        listener: (event: MessageEvent<WorkerResponseWithId>) => void
-    ): void {
-        const listeners = this.listeners.get(type);
-        if (listeners) {
-            const index = listeners.indexOf(listener);
-            if (index !== -1) {
-                listeners.splice(index, 1);
-            }
-        }
-    }
-
-    dispatchEvent(event: Event): boolean {
-        return true;
-    }
-
-    postMessage(message: WorkerMessage & { requestId: string }): void {
-        // Simulate async behavior
-        setTimeout(() => {
-            let response: WorkerResponse;
-
-            switch (message.type) {
-                case "load":
-                    response = {
-                        type: "success",
-                        data: {
-                            message: "Model loaded successfully",
-                            vectorSize: 384,
-                            maxTokens: 512,
-                        } as ModelLoadResponse,
+    return {
+        ...actual,
+        wrap: vi.fn(() => {
+            return class {
+                handleLoad() {
+                    return {
+                        vectorSize: 384,
+                        maxTokens: 512,
                     };
-                    break;
-                case "unload":
-                    response = {
-                        type: "success",
-                        data: "Model unloaded successfully",
-                    };
-                    break;
-                case "embed_batch":
-                    response = {
-                        type: "success",
-                        data: message.texts.map(() => new Array(384).fill(0)),
-                    };
-                    break;
-                case "count_token":
-                    response = {
-                        type: "success",
-                        data: Math.ceil(message.text.length / 4),
-                    };
-                    break;
-                default:
-                    response = {
-                        type: "error",
-                        error: "Unknown message type",
-                    };
-            }
+                }
+                handleUnload() {
+                    return undefined;
+                }
+                handleEmbedBatch(texts: string[]) {
+                    return Promise.resolve(
+                        texts.map(() => new Array(384).fill(0))
+                    );
+                }
+                handleCountToken(text: string) {
+                    return Promise.resolve(Math.ceil(text.length / 4));
+                }
+            };
+        }),
+    };
+});
 
-            const event = new MessageEvent("message", {
-                data: { ...response, requestId: message.requestId },
-            });
-
-            // Call all registered message listeners
-            if (this.onmessage) {
-                this.onmessage.call(this, event);
-            }
-
-            const messageListeners = this.listeners.get("message") || [];
-            for (const listener of messageListeners) {
-                listener(event);
-            }
-        }, 0);
-    }
-
-    terminate(): void {
-        this.listeners.clear();
-        this.onmessage = null;
-        this.onmessageerror = null;
-        this.onerror = null;
-    }
-}
-
-// Mock window.Worker
-(global as unknown as { Worker: typeof Worker }).Worker = MockWorker;
+// Mock InlineWorker import
+vi.mock("../transformers.worker", async () => {
+    return {
+        default: class {},
+        TransformersWorker: class {},
+    };
+});
 
 describe("EmbeddingModelService", () => {
     let service: EmbeddingModelService;
@@ -130,9 +52,7 @@ describe("EmbeddingModelService", () => {
 
     describe("loadModel", () => {
         it("should load model successfully", async () => {
-            const response = await service.loadModel("test-model");
-            expect(response.vectorSize).toBe(384);
-            expect(response.maxTokens).toBe(512);
+            await service.loadModel("test-model");
             expect(service.getVectorSize()).toBe(384);
             expect(service.getMaxTokens()).toBe(512);
         });

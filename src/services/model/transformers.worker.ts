@@ -3,44 +3,7 @@ import type {
     Pipeline,
     PretrainedOptions,
 } from "@huggingface/transformers";
-
-// Types for messages between main thread and worker
-export type LoadMessage = {
-    type: "load";
-    modelId: string;
-};
-
-export type CountTokenMessage = {
-    type: "count_token";
-    text: string;
-};
-
-export type UnloadMessage = {
-    type: "unload";
-};
-
-export type EmbedBatchMessage = {
-    type: "embed_batch";
-    texts: string[];
-};
-
-export type WorkerMessage =
-    | LoadMessage
-    | UnloadMessage
-    | EmbedBatchMessage
-    | CountTokenMessage;
-
-export type WorkerResponse = {
-    type: "success" | "error";
-    data?: unknown;
-    error?: string;
-};
-
-export type ModelLoadResponse = {
-    message: string;
-    vectorSize: number;
-    maxTokens: number;
-};
+import * as comlink from "comlink";
 
 interface Transformers {
     pipeline(
@@ -49,11 +12,6 @@ interface Transformers {
         options: PretrainedOptions
     ): Promise<Pipeline>;
 }
-
-// Global variables
-let extractor: FeatureExtractionPipeline | null = null;
-let vectorSize: number | null = null;
-let maxTokens: number | null = null;
 
 const isTest =
     typeof process === "undefined" || process.versions?.electron === undefined;
@@ -78,8 +36,7 @@ const createMockPipeline = () => {
         },
         encode: (text: string) => new Array(Math.ceil(text.length / 4)).fill(0), // Rough mock implementation
     };
-    vectorSize = 384;
-    maxTokens = 512;
+
     return {
         pipeline: async () => mockPipeline as unknown as Pipeline,
     };
@@ -112,161 +69,83 @@ async function importTransformers(): Promise<Transformers> {
     }
 }
 
-// Message handler setup for both browser and Node.js environments
-const setupMessageHandler = () => {
-    const handleMessage = async (
-        message: WorkerMessage & { requestId: string }
-    ) => {
-        try {
-            switch (message.type) {
-                case "load":
-                    await handleLoad(message);
-                    break;
-                case "unload":
-                    await handleUnload(message);
-                    break;
-                case "embed_batch":
-                    await handleEmbedBatch(message);
-                    break;
-                case "count_token":
-                    await handleCountToken(message);
-                    break;
-                default:
-                    throw new Error(
-                        `Unknown message type: ${
-                            (message as { type: string }).type
-                        }`
-                    );
+class TransformersWorker {
+    extractor: FeatureExtractionPipeline | null = null;
+    vectorSize: number | null = null;
+    maxTokens: number | null = null;
+
+    constructor() {
+        console.log("TransformersWorker constructor");
+        this.extractor = null;
+        this.vectorSize = null;
+        this.maxTokens = null;
+    }
+
+    async handleLoad(
+        modelId: string
+    ): Promise<{ vectorSize: number; maxTokens: number }> {
+        const transformers = await importTransformers();
+        this.extractor = await transformers.pipeline(
+            "feature-extraction",
+            modelId,
+            {
+                // @ts-ignore
+                dtype: "fp32",
+                device: "webgpu",
             }
-        } catch (error) {
-            const response: WorkerResponse = {
-                type: "error",
-                error: error instanceof Error ? error.message : String(error),
-            };
+        );
 
-            postMessage({ ...response, requestId: message.requestId });
+        // Get vector size by running inference on a test input
+        const tensor = await this.extractor("test", {
+            pooling: "mean",
+            normalize: true,
+        });
+        const testEmbedding = tensor.tolist();
+        this.vectorSize = testEmbedding[0].length;
+
+        // Get max tokens from the tokenizer
+        this.maxTokens = this.extractor.tokenizer.model_max_length ?? 512;
+
+        if (this.vectorSize === null || this.maxTokens === null) {
+            throw new Error("Failed to initialize model parameters");
         }
-    };
 
-    if (isTest) {
-        // Node.js environment
-        try {
-            // Using type assertion since we know the module exists in Node.js
-            const nodeWorker =
-                require("node:worker_threads") as typeof import("node:worker_threads");
-            nodeWorker.parentPort?.on("message", handleMessage);
-        } catch (e) {
-            // Ignore error in browser environment
-        }
-    } else {
-        // Browser environment
-        self.onmessage = (
-            event: MessageEvent<WorkerMessage & { requestId: string }>
-        ) => handleMessage(event.data);
-    }
-};
-
-function postMessage(response: WorkerResponse & { requestId: string }): void {
-    if (isTest) {
-        try {
-            const nodeWorker =
-                require("node:worker_threads") as typeof import("node:worker_threads");
-            nodeWorker.parentPort?.postMessage(response);
-        } catch (e) {
-            // Ignore error in browser environment
-            console.error("postMessage error", e);
-        }
-    } else {
-        self.postMessage(response);
-    }
-}
-
-async function handleLoad(
-    message: LoadMessage & { requestId: string }
-): Promise<void> {
-    const transformers = await importTransformers();
-    extractor = await transformers.pipeline(
-        "feature-extraction",
-        message.modelId,
-        {
-            // @ts-ignore
-            dtype: "fp32",
-            device: "webgpu",
-        }
-    );
-
-    // Get vector size by running inference on a test input
-    const tensor = await extractor("test", {
-        pooling: "mean",
-        normalize: true,
-    });
-    const testEmbedding = tensor.tolist();
-    vectorSize = testEmbedding[0].length;
-
-    // Get max tokens from the tokenizer
-    maxTokens = extractor.tokenizer.model_max_length ?? 512;
-
-    const response: WorkerResponse = {
-        type: "success",
-        data: {
-            message: "Model loaded successfully",
-            vectorSize,
-            maxTokens,
-        } as ModelLoadResponse,
-    };
-
-    postMessage({ ...response, requestId: message.requestId });
-}
-
-async function handleUnload(
-    message: UnloadMessage & { requestId: string }
-): Promise<void> {
-    extractor = null;
-
-    postMessage({
-        type: "success",
-        data: "Model unloaded successfully",
-        requestId: message.requestId,
-    });
-}
-
-async function handleEmbedBatch(
-    message: EmbedBatchMessage & { requestId: string }
-): Promise<void> {
-    if (!extractor) {
-        throw new Error("Model not loaded");
+        return {
+            vectorSize: this.vectorSize,
+            maxTokens: this.maxTokens,
+        };
     }
 
-    const tensor = await extractor(message.texts, {
-        pooling: "mean",
-        normalize: true,
-    });
-    const embeddings = tensor.tolist();
-
-    postMessage({
-        type: "success",
-        data: embeddings,
-        requestId: message.requestId,
-    });
-}
-
-// Add new handler for count_token
-async function handleCountToken(
-    message: CountTokenMessage & { requestId: string }
-): Promise<void> {
-    if (!extractor) {
-        throw new Error("Model not loaded");
+    async handleUnload(): Promise<void> {
+        this.extractor = null;
     }
 
-    const tokenCount = extractor.tokenizer.encode(message.text).length;
+    async handleEmbedBatch(texts: string[]): Promise<number[][]> {
+        if (!this.extractor) {
+            throw new Error("Model not loaded");
+        }
 
-    postMessage({
-        type: "success",
-        data: tokenCount,
-        requestId: message.requestId,
-    });
-    console.log("handleCountToken end");
+        const tensor = await this.extractor(texts, {
+            pooling: "mean",
+            normalize: true,
+        });
+        const embeddings = tensor.tolist();
+
+        return embeddings;
+    }
+
+    // Add new handler for count_token
+    async handleCountToken(text: string): Promise<number> {
+        if (!this.extractor) {
+            throw new Error("Model not loaded");
+        }
+
+        const tokenCount = this.extractor.tokenizer.encode(text).length;
+
+        return tokenCount;
+    }
 }
 
-// Initialize message handler
-setupMessageHandler();
+export type { TransformersWorker };
+
+comlink.expose(TransformersWorker);
