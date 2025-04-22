@@ -73,12 +73,40 @@ class TransformersWorker {
     extractor: FeatureExtractionPipeline | null = null;
     vectorSize: number | null = null;
     maxTokens: number | null = null;
+    private embeddingQueue: Promise<unknown> = Promise.resolve();
 
     constructor() {
         console.log("TransformersWorker constructor");
         this.extractor = null;
         this.vectorSize = null;
         this.maxTokens = null;
+    }
+
+    private async enqueue<T>(task: () => Promise<T>): Promise<T> {
+        let localResolve: (value: unknown) => void;
+
+        // Create a new promise that will be resolved when the task is complete
+        const taskPromise = new Promise<T>((resolve) => {
+            localResolve = resolve;
+        });
+
+        // Chain the new task to the current queue
+        this.embeddingQueue = this.embeddingQueue.then(async () => {
+            try {
+                const result = await task();
+                if (localResolve) {
+                    localResolve(result);
+                }
+                return result;
+            } catch (error) {
+                if (localResolve) {
+                    localResolve(Promise.reject(error));
+                }
+                throw error;
+            }
+        });
+
+        return taskPromise;
     }
 
     async handleLoad(
@@ -125,13 +153,15 @@ class TransformersWorker {
             throw new Error("Model not loaded");
         }
 
-        const tensor = await this.extractor(texts, {
-            pooling: "mean",
-            normalize: true,
-        });
-        const embeddings = tensor.tolist();
+        const extractor = this.extractor; // Create a local reference to avoid null check issues
+        return this.enqueue(async () => {
+            const tensor = await extractor(texts, {
+                pooling: "mean",
+                normalize: true,
+            });
 
-        return embeddings;
+            return tensor.tolist();
+        });
     }
 
     // Add new handler for count_token
@@ -140,9 +170,7 @@ class TransformersWorker {
             throw new Error("Model not loaded");
         }
 
-        const tokenCount = this.extractor.tokenizer.encode(text).length;
-
-        return tokenCount;
+        return this.extractor.tokenizer.encode(text).length;
     }
 }
 
