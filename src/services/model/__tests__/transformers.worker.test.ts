@@ -10,6 +10,10 @@ describe("TransformersWorker", () => {
             extractor: null,
             vectorSize: null,
             maxTokens: null,
+            embeddingQueue: Promise.resolve(),
+            enqueue: async <T>(task: () => Promise<T>) => {
+                return task();
+            },
             handleLoad: async (modelId: string) => {
                 return {
                     vectorSize: 384, // Mock vector size
@@ -25,7 +29,7 @@ describe("TransformersWorker", () => {
             handleCountToken: async (text: string) => {
                 return Math.ceil(text.length / 4); // Rough mock implementation
             },
-        } as TransformersWorker;
+        } as unknown as TransformersWorker;
     });
 
     afterEach(() => {
@@ -80,6 +84,10 @@ describe("TransformersWorker", () => {
             extractor: null,
             vectorSize: null,
             maxTokens: null,
+            embeddingQueue: Promise.resolve(),
+            enqueue: async <T>(task: () => Promise<T>) => {
+                return task();
+            },
             handleLoad: async (modelId: string) => {
                 return {
                     vectorSize: 384,
@@ -95,7 +103,7 @@ describe("TransformersWorker", () => {
             handleCountToken: async (text: string) => {
                 return Math.ceil(text.length / 4);
             },
-        } as TransformersWorker;
+        } as unknown as TransformersWorker;
 
         await expect(
             errorWorkerInstance.handleEmbedBatch(["Test"])
@@ -123,6 +131,10 @@ describe("TransformersWorker", () => {
             extractor: null,
             vectorSize: null,
             maxTokens: null,
+            embeddingQueue: Promise.resolve(),
+            enqueue: async <T>(task: () => Promise<T>) => {
+                return task();
+            },
             handleLoad: async (modelId: string) => {
                 return {
                     vectorSize: 384,
@@ -138,7 +150,7 @@ describe("TransformersWorker", () => {
             handleCountToken: async () => {
                 throw new Error("Model not loaded");
             },
-        } as TransformersWorker;
+        } as unknown as TransformersWorker;
 
         await expect(
             errorWorkerInstance.handleCountToken("Test")
