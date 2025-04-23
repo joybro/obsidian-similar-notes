@@ -83,30 +83,15 @@ class TransformersWorker {
     }
 
     private async enqueue<T>(task: () => Promise<T>): Promise<T> {
-        let localResolve: (value: unknown) => void;
-
-        // Create a new promise that will be resolved when the task is complete
-        const taskPromise = new Promise<T>((resolve) => {
-            localResolve = resolve;
-        });
-
         // Chain the new task to the current queue
-        this.embeddingQueue = this.embeddingQueue.then(async () => {
-            try {
-                const result = await task();
-                if (localResolve) {
-                    localResolve(result);
-                }
-                return result;
-            } catch (error) {
-                if (localResolve) {
-                    localResolve(Promise.reject(error));
-                }
-                throw error;
-            }
-        });
+        this.embeddingQueue = this.embeddingQueue
+            .then(() => task())
+            .catch((e) => {
+                console.error(e);
+                throw e;
+            });
 
-        return taskPromise;
+        return this.embeddingQueue as Promise<T>;
     }
 
     async handleLoad(
