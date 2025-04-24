@@ -287,7 +287,6 @@ export default class MainPlugin extends Plugin {
         }
     }
 
-    // Get similar notes (dummy data)
     private async getSimilarNotes(file: TFile): Promise<SimilarNote[]> {
         const content = await this.app.vault.cachedRead(file);
         if (content.length === 0) {
@@ -297,12 +296,10 @@ export default class MainPlugin extends Plugin {
         const chunks = await this.splitter.splitText(content);
         const embeddings = await this.modelService.embedTexts(chunks);
 
-        console.log("embeddings", embeddings);
-
         // Get search results for each embedding and flatten them into a single array
         const searchResultsArrays = await Promise.all(
             embeddings.map((embedding) =>
-                this.embeddingStore.searchSimilar(embedding, 10)
+                this.embeddingStore.searchSimilar(embedding, 10, 0, [file.path])
             )
         );
 
@@ -326,7 +323,7 @@ export default class MainPlugin extends Plugin {
         // Sort by score in descending order
         uniqueResultsArray.sort((a, b) => b.score - a.score);
 
-        console.log("uniqueResultsArray", uniqueResultsArray);
+        log.info("uniqueResultsArray", uniqueResultsArray);
 
         // Convert to SimilarNote format
         const similarNotes = uniqueResultsArray
