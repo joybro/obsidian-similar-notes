@@ -4,14 +4,14 @@ import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
-import { EmbeddingModelService } from "./services/model/embeddingModelService";
-import { NoteChangeQueue } from "./services/noteChangeQueue";
 import type {
     EmbeddedChunk,
     EmbeddedChunkStore,
     SearchResult,
-} from "./services/storage/embeddedChunkStore";
-import { OramaEmbeddedChunkStore } from "./services/storage/oramaEmbeddedChunkStore";
+} from "./infrastructure/embeddedChunkStore";
+import { OramaEmbeddedChunkStore } from "./infrastructure/oramaEmbeddedChunkStore";
+import { EmbeddingModelService } from "./services/model/embeddingModelService";
+import { NoteChangeQueue } from "./services/noteChangeQueue";
 
 // Define the SimilarNote interface
 interface SimilarNote {
