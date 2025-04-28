@@ -19,6 +19,7 @@ import type {
 
 type Schema = {
     path: "string";
+    pathHash: "string";
     title: "string";
     embedding: `vector[${number}]`;
     lastUpdated: "number";
@@ -39,6 +40,7 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
         this.filepath = filepath;
         this.schema = {
             path: "string",
+            pathHash: "string",
             title: "string",
             embedding: `vector[${vectorSize}]`,
             lastUpdated: "number",
@@ -107,11 +109,19 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
     }
 
     async add(chunk: EmbeddedChunk): Promise<void> {
+        const pathHash = await this.calculatePathHash(chunk.path);
+        chunk.pathHash = pathHash;
         await insert(this.db, chunk as Doc);
         this.hasChanges = true;
     }
 
     async addMulti(chunks: EmbeddedChunk[]): Promise<void> {
+        const pathHashes = await Promise.all(
+            chunks.map((chunk) => this.calculatePathHash(chunk.path))
+        );
+        for (let i = 0; i < chunks.length; i++) {
+            chunks[i].pathHash = pathHashes[i];
+        }
         await insertMultiple(this.db, chunks as Doc[]);
         this.hasChanges = true;
     }
@@ -122,35 +132,28 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
     }
 
     async getByPath(path: string): Promise<EmbeddedChunk[]> {
+        const pathHash = await this.calculatePathHash(path);
         const results = await search(this.db, {
-            term: path,
-            properties: ["path"],
+            term: pathHash,
+            properties: ["pathHash"],
             exact: true,
         });
-        return (
-            results.hits
-                // orama 3.1.1 has a bug on exact match
-                // https://github.com/oramasearch/orama/issues/866
-                .filter((hit) => hit.document.path === path)
-                .map((hit) => hit.document as unknown as EmbeddedChunk)
+        return results.hits.map(
+            (hit) => hit.document as unknown as EmbeddedChunk
         );
     }
 
     async removeByPath(path: string): Promise<void> {
+        const pathHash = await this.calculatePathHash(path);
         const results = await search(this.db, {
-            term: path,
-            properties: ["path"],
+            term: pathHash,
+            properties: ["pathHash"],
             exact: true,
+            limit: 100,
         });
 
-        // orama 3.1.1 has a bug on exact match
-        // https://github.com/oramasearch/orama/issues/866
-        const filtered = results.hits.filter(
-            (hit) => hit.document.path === path
-        );
-
-        if (filtered.length > 0) {
-            for (const hit of filtered) {
+        if (results.hits.length > 0) {
+            for (const hit of results.hits) {
                 await remove(this.db, hit.id);
             }
             this.hasChanges = true;
@@ -217,5 +220,18 @@ export class OramaEmbeddedChunkStore implements EmbeddedChunkStore {
 
     count(): number {
         return count(this.db);
+    }
+
+    /**
+     * Helper function to calculate a SHA-256 hash for a filepath
+     */
+    private async calculatePathHash(path: string): Promise<string> {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(path);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray
+            .map((byte) => byte.toString(16).padStart(2, "0"))
+            .join("");
     }
 }
