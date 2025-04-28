@@ -144,7 +144,7 @@ export default class MainPlugin extends Plugin {
                 const embeddedChunks: EmbeddedChunk[] = embeddings.map(
                     (embedding, index) => ({
                         path: file.path,
-                        title: file.name,
+                        title: file.basename,
                         embedding,
                         content: chunks[index],
                         chunkIndex: index,
