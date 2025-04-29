@@ -56,6 +56,13 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         } as const;
     }
 
+    async init(): Promise<void> {
+        this.db = await create({
+            schema: this.schema,
+        });
+        this.hasChanges = false;
+    }
+
     async flush(): Promise<void> {
         if (!this.filepath) {
             throw new Error("No filepath specified for saving");
@@ -65,6 +72,9 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         }
         const JSONIndex = await persist(this.db, "json");
         const adapter = this.vault.adapter;
+        if (JSONIndex === undefined) {
+            throw new Error("Failed to persist OramaNoteChunkRepository");
+        }
 
         if (typeof JSONIndex === "string") {
             await adapter.write(this.filepath, JSONIndex);
@@ -195,15 +205,18 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
 
             // Add filtered results to our collection
             allResults = allResults.concat(
-                filteredHits
-                    .map((hit) => ({
-                        chunk: hit.document as unknown as NoteChunkInternal,
-                        score: hit.score,
-                    }))
-                    .map(({ chunk, score }) => [
-                        NoteChunk.fromDTO(chunk),
-                        score,
-                    ])
+                filteredHits.map((hit) => {
+                    const doc = hit.document as unknown as Doc;
+                    const dto: NoteChunkDTO = {
+                        path: doc.path,
+                        title: doc.title,
+                        content: doc.content,
+                        chunkIndex: doc.chunkIndex,
+                        totalChunks: doc.totalChunks,
+                        embedding: doc.embedding as unknown as number[],
+                    };
+                    return [NoteChunk.fromDTO(dto), hit.score];
+                })
             );
 
             // If we have enough results, break the loop
