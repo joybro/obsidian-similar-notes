@@ -2,20 +2,20 @@ import type { NoteChunk } from "@/domain/model/NoteChunk";
 
 export interface NoteChunkRepository {
     /**
-     * Saves a NoteChunk.
+     * Puts a NoteChunk.
      * If a chunk with the same chunkId exists, it will be overwritten.
      */
-    save(noteChunk: NoteChunk): Promise<void>;
+    put(noteChunk: NoteChunk): Promise<void>;
 
     /**
-     * Saves multiple NoteChunks.
+     * Puts multiple NoteChunks.
      */
-    saveMulti(noteChunks: NoteChunk[]): Promise<void>;
+    putMulti(noteChunks: NoteChunk[]): Promise<void>;
 
     /**
-     * Deletes all NoteChunks associated with a specific file path.
+     * Removes all NoteChunks associated with a specific file path.
      */
-    deleteByPath(path: string): Promise<void>;
+    removeByPath(path: string): Promise<void>;
 
     /**
      * Finds and returns NoteChunks that are most similar to the given embedding vector.
@@ -38,5 +38,10 @@ export interface NoteChunkRepository {
     /**
      * Persists NoteChunks in memory to disk.
      */
-    flush(): Promise<void>;
+    persist(): Promise<void>;
+
+    /**
+     * Restores NoteChunks from disk into memory.
+     */
+    restore(): Promise<void>;
 }

@@ -100,7 +100,7 @@ describe("OramaNoteChunkRepository", () => {
     });
 
     test("should save and retrieve a chunk", async () => {
-        await repository.save(testChunk1);
+        await repository.put(testChunk1);
         const results = await repository.findSimilarChunks(
             testChunk1.embedding,
             10
@@ -113,7 +113,7 @@ describe("OramaNoteChunkRepository", () => {
         expect(repository.count()).toBe(1);
     });
     test("should save multiple chunks", async () => {
-        await repository.saveMulti([testChunk1, testChunk2]);
+        await repository.putMulti([testChunk1, testChunk2]);
         const results = await repository.findSimilarChunks(
             testChunk1.embedding,
             10
@@ -128,8 +128,8 @@ describe("OramaNoteChunkRepository", () => {
     });
 
     test("should delete chunks by path", async () => {
-        await repository.saveMulti([testChunk1, testChunk2]);
-        await repository.deleteByPath(testChunk1.path);
+        await repository.putMulti([testChunk1, testChunk2]);
+        await repository.removeByPath(testChunk1.path);
         const results1 = await repository.findSimilarChunks(
             testChunk1.embedding,
             10
@@ -147,7 +147,7 @@ describe("OramaNoteChunkRepository", () => {
     });
 
     test("should exclude paths in similar search", async () => {
-        await repository.saveMulti([testChunk1, testChunk2]);
+        await repository.putMulti([testChunk1, testChunk2]);
         const results = await repository.findSimilarChunks(
             testChunk1.embedding,
             10,
@@ -162,7 +162,7 @@ describe("OramaNoteChunkRepository", () => {
     });
 
     test("should persist and load data", async () => {
-        await repository.save(testChunk1);
+        await repository.put(testChunk1);
 
         // Mock the file content for loading
         const mockFileContent = JSON.stringify({ some: "data" });
@@ -177,7 +177,7 @@ describe("OramaNoteChunkRepository", () => {
             vectorSize,
             testDbPath
         );
-        await newRepository.load();
+        await newRepository.restore();
 
         // Verify that the mock functions were called
         expect(mockAdapter.exists).toHaveBeenCalledWith(testDbPath);
@@ -187,7 +187,7 @@ describe("OramaNoteChunkRepository", () => {
 
     describe("change tracking", () => {
         test("should not save when no changes are made", async () => {
-            await repository.flush();
+            await repository.persist();
             expect(mockAdapter.write).not.toHaveBeenCalled();
             expect(mockAdapter.writeBinary).not.toHaveBeenCalled();
         });
@@ -197,8 +197,8 @@ describe("OramaNoteChunkRepository", () => {
             (persist as Mock).mockResolvedValue(mockFileContent);
             mockAdapter.exists.mockResolvedValue(false);
 
-            await repository.save(testChunk1);
-            await repository.flush();
+            await repository.put(testChunk1);
+            await repository.persist();
             expect(mockAdapter.write).toHaveBeenCalledTimes(1);
         });
 
@@ -207,8 +207,8 @@ describe("OramaNoteChunkRepository", () => {
             (persist as Mock).mockResolvedValue(mockFileContent);
             mockAdapter.exists.mockResolvedValue(true);
 
-            await repository.save(testChunk1);
-            await repository.flush();
+            await repository.put(testChunk1);
+            await repository.persist();
             expect(mockAdapter.write).toHaveBeenCalledTimes(1);
         });
 
@@ -216,10 +216,10 @@ describe("OramaNoteChunkRepository", () => {
             const mockFileContent = JSON.stringify({ some: "data" });
             (persist as Mock).mockResolvedValue(mockFileContent);
 
-            await repository.save(testChunk1);
-            await repository.flush();
+            await repository.put(testChunk1);
+            await repository.persist();
             vi.clearAllMocks();
-            await repository.flush();
+            await repository.persist();
             expect(mockAdapter.write).not.toHaveBeenCalled();
             expect(mockAdapter.writeBinary).not.toHaveBeenCalled();
         });
@@ -230,25 +230,25 @@ describe("OramaNoteChunkRepository", () => {
             mockAdapter.exists.mockResolvedValue(false);
 
             // Test save
-            await repository.save(testChunk1);
-            await repository.flush();
+            await repository.put(testChunk1);
+            await repository.persist();
             expect(mockAdapter.write).toHaveBeenCalledTimes(1);
             vi.clearAllMocks();
 
             // Test saveMulti
-            await repository.saveMulti([testChunk2]);
-            await repository.flush();
+            await repository.putMulti([testChunk2]);
+            await repository.persist();
             expect(mockAdapter.write).toHaveBeenCalledTimes(1);
             vi.clearAllMocks();
 
             // Test deleteByPath
-            await repository.deleteByPath(testChunk1.path);
-            await repository.flush();
+            await repository.removeByPath(testChunk1.path);
+            await repository.persist();
             expect(mockAdapter.write).toHaveBeenCalledTimes(1);
         });
 
         test("should reset changes flag after loading", async () => {
-            await repository.save(testChunk1);
+            await repository.put(testChunk1);
 
             // Mock the file content for loading
             mockAdapter.exists.mockResolvedValue(true);
@@ -256,9 +256,9 @@ describe("OramaNoteChunkRepository", () => {
                 JSON.stringify({ some: "data" })
             );
 
-            await repository.load();
+            await repository.restore();
             vi.clearAllMocks();
-            await repository.flush();
+            await repository.persist();
             expect(mockAdapter.write).not.toHaveBeenCalled();
             expect(mockAdapter.writeBinary).not.toHaveBeenCalled();
         });

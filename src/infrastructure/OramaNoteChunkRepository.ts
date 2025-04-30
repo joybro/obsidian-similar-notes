@@ -63,7 +63,7 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         this.hasChanges = false;
     }
 
-    async flush(): Promise<void> {
+    async persist(): Promise<void> {
         if (!this.filepath) {
             throw new Error("No filepath specified for saving");
         }
@@ -84,7 +84,7 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         this.hasChanges = false;
     }
 
-    async load(): Promise<void> {
+    async restore(): Promise<void> {
         try {
             const adapter = this.vault.adapter;
             const exists = await adapter.exists(this.filepath);
@@ -102,7 +102,7 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         }
     }
 
-    async save(noteChunk: NoteChunk): Promise<void> {
+    async put(noteChunk: NoteChunk): Promise<void> {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
@@ -115,7 +115,7 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         this.hasChanges = true;
     }
 
-    async saveMulti(chunks: NoteChunk[]): Promise<void> {
+    async putMulti(chunks: NoteChunk[]): Promise<void> {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
@@ -142,7 +142,7 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
             .join("");
     }
 
-    async deleteByPath(path: string): Promise<void> {
+    async removeByPath(path: string): Promise<void> {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
