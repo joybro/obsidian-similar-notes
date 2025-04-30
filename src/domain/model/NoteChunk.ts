@@ -1,16 +1,5 @@
 import type { NoteChunkDTO } from "./NoteChunkDTO";
 
-export interface EmbeddedChunk {
-    path: string; // Original file path
-    pathHash: string; // SHA-256 hash of the file path
-    title: string; // File title (extracted from filename)
-    embedding: number[]; // Embedding vector
-    lastUpdated: number; // Last update timestamp
-    content: string; // Actual embedded text content (full or partial)
-    chunkIndex: number; // Chunk index within the same document (when split)
-    totalChunks: number; // Total number of chunks (when split)
-}
-
 export class NoteChunk {
     constructor(
         public readonly path: string,

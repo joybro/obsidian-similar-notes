@@ -4,12 +4,9 @@ import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
-import type {
-    EmbeddedChunk,
-    EmbeddedChunkStore,
-    SearchResult,
-} from "./infrastructure/embeddedChunkStore";
-import { OramaEmbeddedChunkStore } from "./infrastructure/oramaEmbeddedChunkStore";
+import { NoteChunk } from "./domain/model/NoteChunk";
+import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
+import { OramaNoteChunkRepository } from "./infrastructure/OramaNoteChunkRepository";
 import { EmbeddingModelService } from "./services/model/embeddingModelService";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
 
@@ -38,7 +35,7 @@ export default class MainPlugin extends Plugin {
     private similarNotesViews: Map<WorkspaceLeaf, SimilarNotesView> = new Map();
     private eventRefs: EventRef[] = [];
     private settings: SimilarNotesSettings;
-    private embeddingStore: EmbeddedChunkStore;
+    private noteChunkRepository: NoteChunkRepository;
     private autoSaveInterval: NodeJS.Timeout;
     private fileChangeQueue: NoteChangeQueue;
     private modelService: EmbeddingModelService;
@@ -120,7 +117,7 @@ export default class MainPlugin extends Plugin {
             );
 
             const processDeletedNote = async (path: string) => {
-                await this.embeddingStore.removeByPath(path);
+                await this.noteChunkRepository.removeByPath(path);
             };
 
             const processUpdatedNote = async (path: string) => {
@@ -141,24 +138,24 @@ export default class MainPlugin extends Plugin {
                 const embeddings = await this.modelService.embedTexts(chunks);
                 log.info("embeddings", embeddings);
 
-                const embeddedChunks: EmbeddedChunk[] = embeddings.map(
-                    (embedding, index) => ({
-                        path: file.path,
-                        title: file.basename,
-                        embedding,
-                        content: chunks[index],
-                        chunkIndex: index,
-                        totalChunks: chunks.length,
-                        lastUpdated: Date.now(),
-                    })
+                const noteChunks: NoteChunk[] = embeddings.map(
+                    (embedding, index) =>
+                        NoteChunk.fromDTO({
+                            path: file.path,
+                            title: file.basename,
+                            embedding,
+                            content: chunks[index],
+                            chunkIndex: index,
+                            totalChunks: chunks.length,
+                        })
                 );
 
-                await this.embeddingStore.removeByPath(file.path);
-                await this.embeddingStore.addMulti(embeddedChunks);
+                await this.noteChunkRepository.removeByPath(file.path);
+                await this.noteChunkRepository.putMulti(noteChunks);
 
                 log.info(
                     "count of chunks in embedding store",
-                    this.embeddingStore.count()
+                    this.noteChunkRepository.count()
                 );
             };
 
@@ -214,12 +211,11 @@ export default class MainPlugin extends Plugin {
         }
 
         // Save any pending changes and close store
-        if (this.embeddingStore) {
+        if (this.noteChunkRepository) {
             try {
-                await this.embeddingStore.save();
-                await this.embeddingStore.close();
+                await this.noteChunkRepository.persist();
             } catch (e) {
-                log.error("Error while closing embedding store:", e);
+                log.error("Error while closing note chunk repository:", e);
             }
         }
         // Cleanup file change queue
@@ -299,7 +295,9 @@ export default class MainPlugin extends Plugin {
         // Get search results for each embedding and flatten them into a single array
         const searchResultsArrays = await Promise.all(
             embeddings.map((embedding) =>
-                this.embeddingStore.searchSimilar(embedding, 10, 0, [file.path])
+                this.noteChunkRepository.findSimilarChunks(embedding, 10, 0, [
+                    file.path,
+                ])
             )
         );
 
@@ -307,30 +305,30 @@ export default class MainPlugin extends Plugin {
         const results = searchResultsArrays.flat();
 
         // Reduce results to unique paths
-        const uniqueResults = results.reduce((acc, result) => {
+        const uniqueResults = results.reduce((acc, [noteChunk, score]) => {
             if (
-                acc[result.chunk.path] === undefined ||
-                acc[result.chunk.path].score < result.score
+                acc[noteChunk.path] === undefined ||
+                acc[noteChunk.path][1] < score
             ) {
-                acc[result.chunk.path] = result;
+                acc[noteChunk.path] = [noteChunk, score];
             }
             return acc;
-        }, {} as Record<string, SearchResult>);
+        }, {} as Record<string, [NoteChunk, number]>);
 
         // Convert uniqueResults object to array
         const uniqueResultsArray = Object.values(uniqueResults);
 
         // Sort by score in descending order
-        uniqueResultsArray.sort((a, b) => b.score - a.score);
+        uniqueResultsArray.sort((a, b) => b[1] - a[1]);
 
         log.info("uniqueResultsArray", uniqueResultsArray);
 
         // Convert to SimilarNote format
         const similarNotes = uniqueResultsArray
             .map((result) => ({
-                file: this.app.vault.getFileByPath(result.chunk.path),
-                title: result.chunk.title,
-                similarity: result.score,
+                file: this.app.vault.getFileByPath(result[0].path),
+                title: result[0].title,
+                similarity: result[1],
             }))
             .filter((note) => note.file !== null) as SimilarNote[];
 
@@ -354,19 +352,16 @@ export default class MainPlugin extends Plugin {
     private async initializeStore(vectorSize: number) {
         try {
             // Create store instance
-            this.embeddingStore = new OramaEmbeddedChunkStore(
+            this.noteChunkRepository = new OramaNoteChunkRepository(
                 this.app.vault,
-                this.settings.dbPath,
-                vectorSize
+                vectorSize,
+                this.settings.dbPath
             );
-
-            // Initialize store
-            await this.embeddingStore.init();
 
             // Try to load existing database
             try {
-                await this.embeddingStore.load();
-                const count = this.embeddingStore.count();
+                await this.noteChunkRepository.restore();
+                const count = this.noteChunkRepository.count();
                 log.info(
                     "Successfully loaded existing database from",
                     this.settings.dbPath,
@@ -397,7 +392,7 @@ export default class MainPlugin extends Plugin {
         const intervalMs = this.settings.autoSaveInterval * 60 * 1000;
         this.autoSaveInterval = setInterval(async () => {
             try {
-                await this.embeddingStore.save();
+                await this.noteChunkRepository.persist();
                 await this.saveQueueMetadataToDisk();
                 log.info("Auto-saved databases");
             } catch (e) {
