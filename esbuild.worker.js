@@ -6,7 +6,7 @@ const esbuild = require("esbuild");
 
 esbuild
     .build({
-        entryPoints: ["src/services/model/transformers.worker.ts"],
+        entryPoints: ["src/domain/service/transformers.worker.ts"],
         bundle: true,
         outfile: "public/transformers.worker.js",
         format: "iife",

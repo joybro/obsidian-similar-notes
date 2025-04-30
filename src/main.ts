@@ -6,8 +6,8 @@ import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
 import { NoteChunk } from "./domain/model/NoteChunk";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
+import { EmbeddingService } from "./domain/service/EmbeddingService";
 import { OramaNoteChunkRepository } from "./infrastructure/OramaNoteChunkRepository";
-import { EmbeddingModelService } from "./services/model/embeddingModelService";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
 
 // Define the SimilarNote interface
@@ -38,7 +38,7 @@ export default class MainPlugin extends Plugin {
     private noteChunkRepository: NoteChunkRepository;
     private autoSaveInterval: NodeJS.Timeout;
     private fileChangeQueue: NoteChangeQueue;
-    private modelService: EmbeddingModelService;
+    private modelService: EmbeddingService;
     private fileChangeLoop: () => Promise<void>;
     private fileChangeLoopTimer: NodeJS.Timeout;
     private splitter: RecursiveCharacterTextSplitter;
@@ -55,7 +55,7 @@ export default class MainPlugin extends Plugin {
 
         // Initialize model service
         try {
-            this.modelService = new EmbeddingModelService();
+            this.modelService = new EmbeddingService();
             await this.modelService.loadModel(this.settings.modelId);
 
             log.info("Model service initialized successfully");
@@ -305,30 +305,30 @@ export default class MainPlugin extends Plugin {
         const results = searchResultsArrays.flat();
 
         // Reduce results to unique paths
-        const uniqueResults = results.reduce((acc, [noteChunk, score]) => {
+        const uniqueResults = results.reduce((acc, result) => {
             if (
-                acc[noteChunk.path] === undefined ||
-                acc[noteChunk.path][1] < score
+                acc[result.chunk.path] === undefined ||
+                acc[result.chunk.path].score < result.score
             ) {
-                acc[noteChunk.path] = [noteChunk, score];
+                acc[result.chunk.path] = result;
             }
             return acc;
-        }, {} as Record<string, [NoteChunk, number]>);
+        }, {} as Record<string, { chunk: NoteChunk; score: number }>);
 
         // Convert uniqueResults object to array
         const uniqueResultsArray = Object.values(uniqueResults);
 
         // Sort by score in descending order
-        uniqueResultsArray.sort((a, b) => b[1] - a[1]);
+        uniqueResultsArray.sort((a, b) => b.score - a.score);
 
         log.info("uniqueResultsArray", uniqueResultsArray);
 
         // Convert to SimilarNote format
         const similarNotes = uniqueResultsArray
             .map((result) => ({
-                file: this.app.vault.getFileByPath(result[0].path),
-                title: result[0].title,
-                similarity: result[1],
+                file: this.app.vault.getFileByPath(result.chunk.path),
+                title: result.chunk.title,
+                similarity: result.score,
             }))
             .filter((note) => note.file !== null) as SimilarNote[];
 

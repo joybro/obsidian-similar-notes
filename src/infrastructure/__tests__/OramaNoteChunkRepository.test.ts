@@ -106,12 +106,13 @@ describe("OramaNoteChunkRepository", () => {
             10
         );
         expect(results).toHaveLength(1);
-        expect(results[0][0].toDTO()).toEqual({
+        expect(results[0].chunk.toDTO()).toEqual({
             ...testChunk1.toDTO(),
             embedding: null,
         });
         expect(repository.count()).toBe(1);
     });
+
     test("should save multiple chunks", async () => {
         await repository.putMulti([testChunk1, testChunk2]);
         const results = await repository.findSimilarChunks(
@@ -120,10 +121,10 @@ describe("OramaNoteChunkRepository", () => {
         );
         expect(results).toHaveLength(2);
         expect(
-            results.filter(([chunk]) => chunk.path === testChunk1.path)
+            results.filter((result) => result.chunk.path === testChunk1.path)
         ).toHaveLength(1);
         expect(
-            results.filter(([chunk]) => chunk.path === testChunk2.path)
+            results.filter((result) => result.chunk.path === testChunk2.path)
         ).toHaveLength(1);
     });
 
@@ -139,10 +140,10 @@ describe("OramaNoteChunkRepository", () => {
             10
         );
         expect(
-            results1.filter(([chunk]) => chunk.path === testChunk1.path)
+            results1.filter((result) => result.chunk.path === testChunk1.path)
         ).toHaveLength(0);
         expect(
-            results2.filter(([chunk]) => chunk.path === testChunk2.path)
+            results2.filter((result) => result.chunk.path === testChunk2.path)
         ).toHaveLength(1);
     });
 
@@ -155,7 +156,7 @@ describe("OramaNoteChunkRepository", () => {
             [testChunk1.path]
         );
         expect(results).toHaveLength(1);
-        expect(results[0][0].toDTO()).toEqual({
+        expect(results[0].chunk.toDTO()).toEqual({
             ...testChunk2.toDTO(),
             embedding: null,
         });

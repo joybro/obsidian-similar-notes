@@ -167,14 +167,14 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         limit: number,
         minScore?: number,
         excludePaths?: string[]
-    ): Promise<[NoteChunk, number][]> {
+    ): Promise<{ chunk: NoteChunk; score: number }[]> {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
 
         const batchSize = limit * 2;
         let offset = 0;
-        let allResults: [NoteChunk, number][] = [];
+        let allResults: { chunk: NoteChunk; score: number }[] = [];
 
         while (true) {
             const searchParams: SearchParams<Orama<Schema>> = {
@@ -215,7 +215,10 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
                         totalChunks: doc.totalChunks,
                         embedding: doc.embedding as unknown as number[],
                     };
-                    return [NoteChunk.fromDTO(dto), hit.score];
+                    return {
+                        chunk: NoteChunk.fromDTO(dto),
+                        score: hit.score,
+                    };
                 })
             );
 

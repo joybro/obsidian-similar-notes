@@ -4,7 +4,7 @@ import type { TransformersWorker } from "./transformers.worker";
 // @ts-ignore
 import InlineWorker from "./transformers.worker";
 
-export class EmbeddingModelService {
+export class EmbeddingService {
     private worker: Comlink.Remote<TransformersWorker> | null = null;
     private modelId: string | null = null;
     private vectorSize: number | null = null;

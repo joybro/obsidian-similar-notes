@@ -1,5 +1,5 @@
+import type { TransformersWorker } from "@/domain/service/transformers.worker";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { TransformersWorker } from "../transformers.worker";
 
 describe("TransformersWorker", () => {
     let workerInstance: TransformersWorker;

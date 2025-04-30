@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EmbeddingModelService } from "../embeddingModelService";
+import { EmbeddingService } from "../EmbeddingService";
 
 // Mock Comlink.wrap
 vi.mock("comlink", async () => {
@@ -40,10 +40,10 @@ vi.mock("../transformers.worker", async () => {
 });
 
 describe("EmbeddingModelService", () => {
-    let service: EmbeddingModelService;
+    let service: EmbeddingService;
 
     beforeEach(() => {
-        service = new EmbeddingModelService();
+        service = new EmbeddingService();
     });
 
     afterEach(() => {

@@ -28,7 +28,7 @@ export interface NoteChunkRepository {
         limit: number,
         minScore?: number,
         excludePaths?: string[]
-    ): Promise<[NoteChunk, number][]>;
+    ): Promise<{ chunk: NoteChunk; score: number }[]>;
 
     /**
      * Returns the total number of stored NoteChunks.
