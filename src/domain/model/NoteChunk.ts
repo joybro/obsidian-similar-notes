@@ -11,7 +11,7 @@ export class NoteChunk {
     ) {}
 
     /**
-     * 임베딩을 채워넣은 새로운 NoteChunk를 리턴한다 (immutable 스타일).
+     * returns a new NoteChunk with the embedding set.
      */
     withEmbedding(embedding: number[]): NoteChunk {
         return new NoteChunk(

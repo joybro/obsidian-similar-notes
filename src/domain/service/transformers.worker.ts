@@ -133,6 +133,22 @@ class TransformersWorker {
         this.extractor = null;
     }
 
+    async handleEmbed(text: string): Promise<number[]> {
+        if (!this.extractor) {
+            throw new Error("Model not loaded");
+        }
+
+        const extractor = this.extractor; // Create a local reference to avoid null check issues
+        return this.enqueue(async () => {
+            const tensor = await extractor(text, {
+                pooling: "mean",
+                normalize: true,
+            });
+
+            return tensor.tolist();
+        });
+    }
+
     async handleEmbedBatch(texts: string[]): Promise<number[][]> {
         if (!this.extractor) {
             throw new Error("Model not loaded");

@@ -40,6 +40,14 @@ export class EmbeddingService {
         this.maxTokens = null;
     }
 
+    public async embedText(text: string): Promise<number[]> {
+        if (!this.worker || !this.modelId) {
+            throw new Error("Model not loaded");
+        }
+
+        return await this.worker.handleEmbed(text);
+    }
+
     public async embedTexts(texts: string[]): Promise<number[][]> {
         if (!this.worker || !this.modelId) {
             throw new Error("Model not loaded");

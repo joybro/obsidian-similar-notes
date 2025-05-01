@@ -1,13 +1,14 @@
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import log from "loglevel";
 import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
-import { NoteChunk } from "./domain/model/NoteChunk";
+import type { NoteChunk } from "./domain/model/NoteChunk";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
+import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
+import { LangChainNoteChunkingService } from "./infrastructure/LangChainNoteChunkingService";
 import { OramaNoteChunkRepository } from "./infrastructure/OramaNoteChunkRepository";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
@@ -42,8 +43,8 @@ export default class MainPlugin extends Plugin {
     private modelService: EmbeddingService;
     private fileChangeLoop: () => Promise<void>;
     private fileChangeLoopTimer: NodeJS.Timeout;
-    private splitter: RecursiveCharacterTextSplitter;
     private noteRepository: NoteRepository;
+    private noteChunkingService: NoteChunkingService;
 
     async onload() {
         log.setDefaultLevel(log.levels.INFO);
@@ -67,6 +68,10 @@ export default class MainPlugin extends Plugin {
         } catch (error) {
             log.error("Failed to initialize model service:", error);
         }
+
+        this.noteChunkingService = new LangChainNoteChunkingService(
+            this.modelService
+        );
 
         // Initialize store
         await this.initializeStore(this.modelService.getVectorSize());
@@ -111,16 +116,6 @@ export default class MainPlugin extends Plugin {
 
             const statusBarItem = this.addStatusBarItem();
 
-            this.splitter = RecursiveCharacterTextSplitter.fromLanguage(
-                "markdown",
-                {
-                    chunkSize: this.modelService.getMaxTokens(),
-                    chunkOverlap: 100,
-                    lengthFunction: (text) =>
-                        this.modelService.countTokens(text),
-                }
-            );
-
             const processDeletedNote = async (path: string) => {
                 await this.noteChunkRepository.removeByPath(path);
             };
@@ -131,23 +126,16 @@ export default class MainPlugin extends Plugin {
                     return;
                 }
 
-                const chunks = await this.splitter.splitText(note.content);
-                log.info("chunks", chunks);
-
-                const embeddings = await this.modelService.embedTexts(chunks);
-                log.info("embeddings", embeddings);
-
-                const noteChunks: NoteChunk[] = embeddings.map(
-                    (embedding, index) =>
-                        NoteChunk.fromDTO({
-                            path: note.path,
-                            title: note.title,
-                            embedding,
-                            content: chunks[index],
-                            chunkIndex: index,
-                            totalChunks: chunks.length,
-                        })
+                const splitted = await this.noteChunkingService.split(note);
+                const noteChunks = await Promise.all(
+                    splitted.map(async (chunk) =>
+                        chunk.withEmbedding(
+                            await this.modelService.embedText(chunk.content)
+                        )
+                    )
                 );
+
+                log.info("chunks", noteChunks);
 
                 await this.noteChunkRepository.removeByPath(note.path);
                 await this.noteChunkRepository.putMulti(noteChunks);
@@ -288,8 +276,10 @@ export default class MainPlugin extends Plugin {
             return [];
         }
 
-        const chunks = await this.splitter.splitText(note.content);
-        const embeddings = await this.modelService.embedTexts(chunks);
+        const chunks = await this.noteChunkingService.split(note);
+        const embeddings = await this.modelService.embedTexts(
+            chunks.map((chunk) => chunk.content)
+        );
 
         // Get search results for each embedding and flatten them into a single array
         const searchResultsArrays = await Promise.all(
