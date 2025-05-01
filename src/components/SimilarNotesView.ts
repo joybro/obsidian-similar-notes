@@ -5,7 +5,7 @@ import { type Root, createRoot } from "react-dom/client";
 import SimilarNotesViewReact from "./SimilarNotesViewReact";
 
 // Interface for similar note items
-interface SimilarNote {
+export interface SimilarNotesViewData {
     file: TFile;
     title: string;
     similarity: number;
@@ -19,7 +19,9 @@ export class SimilarNotesView extends Component {
     constructor(
         private app: App,
         private parentEl: HTMLElement,
-        private getSimilarNotes: (file: TFile) => Promise<SimilarNote[]>
+        private getSimilarNotes: (
+            file: TFile
+        ) => Promise<SimilarNotesViewData[]>
     ) {
         super();
         this.containerEl = parentEl.createDiv({
