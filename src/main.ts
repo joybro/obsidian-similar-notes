@@ -6,10 +6,11 @@ import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesView } from "./components/SimilarNotesView";
 import { NoteChunk } from "./domain/model/NoteChunk";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
+import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
 import { OramaNoteChunkRepository } from "./infrastructure/OramaNoteChunkRepository";
+import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
-
 // Define the SimilarNote interface
 interface SimilarNote {
     file: TFile;
@@ -42,9 +43,13 @@ export default class MainPlugin extends Plugin {
     private fileChangeLoop: () => Promise<void>;
     private fileChangeLoopTimer: NodeJS.Timeout;
     private splitter: RecursiveCharacterTextSplitter;
+    private noteRepository: NoteRepository;
+
     async onload() {
         log.setDefaultLevel(log.levels.INFO);
         log.info("Loading Similar Notes plugin");
+
+        this.noteRepository = new VaultNoteRepository(this.app.vault);
 
         // Load settings
         this.settings = Object.assign(
@@ -121,18 +126,12 @@ export default class MainPlugin extends Plugin {
             };
 
             const processUpdatedNote = async (path: string) => {
-                const file = this.app.vault.getFileByPath(path);
-                if (!file) {
-                    log.error("file not found", path);
+                const note = await this.noteRepository.findByPath(path);
+                if (!note || !note.content) {
                     return;
                 }
 
-                const content = await this.app.vault.cachedRead(file);
-                if (content.length === 0) {
-                    return;
-                }
-
-                const chunks = await this.splitter.splitText(content);
+                const chunks = await this.splitter.splitText(note.content);
                 log.info("chunks", chunks);
 
                 const embeddings = await this.modelService.embedTexts(chunks);
@@ -141,8 +140,8 @@ export default class MainPlugin extends Plugin {
                 const noteChunks: NoteChunk[] = embeddings.map(
                     (embedding, index) =>
                         NoteChunk.fromDTO({
-                            path: file.path,
-                            title: file.basename,
+                            path: note.path,
+                            title: note.title,
                             embedding,
                             content: chunks[index],
                             chunkIndex: index,
@@ -150,7 +149,7 @@ export default class MainPlugin extends Plugin {
                         })
                 );
 
-                await this.noteChunkRepository.removeByPath(file.path);
+                await this.noteChunkRepository.removeByPath(note.path);
                 await this.noteChunkRepository.putMulti(noteChunks);
 
                 log.info(
@@ -284,19 +283,19 @@ export default class MainPlugin extends Plugin {
     }
 
     private async getSimilarNotes(file: TFile): Promise<SimilarNote[]> {
-        const content = await this.app.vault.cachedRead(file);
-        if (content.length === 0) {
+        const note = await this.noteRepository.findByFile(file);
+        if (!note.content) {
             return [];
         }
 
-        const chunks = await this.splitter.splitText(content);
+        const chunks = await this.splitter.splitText(note.content);
         const embeddings = await this.modelService.embedTexts(chunks);
 
         // Get search results for each embedding and flatten them into a single array
         const searchResultsArrays = await Promise.all(
             embeddings.map((embedding) =>
                 this.noteChunkRepository.findSimilarChunks(embedding, 10, 0, [
-                    file.path,
+                    note.path,
                 ])
             )
         );
@@ -424,7 +423,7 @@ export default class MainPlugin extends Plugin {
 
     private async saveQueueMetadataToDisk(): Promise<void> {
         const metadata = await this.fileChangeQueue.getMetadata();
-        this.app.vault.adapter.write(
+        await this.app.vault.adapter.write(
             this.settings.fileHashStorePath,
             JSON.stringify(metadata)
         );
