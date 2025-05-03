@@ -144,7 +144,7 @@ class TransformersWorker {
                 normalize: true,
             });
 
-            return tensor.tolist();
+            return tensor.tolist()[0];
         });
     }
 
