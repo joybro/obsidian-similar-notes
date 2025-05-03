@@ -1,6 +1,7 @@
 import log from "loglevel";
 import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
+import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import {
     SimilarNotesView,
@@ -11,22 +12,21 @@ import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
 import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
 import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
-import { LangChainNoteChunkingService } from "./infrastructure/LangChainNoteChunkingService";
+import { LangChainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { OramaNoteChunkRepository } from "./infrastructure/OramaNoteChunkRepository";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
-
 interface SimilarNotesSettings {
     dbPath: string;
     autoSaveInterval: number; // in minutes
-    fileHashStorePath: string;
+    fileMtimePath: string;
     modelId: string; // The model ID to use for embeddings
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
     dbPath: ".obsidian/similar-notes.json",
     autoSaveInterval: 5,
-    fileHashStorePath: ".obsidian/similar-notes-file-hashes.json",
+    fileMtimePath: ".obsidian/similar-notes-file-mtimes.json",
     modelId: "sentence-transformers/all-MiniLM-L6-v2",
 };
 
@@ -43,6 +43,8 @@ export default class MainPlugin extends Plugin {
     private noteRepository: NoteRepository;
     private noteChunkingService: NoteChunkingService;
     private similarNoteFinder: SimilarNoteFinder;
+    private similarNoteCoordinator: SimilarNoteCoordinator;
+
     async onload() {
         log.setDefaultLevel(log.levels.INFO);
         log.info("Loading Similar Notes plugin");
@@ -77,6 +79,12 @@ export default class MainPlugin extends Plugin {
             this.noteChunkRepository,
             this.noteChunkingService,
             this.modelService
+        );
+
+        this.similarNoteCoordinator = new SimilarNoteCoordinator(
+            this.app.vault,
+            this.noteRepository,
+            this.similarNoteFinder
         );
 
         // Setup auto-save interval
@@ -386,21 +394,21 @@ export default class MainPlugin extends Plugin {
     private async saveQueueMetadataToDisk(): Promise<void> {
         const metadata = await this.fileChangeQueue.getMetadata();
         await this.app.vault.adapter.write(
-            this.settings.fileHashStorePath,
+            this.settings.fileMtimePath,
             JSON.stringify(metadata)
         );
     }
 
-    private async loadQueueMetadataFromDisk(): Promise<Record<string, string>> {
+    private async loadQueueMetadataFromDisk(): Promise<Record<string, number>> {
         const exist = await this.app.vault.adapter.exists(
-            this.settings.fileHashStorePath
+            this.settings.fileMtimePath
         );
 
         if (!exist) {
             return {};
         }
         const content = await this.app.vault.adapter.read(
-            this.settings.fileHashStorePath
+            this.settings.fileMtimePath
         );
         return JSON.parse(content);
     }

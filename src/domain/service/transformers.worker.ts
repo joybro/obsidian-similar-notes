@@ -76,7 +76,6 @@ class TransformersWorker {
     private embeddingQueue: Promise<unknown> = Promise.resolve();
 
     constructor() {
-        console.log("TransformersWorker constructor");
         this.extractor = null;
         this.vectorSize = null;
         this.maxTokens = null;

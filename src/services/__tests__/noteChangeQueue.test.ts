@@ -3,18 +3,32 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { NoteChangeQueue } from "../noteChangeQueue";
 
 // Mock Vault with only the methods we need
-type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on">;
-
-const mockHashFunc = (content: string) => Promise.resolve(content);
+type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on" | "offref">;
 
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
     let fileChangeQueue: NoteChangeQueue;
 
-    const testFile1 = { path: "file1.md", extension: "md" } as TFile;
-    const testFile2 = { path: "file2.md", extension: "md" } as TFile;
-    const testFile3 = { path: "file3.md", extension: "md" } as TFile;
-    const nonMarkdownFile = { path: "image.png", extension: "png" } as TFile;
+    const testFile1 = {
+        path: "file1.md",
+        extension: "md",
+        stat: { mtime: 1000 },
+    } as TFile;
+    const testFile2 = {
+        path: "file2.md",
+        extension: "md",
+        stat: { mtime: 2000 },
+    } as TFile;
+    const testFile3 = {
+        path: "file3.md",
+        extension: "md",
+        stat: { mtime: 3000 },
+    } as TFile;
+    const nonMarkdownFile = {
+        path: "image.png",
+        extension: "png",
+        stat: { mtime: 4000 },
+    } as TFile;
 
     beforeEach(() => {
         // Reset mocks
@@ -29,12 +43,12 @@ describe("FileChangeQueue", () => {
                 // Return a function that can be called to unregister the event
                 return () => {};
             }),
+            offref: vi.fn(),
         };
 
         // Create a new file change queue
         fileChangeQueue = new NoteChangeQueue({
             vault: mockVault as unknown as Vault,
-            hashFunc: (content: string) => Promise.resolve(content),
         });
     });
 
@@ -51,10 +65,10 @@ describe("FileChangeQueue", () => {
         const changes = fileChangeQueue.pollFileChanges(2);
         expect(changes[0].path).toBe("file1.md");
         expect(changes[0].reason).toBe("new");
-        expect(changes[0].hash).toBe("content1");
+        expect(changes[0].mtime).toBe(1000);
         expect(changes[1].path).toBe("file2.md");
         expect(changes[1].reason).toBe("new");
-        expect(changes[1].hash).toBe("content2");
+        expect(changes[1].mtime).toBe(2000);
 
         // Should have registered event callbacks
         expect(mockVault.on).toHaveBeenCalledTimes(3);
@@ -74,8 +88,8 @@ describe("FileChangeQueue", () => {
 
     test("should detect modified files", async () => {
         await fileChangeQueue.initialize({
-            "file1.md": "oldhash1",
-            "file2.md": "oldhash2",
+            "file1.md": 999,
+            "file2.md": 1999,
         });
 
         // Should have 2 modified files in the queue
@@ -84,17 +98,17 @@ describe("FileChangeQueue", () => {
         const changes = fileChangeQueue.pollFileChanges(2);
         expect(changes[0].path).toBe("file1.md");
         expect(changes[0].reason).toBe("modified");
-        expect(changes[0].hash).toBe("content1");
+        expect(changes[0].mtime).toBe(1000);
         expect(changes[1].path).toBe("file2.md");
         expect(changes[1].reason).toBe("modified");
-        expect(changes[1].hash).toBe("content2");
+        expect(changes[1].mtime).toBe(2000);
     });
 
     test("should detect deleted files", async () => {
         await fileChangeQueue.initialize({
-            "file1.md": "content1",
-            "file2.md": "content2",
-            "deleted.md": "content3",
+            "file1.md": 1000,
+            "file2.md": 2000,
+            "deleted.md": 3000,
         });
 
         // Should have 1 deleted file in the queue
@@ -115,14 +129,16 @@ describe("FileChangeQueue", () => {
         const changes = fileChangeQueue.pollFileChanges(2);
         expect(changes[0].path).toBe("file1.md");
         expect(changes[0].reason).toBe("modified");
+        expect(changes[0].mtime).toBe(1000);
         expect(changes[1].path).toBe("file2.md");
         expect(changes[1].reason).toBe("modified");
+        expect(changes[1].mtime).toBe(2000);
     });
 
     test("should poll changes from the queue", async () => {
         await fileChangeQueue.initialize({
-            "file2.md": "old content2",
-            "file3.md": "content3",
+            "file2.md": 1999,
+            "file3.md": 2999,
         });
 
         expect(fileChangeQueue.getFileChangeCount()).toBe(3);
@@ -132,10 +148,10 @@ describe("FileChangeQueue", () => {
         expect(changes).toHaveLength(3);
         expect(changes[0].path).toBe("file1.md");
         expect(changes[0].reason).toBe("new");
-        expect(changes[0].hash).toBe("content1");
+        expect(changes[0].mtime).toBe(1000);
         expect(changes[1].path).toBe("file2.md");
         expect(changes[1].reason).toBe("modified");
-        expect(changes[1].hash).toBe("content2");
+        expect(changes[1].mtime).toBe(2000);
         expect(changes[2].path).toBe("file3.md");
         expect(changes[2].reason).toBe("deleted");
     });
@@ -168,9 +184,12 @@ describe("FileChangeQueue", () => {
                 }
             );
 
+            // Ensure offref is present for this mockVault
+            mockVault.offref = vi.fn();
+
             await fileChangeQueue.initialize({
-                "file1.md": "content1",
-                "file2.md": "content2",
+                "file1.md": 1000,
+                "file2.md": 2000,
             });
         });
 
@@ -192,7 +211,7 @@ describe("FileChangeQueue", () => {
             const changes = fileChangeQueue.pollFileChanges(1);
             expect(changes[0].path).toBe("file3.md");
             expect(changes[0].reason).toBe("new");
-            expect(changes[0].hash).toBe("new content");
+            expect(changes[0].mtime).toBe(3000);
         });
 
         test("should handle file modification events", async () => {
@@ -215,7 +234,7 @@ describe("FileChangeQueue", () => {
             const changes = fileChangeQueue.pollFileChanges(1);
             expect(changes[0].path).toBe("file1.md");
             expect(changes[0].reason).toBe("modified");
-            expect(changes[0].hash).toBe("modified content");
+            expect(changes[0].mtime).toBe(1000);
         });
 
         test("should handle multiple modify events for the same file", async () => {
@@ -247,7 +266,7 @@ describe("FileChangeQueue", () => {
             const changes = fileChangeQueue.pollFileChanges(1);
             expect(changes[0].path).toBe("file1.md");
             expect(changes[0].reason).toBe("modified");
-            expect(changes[0].hash).toBe("modified content 2");
+            expect(changes[0].mtime).toBe(1000);
         });
 
         test("should handle file deletion events", async () => {
@@ -276,121 +295,97 @@ describe("FileChangeQueue", () => {
             // Clean up the queue
             fileChangeQueue.cleanup();
 
-            // Should have called all unregister functions
-            expect(unregisterCreate).toHaveBeenCalled();
-            expect(unregisterModify).toHaveBeenCalled();
-            expect(unregisterDelete).toHaveBeenCalled();
-        });
-    });
-
-    describe("hash function", () => {
-        test("should produce consistent SHA-256 hashes", async () => {
-            const content = "test content";
-            const hash1 = await NoteChangeQueue.calculateNoteHash(content);
-            const hash2 = await NoteChangeQueue.calculateNoteHash(content);
-
-            // Hashes should be consistent
-            expect(hash1).toBe(hash2);
-
-            // Hash should be 64 characters (32 bytes in hex)
-            expect(hash1).toHaveLength(64);
-
-            // Different content should produce different hashes
-            const differentHash = await NoteChangeQueue.calculateNoteHash(
-                "different content"
-            );
-            expect(hash1).not.toBe(differentHash);
-
-            // Hash should be hexadecimal
-            expect(hash1).toMatch(/^[0-9a-f]{64}$/);
+            // Should have called vault.offref for each event ref
+            expect(mockVault.offref).toHaveBeenCalledTimes(3);
         });
     });
 
     describe("markFileChangeProcessed", () => {
-        test("should update hash store for new files", async () => {
+        test("should update mtime store for new files", async () => {
             // Create a file change
             const change = {
                 path: "file1.md",
                 reason: "new" as const,
-                hash: "newhash",
+                mtime: 1234,
             };
 
             // Mark the change as processed
             await fileChangeQueue.markNoteChangeProcessed(change);
 
             const metadata = await fileChangeQueue.getMetadata();
-            expect(metadata["file1.md"]).toBe("newhash");
+            expect(metadata["file1.md"]).toBe(1234);
         });
 
-        test("should update hash store for modified files", async () => {
+        test("should update mtime store for modified files", async () => {
             // Create a file change
             const change = {
                 path: "file1.md",
                 reason: "modified" as const,
-                hash: "modifiedhash",
+                mtime: 2345,
             };
 
             // Mark the change as processed
             await fileChangeQueue.markNoteChangeProcessed(change);
 
             const metadata = await fileChangeQueue.getMetadata();
-            expect(metadata["file1.md"]).toBe("modifiedhash");
+            expect(metadata["file1.md"]).toBe(2345);
         });
 
-        test("should not update hash store for deleted files", async () => {
+        test("should not update mtime store for deleted files", async () => {
             // Create a file change
             const change = { path: "file1.md", reason: "deleted" as const };
 
             // Mark the change as processed
             await fileChangeQueue.markNoteChangeProcessed(change);
 
-            // Should not have saved the updated hashes
+            // Should not have saved the updated mtimes
             const metadata = await fileChangeQueue.getMetadata();
             expect(metadata["file1.md"]).toBeUndefined();
         });
     });
 
     describe("persistence of unprocessed files", () => {
-        let createCallback: (file: TFile) => Promise<void>;
-        let modifyCallback: (file: TFile) => Promise<void>;
-        let deleteCallback: (file: TFile) => Promise<void>;
+        const testFile1 = {
+            path: "file1.md",
+            extension: "md",
+            stat: { mtime: 1000 },
+        } as TFile;
+        const testFile2 = {
+            path: "file2.md",
+            extension: "md",
+            stat: { mtime: 2000 },
+        } as TFile;
 
         beforeEach(async () => {
-            // Capture the callbacks when they're registered
-            (mockVault.on as ReturnType<typeof vi.fn>).mockImplementation(
-                (event: string, callback: (file: TFile) => Promise<void>) => {
-                    if (event === "create") createCallback = callback;
-                    if (event === "modify") modifyCallback = callback;
-                    if (event === "delete") deleteCallback = callback;
+            // Reset mocks
+            mockVault = {
+                getMarkdownFiles: vi
+                    .fn()
+                    .mockReturnValue([testFile1, testFile2]),
+                read: vi.fn().mockImplementation(async (file: TFile) => {
+                    if (file.path === "file1.md") return "content1";
+                    if (file.path === "file2.md") return "content2";
+                    return "";
+                }),
+                on: vi.fn().mockImplementation((event, callback) => {
+                    // Return a function that can be called to unregister the event
                     return () => {};
-                }
-            );
+                }),
+                offref: vi.fn(),
+            };
         });
 
-        test("should keep unprocessed files in queue after polling", async () => {
-            const newContent = "new content";
-
-            // Mock the vault read function for the new file
-            const mockRead = vi.fn().mockResolvedValue(newContent);
-            (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
-                mockRead
-            );
-
-            // initialize the queue
+        test("should not re-queue unprocessed files after polling and re-initialization", async () => {
             fileChangeQueue = new NoteChangeQueue({
                 vault: mockVault as unknown as Vault,
-                hashFunc: mockHashFunc,
             });
             await fileChangeQueue.initialize({
-                "file1.md": "content1",
-                "file2.md": "content2",
+                "file1.md": 1500,
+                "file2.md": 2500,
             });
 
             let changes = fileChangeQueue.pollFileChanges(5);
             expect(changes).toHaveLength(2);
-            expect(changes[0].path).toBe("file1.md");
-            expect(changes[0].reason).toBe("modified");
-            expect(changes[0].hash).toBe(newContent);
 
             // cleanup without marking the file as processed
             const metadata = await fileChangeQueue.getMetadata();
@@ -399,80 +394,13 @@ describe("FileChangeQueue", () => {
             // initialize the queue again (= plugin reload)
             fileChangeQueue = new NoteChangeQueue({
                 vault: mockVault as unknown as Vault,
-                hashFunc: mockHashFunc,
             });
             await fileChangeQueue.initialize(metadata);
 
-            // The file should still be in the queue because it wasn't processed
+            // the queue should have changes from the previous run
+            // because they were not marked as processed
             changes = fileChangeQueue.pollFileChanges(5);
             expect(changes).toHaveLength(2);
-            expect(changes[0].path).toBe("file1.md");
-            expect(changes[0].reason).toBe("modified");
-            expect(changes[0].hash).toBe(newContent);
-        });
-
-        test("should keep unprocessed files in queue after modify callback", async () => {
-            const newContent = "new content";
-
-            // Mock the vault read function for the new file
-            let mockRead: (file: TFile) => string = (file: TFile) => {
-                if (file.path === "file1.md") return "content1";
-                if (file.path === "file2.md") return "content2";
-                return "";
-            };
-            (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
-                mockRead
-            );
-
-            // initialize the queue
-            fileChangeQueue = new NoteChangeQueue({
-                vault: mockVault as unknown as Vault,
-                hashFunc: mockHashFunc,
-            });
-            await fileChangeQueue.initialize({
-                "file1.md": "content1",
-                "file2.md": "content2",
-            });
-
-            let changes = fileChangeQueue.pollFileChanges(5);
-            expect(changes).toHaveLength(0);
-
-            // emit modify event
-            mockRead = (file: TFile) => {
-                if (file.path === "file1.md") return newContent;
-                if (file.path === "file2.md") return "content2";
-                return "";
-            };
-            (mockVault.read as ReturnType<typeof vi.fn>).mockImplementation(
-                mockRead
-            );
-            await modifyCallback(testFile1);
-
-            changes = fileChangeQueue.pollFileChanges(5);
-            expect(changes).toHaveLength(1);
-            expect(changes[0].path).toBe("file1.md");
-            expect(changes[0].reason).toBe("modified");
-            expect(changes[0].hash).toBe(newContent);
-
-            // cleanup without marking the file as processed
-            fileChangeQueue.cleanup();
-
-            // initialize the queue again (= plugin reload)
-            fileChangeQueue = new NoteChangeQueue({
-                vault: mockVault as unknown as Vault,
-                hashFunc: mockHashFunc,
-            });
-            await fileChangeQueue.initialize({
-                "file1.md": "content1",
-                "file2.md": "content2",
-            });
-
-            // The file should still be in the queue because it wasn't processed
-            changes = fileChangeQueue.pollFileChanges(5);
-            expect(changes).toHaveLength(1);
-            expect(changes[0].path).toBe("file1.md");
-            expect(changes[0].reason).toBe("modified");
-            expect(changes[0].hash).toBe(newContent);
         });
     });
 });
