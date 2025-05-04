@@ -44,7 +44,7 @@ export default class MainPlugin extends Plugin {
         log.setDefaultLevel(log.levels.INFO);
         log.info("Loading Similar Notes plugin");
 
-        this.noteRepository = new VaultNoteRepository(this.app.vault);
+        this.noteRepository = new VaultNoteRepository(this.app);
 
         // Load settings
         this.settings = Object.assign(

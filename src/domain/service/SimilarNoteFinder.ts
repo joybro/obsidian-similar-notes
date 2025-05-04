@@ -28,6 +28,7 @@ export class SimilarNoteFinder {
             embeddings.map((embedding) =>
                 this.noteChunkRepository.findSimilarChunks(embedding, 10, 0, [
                     note.path,
+                    ...note.links,
                 ])
             )
         );
