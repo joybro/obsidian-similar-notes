@@ -20,6 +20,12 @@ export class SimilarNoteCoordinator {
         return this.noteBottomViewModel$.asObservable();
     }
 
+    async onFileOpen(file: TFile | null) {
+        if (file) {
+            await this.updateSimilarNotes(file);
+        }
+    }
+
     async updateSimilarNotes(currentFile: TFile) {
         const note = await this.noteRepository.findByFile(currentFile);
         const similarNotes = await this.similarNoteFinder.findSimilarNotes(

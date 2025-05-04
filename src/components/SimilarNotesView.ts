@@ -46,7 +46,7 @@ export class SimilarNotesView extends Component {
         return this.containerEl;
     }
 
-    onunload(): void {
+    public unload(): void {
         this.root.unmount();
     }
 }
