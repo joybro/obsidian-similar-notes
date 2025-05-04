@@ -3,10 +3,7 @@ import type { EventRef, WorkspaceLeaf } from "obsidian";
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
-import {
-    SimilarNotesView,
-    type SimilarNotesViewData,
-} from "./components/SimilarNotesView";
+import { SimilarNotesView } from "./components/SimilarNotesView";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
@@ -92,18 +89,6 @@ export default class MainPlugin extends Plugin {
 
         // Add settings tab
         this.addSettingTab(new SimilarNotesSettingTab(this.app, this));
-
-        // Register event when active leaf changes
-        const leafChangeRef = this.app.workspace.on(
-            "active-leaf-change",
-            async (leaf) => {
-                if (leaf && leaf.view instanceof MarkdownView) {
-                    await this.updateSimilarNotesView(leaf);
-                }
-            }
-        );
-        this.eventRefs.push(leafChangeRef);
-        this.registerEvent(leafChangeRef);
 
         // Register event when current open file changes
         const fileOpenRef = this.app.workspace.on("file-open", async (file) => {
@@ -251,7 +236,7 @@ export default class MainPlugin extends Plugin {
 
         // If view already exists for this leaf, update it
         if (this.similarNotesViews.has(leaf)) {
-            await this.similarNotesViews.get(leaf)?.updateForFile(file);
+            this.similarNoteCoordinator.updateSimilarNotes(file);
             return;
         }
 
@@ -265,12 +250,13 @@ export default class MainPlugin extends Plugin {
             // Insert similar notes section before embedded backlinks container
             const similarNotesView = new SimilarNotesView(
                 this.app,
+                leaf,
                 embeddedBacklinksContainer.parentElement,
-                (file) => this.getSimilarNotes(file)
+                this.similarNoteCoordinator.getNoteBottomViewModelObservable()
             );
 
             this.similarNotesViews.set(leaf, similarNotesView);
-            await similarNotesView.updateForFile(file);
+            this.similarNoteCoordinator.updateSimilarNotes(file);
 
             // Move similar notes container before embedded backlinks container
             const similarNotesContainer = similarNotesView.getContainerEl();
@@ -281,39 +267,14 @@ export default class MainPlugin extends Plugin {
         }
     }
 
-    private async getSimilarNotes(
-        file: TFile
-    ): Promise<SimilarNotesViewData[]> {
-        const note = await this.noteRepository.findByFile(file);
-        if (!note.content) {
-            return [];
-        }
-
-        const similarNotes = await this.similarNoteFinder.findSimilarNotes(
-            note
-        );
-
-        return similarNotes
-            .map((similarNote) => ({
-                file: this.app.vault.getFileByPath(similarNote.path),
-                title: similarNote.title,
-                similarity: similarNote.similarity,
-            }))
-            .filter(
-                (similarNote) => similarNote.file !== null
-            ) as SimilarNotesViewData[];
-    }
-
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
         this.fileChangeQueue.enqueueAllNotes();
 
         // Refresh all views after reindexing
-        for (const [leaf, view] of Array.from(
-            this.similarNotesViews.entries()
-        )) {
+        for (const [leaf] of Array.from(this.similarNotesViews.entries())) {
             if (leaf.view instanceof MarkdownView && leaf.view.file) {
-                await view.updateForFile(leaf.view.file);
+                this.similarNoteCoordinator.updateSimilarNotes(leaf.view.file);
             }
         }
     }

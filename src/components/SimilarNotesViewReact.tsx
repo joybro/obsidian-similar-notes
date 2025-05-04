@@ -1,11 +1,17 @@
-import type { App, TFile } from "obsidian";
+import type { App, TFile, WorkspaceLeaf } from "obsidian";
+import { MarkdownView } from "obsidian";
 import { useEffect, useState } from "react";
+import type { Observable } from "rxjs";
 
-// Interface for similar note items
-interface SimilarNote {
+export interface SimilarNoteEntry {
     file: TFile;
     title: string;
     similarity: number;
+}
+
+export interface NoteBottomViewModel {
+    currentFile: TFile;
+    similarNoteEntries: SimilarNoteEntry[];
 }
 
 interface SimilarNotesHeaderProps {
@@ -14,15 +20,15 @@ interface SimilarNotesHeaderProps {
 }
 
 interface SimilarNotesContentProps {
-    similarNotes: SimilarNote[];
+    similarNotes: SimilarNoteEntry[];
     onNoteClick: (file: TFile) => void;
     isCollapsed: boolean;
 }
 
 interface SimilarNotesViewProps {
     app: App;
-    currentFile: TFile | null;
-    getSimilarNotes: (file: TFile) => Promise<SimilarNote[]>;
+    leaf: WorkspaceLeaf;
+    bottomViewModelSubject$: Observable<NoteBottomViewModel>;
 }
 
 // Header Component
@@ -102,24 +108,29 @@ const SimilarNotesContent: React.FC<SimilarNotesContentProps> = ({
 // Main Component
 const SimilarNotesViewReact: React.FC<SimilarNotesViewProps> = ({
     app,
-    currentFile,
-    getSimilarNotes,
+    leaf,
+    bottomViewModelSubject$,
 }) => {
     const [collapsed, setCollapsed] = useState(false);
-    const [similarNotes, setSimilarNotes] = useState<SimilarNote[]>([]);
+    const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
 
+    const handleNewModel = (model: NoteBottomViewModel) => {
+        if (!(leaf.view instanceof MarkdownView)) {
+            throw new Error("Leaf is not a MarkdownView");
+        }
+
+        if (leaf.view.file !== model.currentFile) {
+            return;
+        }
+
+        setSimilarNotes(model.similarNoteEntries);
+    };
+
+    // biome-ignore lint/correctness/useExhaustiveDependencies(handleNewModel):
     useEffect(() => {
-        const loadSimilarNotes = async () => {
-            if (currentFile) {
-                const notes = await getSimilarNotes(currentFile);
-                setSimilarNotes(notes);
-            } else {
-                setSimilarNotes([]);
-            }
-        };
-
-        loadSimilarNotes();
-    }, [currentFile, getSimilarNotes]);
+        const sub = bottomViewModelSubject$.subscribe(handleNewModel);
+        return () => sub.unsubscribe();
+    }, [bottomViewModelSubject$]);
 
     const handleNoteClick = (file: TFile) => {
         app.workspace.getLeaf().openFile(file);

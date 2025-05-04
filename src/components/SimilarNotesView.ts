@@ -1,8 +1,11 @@
-import type { App, TFile } from "obsidian";
+import type { App, TFile, WorkspaceLeaf } from "obsidian";
 import { Component } from "obsidian";
 import * as React from "react";
 import { type Root, createRoot } from "react-dom/client";
-import SimilarNotesViewReact from "./SimilarNotesViewReact";
+import type { Observable } from "rxjs";
+import SimilarNotesViewReact, {
+    type NoteBottomViewModel,
+} from "./SimilarNotesViewReact";
 
 // Interface for similar note items
 export interface SimilarNotesViewData {
@@ -13,15 +16,13 @@ export interface SimilarNotesViewData {
 
 export class SimilarNotesView extends Component {
     private containerEl: HTMLElement;
-    private currentFile: TFile | null = null;
     private root: Root;
 
     constructor(
         private app: App,
+        private leaf: WorkspaceLeaf,
         private parentEl: HTMLElement,
-        private getSimilarNotes: (
-            file: TFile
-        ) => Promise<SimilarNotesViewData[]>
+        private bottomViewModelSubject$: Observable<NoteBottomViewModel>
     ) {
         super();
         this.containerEl = parentEl.createDiv({
@@ -35,18 +36,10 @@ export class SimilarNotesView extends Component {
         this.root.render(
             React.createElement(SimilarNotesViewReact, {
                 app: this.app,
-                currentFile: this.currentFile,
-                getSimilarNotes: this.getSimilarNotes,
+                leaf: this.leaf,
+                bottomViewModelSubject$: this.bottomViewModelSubject$,
             })
         );
-    }
-
-    async updateForFile(file: TFile): Promise<void> {
-        // Don't update if it's the same file
-        if (this.currentFile && this.currentFile.path === file.path) return;
-
-        this.currentFile = file;
-        this.render();
     }
 
     public getContainerEl(): HTMLElement {
