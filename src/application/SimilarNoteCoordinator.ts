@@ -7,8 +7,16 @@ import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
 import type { TFile, Vault } from "obsidian";
 import { Subject } from "rxjs";
 
+interface SimilarNoteCacheEntry {
+    mtime: number;
+    notes: SimilarNoteEntry[];
+}
+
+const MAX_CACHE_SIZE = 20;
+
 export class SimilarNoteCoordinator {
     private noteBottomViewModel$ = new Subject<NoteBottomViewModel>();
+    private cache = new Map<string, SimilarNoteCacheEntry>(); // file path -> entry
 
     constructor(
         private readonly vault: Vault,
@@ -21,17 +29,29 @@ export class SimilarNoteCoordinator {
     }
 
     async onFileOpen(file: TFile | null) {
-        if (file) {
-            await this.updateSimilarNotes(file);
+        if (!file) {
+            return;
         }
+
+        const similarNotes = await this.getSimilarNotes(file);
+        this.noteBottomViewModel$.next({
+            currentFile: file,
+            similarNoteEntries: similarNotes,
+        });
     }
 
-    async updateSimilarNotes(currentFile: TFile) {
-        const note = await this.noteRepository.findByFile(currentFile);
+    async getSimilarNotes(file: TFile): Promise<SimilarNoteEntry[]> {
+        const cacheEntry = this.cache.get(file.path);
+        if (cacheEntry && cacheEntry.mtime === file.stat.mtime) {
+            return cacheEntry.notes;
+        }
+
+        const note = await this.noteRepository.findByFile(file);
         const similarNotes = await this.similarNoteFinder.findSimilarNotes(
             note
         );
-        const entries = similarNotes
+
+        const similarNoteEntries = similarNotes
             .map((similarNote) => ({
                 file: this.vault.getFileByPath(similarNote.path),
                 title: similarNote.title,
@@ -40,10 +60,16 @@ export class SimilarNoteCoordinator {
             .filter(
                 (viewModel) => viewModel.file !== null
             ) as SimilarNoteEntry[];
-        const viewModel = {
-            currentFile: currentFile,
-            similarNoteEntries: entries,
-        };
-        this.noteBottomViewModel$.next(viewModel);
+
+        this.cache.set(file.path, {
+            mtime: file.stat.mtime,
+            notes: similarNoteEntries,
+        });
+        if (this.cache.size > MAX_CACHE_SIZE) {
+            const oldestKey = this.cache.keys().next().value;
+            this.cache.delete(oldestKey);
+        }
+
+        return similarNoteEntries;
     }
 }
