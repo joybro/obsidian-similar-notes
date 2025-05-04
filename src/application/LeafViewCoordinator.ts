@@ -1,6 +1,6 @@
 import { NoteBottomView } from "@/components/NoteBottomView";
-import type { App } from "obsidian";
-import { MarkdownView, TFile } from "obsidian";
+import type { App, WorkspaceLeaf } from "obsidian";
+import { MarkdownView } from "obsidian";
 import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 
 export class LeafViewCoordinator {
@@ -11,37 +11,34 @@ export class LeafViewCoordinator {
         private similarNoteCoordinator: SimilarNoteCoordinator
     ) {}
 
-    async onFileOpen(file: TFile | null): Promise<void> {
-        if (!file || !(file instanceof TFile)) {
+    async onActiveLeafChange(leaf: WorkspaceLeaf | null): Promise<void> {
+        if (!leaf || !(leaf.view instanceof MarkdownView)) {
             return;
         }
 
-        const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (!activeLeaf) {
-            return;
-        }
-
-        if (this.noteBottomViewMap.has(activeLeaf)) return;
+        if (this.noteBottomViewMap.has(leaf.view)) return;
 
         const similarNotesView = await this.createAndAttachNoteBottomView(
-            activeLeaf
+            leaf.view
         );
         if (!similarNotesView) {
             throw new Error("Failed to create similar notes view");
         }
 
-        this.noteBottomViewMap.set(activeLeaf, similarNotesView);
+        this.noteBottomViewMap.set(leaf.view, similarNotesView);
+        if (leaf.view.file) {
+            this.similarNoteCoordinator.emitNoteBottomViewModel(leaf.view.file);
+        }
     }
 
     async onLayoutChange(): Promise<void> {
-        const activeLeaves = this.app.workspace.getLeavesOfType(
-            MarkdownView.name
-        ) as unknown as MarkdownView[];
+        const activeLeaves = this.app.workspace.getLeavesOfType("markdown");
 
-        for (const leaf of this.noteBottomViewMap.keys()) {
-            if (!activeLeaves.includes(leaf)) {
-                this.noteBottomViewMap.get(leaf)?.unload();
-                this.noteBottomViewMap.delete(leaf);
+        // Deleted views
+        for (const view of this.noteBottomViewMap.keys()) {
+            if (!activeLeaves.includes(view.leaf)) {
+                this.noteBottomViewMap.get(view)?.unload();
+                this.noteBottomViewMap.delete(view);
             }
         }
     }
@@ -53,10 +50,10 @@ export class LeafViewCoordinator {
     }
 
     private async createAndAttachNoteBottomView(
-        leaf: MarkdownView
+        view: MarkdownView
     ): Promise<NoteBottomView | null> {
         // Find embedded backlinks container
-        const embeddedBacklinksContainer = leaf.containerEl.querySelector(
+        const embeddedBacklinksContainer = view.containerEl.querySelector(
             ".embedded-backlinks"
         );
 
@@ -67,9 +64,13 @@ export class LeafViewCoordinator {
             return null;
         }
 
+        if (!view.file) {
+            return null;
+        }
+
         const noteBottomView = new NoteBottomView(
             this.app.workspace,
-            leaf,
+            view,
             embeddedBacklinksContainer.parentElement,
             this.similarNoteCoordinator.getNoteBottomViewModelObservable()
         );

@@ -5,7 +5,7 @@ import type {
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
 import type { TFile, Vault } from "obsidian";
-import { Subject } from "rxjs";
+import { BehaviorSubject } from "rxjs";
 
 interface SimilarNoteCacheEntry {
     mtime: number;
@@ -15,7 +15,10 @@ interface SimilarNoteCacheEntry {
 const MAX_CACHE_SIZE = 20;
 
 export class SimilarNoteCoordinator {
-    private noteBottomViewModel$ = new Subject<NoteBottomViewModel>();
+    private noteBottomViewModel$ = new BehaviorSubject<NoteBottomViewModel>({
+        currentFile: null,
+        similarNoteEntries: [],
+    });
     private cache = new Map<string, SimilarNoteCacheEntry>(); // file path -> entry
 
     constructor(
@@ -33,6 +36,10 @@ export class SimilarNoteCoordinator {
             return;
         }
 
+        this.emitNoteBottomViewModel(file);
+    }
+
+    async emitNoteBottomViewModel(file: TFile) {
         const similarNotes = await this.getSimilarNotes(file);
         this.noteBottomViewModel$.next({
             currentFile: file,

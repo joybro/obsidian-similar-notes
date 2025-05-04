@@ -94,19 +94,23 @@ export default class MainPlugin extends Plugin {
         this.addSettingTab(new SimilarNotesSettingTab(this.app, this));
 
         // Register event when current open file changes
-        const fileOpenRef = this.app.workspace.on("file-open", async (file) => {
-            await this.leafViewCoordinator.onFileOpen(file);
-            await this.similarNoteCoordinator.onFileOpen(file);
-        });
-        this.registerEvent(fileOpenRef);
-
-        const layoutChangeRef = this.app.workspace.on(
-            "layout-change",
-            async () => {
-                this.leafViewCoordinator.onLayoutChange();
-            }
+        this.registerEvent(
+            this.app.workspace.on("file-open", async (file) => {
+                await this.similarNoteCoordinator.onFileOpen(file);
+            })
         );
-        this.registerEvent(layoutChangeRef);
+
+        this.registerEvent(
+            this.app.workspace.on("layout-change", async () => {
+                this.leafViewCoordinator.onLayoutChange();
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on("active-leaf-change", async (leaf) => {
+                this.leafViewCoordinator.onActiveLeafChange(leaf);
+            })
+        );
 
         // Initialize file change queue
         this.app.workspace.onLayoutReady(async () => {

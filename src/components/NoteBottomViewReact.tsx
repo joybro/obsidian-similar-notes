@@ -9,7 +9,7 @@ export interface SimilarNoteEntry {
 }
 
 export interface NoteBottomViewModel {
-    currentFile: TFile;
+    currentFile: TFile | null;
     similarNoteEntries: SimilarNoteEntry[];
 }
 
@@ -113,7 +113,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     const [collapsed, setCollapsed] = useState(false);
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
 
-    const handleNewModel = (model: NoteBottomViewModel) => {
+    const handleNewViewModel = (model: NoteBottomViewModel) => {
         if (leaf.file !== model.currentFile) {
             return;
         }
@@ -121,9 +121,9 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
         setSimilarNotes(model.similarNoteEntries);
     };
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies(handleNewModel):
+    // biome-ignore lint/correctness/useExhaustiveDependencies(handleNewViewModel):
     useEffect(() => {
-        const sub = bottomViewModelSubject$.subscribe(handleNewModel);
+        const sub = bottomViewModelSubject$.subscribe(handleNewViewModel);
         return () => sub.unsubscribe();
     }, [bottomViewModelSubject$]);
 
