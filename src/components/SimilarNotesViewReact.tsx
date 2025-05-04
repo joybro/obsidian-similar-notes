@@ -1,5 +1,4 @@
-import type { App, TFile, WorkspaceLeaf } from "obsidian";
-import { MarkdownView } from "obsidian";
+import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { useEffect, useState } from "react";
 import type { Observable } from "rxjs";
 
@@ -26,8 +25,8 @@ interface SimilarNotesContentProps {
 }
 
 interface SimilarNotesViewProps {
-    app: App;
-    leaf: WorkspaceLeaf;
+    workspace: Workspace;
+    leaf: MarkdownView;
     bottomViewModelSubject$: Observable<NoteBottomViewModel>;
 }
 
@@ -107,7 +106,7 @@ const SimilarNotesContent: React.FC<SimilarNotesContentProps> = ({
 
 // Main Component
 const SimilarNotesViewReact: React.FC<SimilarNotesViewProps> = ({
-    app,
+    workspace,
     leaf,
     bottomViewModelSubject$,
 }) => {
@@ -115,11 +114,7 @@ const SimilarNotesViewReact: React.FC<SimilarNotesViewProps> = ({
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
 
     const handleNewModel = (model: NoteBottomViewModel) => {
-        if (!(leaf.view instanceof MarkdownView)) {
-            throw new Error("Leaf is not a MarkdownView");
-        }
-
-        if (leaf.view.file !== model.currentFile) {
+        if (leaf.file !== model.currentFile) {
             return;
         }
 
@@ -133,7 +128,7 @@ const SimilarNotesViewReact: React.FC<SimilarNotesViewProps> = ({
     }, [bottomViewModelSubject$]);
 
     const handleNoteClick = (file: TFile) => {
-        app.workspace.getLeaf().openFile(file);
+        workspace.getLeaf().openFile(file);
     };
 
     const toggleCollapse = () => {

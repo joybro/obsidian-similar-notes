@@ -1,4 +1,4 @@
-import type { App, TFile, WorkspaceLeaf } from "obsidian";
+import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { Component } from "obsidian";
 import * as React from "react";
 import { type Root, createRoot } from "react-dom/client";
@@ -19,8 +19,8 @@ export class SimilarNotesView extends Component {
     private root: Root;
 
     constructor(
-        private app: App,
-        private leaf: WorkspaceLeaf,
+        private workspace: Workspace,
+        private leaf: MarkdownView,
         private parentEl: HTMLElement,
         private bottomViewModelSubject$: Observable<NoteBottomViewModel>
     ) {
@@ -35,7 +35,7 @@ export class SimilarNotesView extends Component {
     private render(): void {
         this.root.render(
             React.createElement(SimilarNotesViewReact, {
-                app: this.app,
+                workspace: this.workspace,
                 leaf: this.leaf,
                 bottomViewModelSubject$: this.bottomViewModelSubject$,
             })

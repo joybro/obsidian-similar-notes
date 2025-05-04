@@ -1,10 +1,10 @@
 import { SimilarNotesView } from "@/components/SimilarNotesView";
-import type { App, WorkspaceLeaf } from "obsidian";
+import type { App } from "obsidian";
 import { MarkdownView, TFile } from "obsidian";
 import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 
 export class LeafViewCoordinator {
-    private noteBottomViewMap: Map<WorkspaceLeaf, SimilarNotesView> = new Map();
+    private noteBottomViewMap: Map<MarkdownView, SimilarNotesView> = new Map();
 
     constructor(
         private app: App,
@@ -16,8 +16,8 @@ export class LeafViewCoordinator {
             return;
         }
 
-        const activeLeaf = this.app.workspace.activeLeaf;
-        if (!activeLeaf || !(activeLeaf.view instanceof MarkdownView)) {
+        const activeLeaf = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!activeLeaf) {
             return;
         }
 
@@ -32,7 +32,9 @@ export class LeafViewCoordinator {
     }
 
     async onLayoutChange(): Promise<void> {
-        const activeLeaves = this.app.workspace.getLeavesOfType("markdown");
+        const activeLeaves = this.app.workspace.getLeavesOfType(
+            MarkdownView.name
+        ) as unknown as MarkdownView[];
 
         for (const leaf of this.noteBottomViewMap.keys()) {
             if (!activeLeaves.includes(leaf)) {
@@ -49,10 +51,10 @@ export class LeafViewCoordinator {
     }
 
     private createAndAttachNoteBottomView(
-        leaf: WorkspaceLeaf
+        leaf: MarkdownView
     ): SimilarNotesView | null {
         // Find embedded backlinks container
-        const embeddedBacklinksContainer = leaf.view.containerEl.querySelector(
+        const embeddedBacklinksContainer = leaf.containerEl.querySelector(
             ".embedded-backlinks"
         );
 
@@ -64,7 +66,7 @@ export class LeafViewCoordinator {
         }
 
         const similarNotesView = new SimilarNotesView(
-            this.app,
+            this.app.workspace,
             leaf,
             embeddedBacklinksContainer.parentElement,
             this.similarNoteCoordinator.getNoteBottomViewModelObservable()
