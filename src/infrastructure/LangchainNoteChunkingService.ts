@@ -4,7 +4,7 @@ import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 
-export class LangChainNoteChunkingService implements NoteChunkingService {
+export class LangchainNoteChunkingService implements NoteChunkingService {
     private readonly splitter: RecursiveCharacterTextSplitter;
 
     constructor(private readonly embeddingService: EmbeddingService) {

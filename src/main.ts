@@ -8,7 +8,7 @@ import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
 import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
 import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
-import { LangChainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
+import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { OramaNoteChunkRepository } from "./infrastructure/OramaNoteChunkRepository";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
@@ -63,7 +63,7 @@ export default class MainPlugin extends Plugin {
             log.error("Failed to initialize model service:", error);
         }
 
-        this.noteChunkingService = new LangChainNoteChunkingService(
+        this.noteChunkingService = new LangchainNoteChunkingService(
             this.modelService
         );
 
