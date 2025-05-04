@@ -23,7 +23,9 @@ export class LeafViewCoordinator {
 
         if (this.noteBottomViewMap.has(activeLeaf)) return;
 
-        const similarNotesView = this.createAndAttachNoteBottomView(activeLeaf);
+        const similarNotesView = await this.createAndAttachNoteBottomView(
+            activeLeaf
+        );
         if (!similarNotesView) {
             throw new Error("Failed to create similar notes view");
         }
@@ -50,9 +52,9 @@ export class LeafViewCoordinator {
         }
     }
 
-    private createAndAttachNoteBottomView(
+    private async createAndAttachNoteBottomView(
         leaf: MarkdownView
-    ): NoteBottomView | null {
+    ): Promise<NoteBottomView | null> {
         // Find embedded backlinks container
         const embeddedBacklinksContainer = leaf.containerEl.querySelector(
             ".embedded-backlinks"

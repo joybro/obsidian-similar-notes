@@ -95,8 +95,8 @@ export default class MainPlugin extends Plugin {
 
         // Register event when current open file changes
         const fileOpenRef = this.app.workspace.on("file-open", async (file) => {
-            this.leafViewCoordinator.onFileOpen(file);
-            this.similarNoteCoordinator.onFileOpen(file);
+            await this.leafViewCoordinator.onFileOpen(file);
+            await this.similarNoteCoordinator.onFileOpen(file);
         });
         this.registerEvent(fileOpenRef);
 
