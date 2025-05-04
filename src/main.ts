@@ -41,7 +41,7 @@ export default class MainPlugin extends Plugin {
     private similarNoteCoordinator: SimilarNoteCoordinator;
 
     async onload() {
-        log.setDefaultLevel(log.levels.INFO);
+        log.setDefaultLevel(log.levels.DEBUG);
         log.info("Loading Similar Notes plugin");
 
         this.noteRepository = new VaultNoteRepository(this.app);
