@@ -1,7 +1,7 @@
 import type {
     NoteBottomViewModel,
     SimilarNoteEntry,
-} from "@/components/SimilarNotesViewReact";
+} from "@/components/NoteBottomViewReact";
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
 import type { TFile, Vault } from "obsidian";

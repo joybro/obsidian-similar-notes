@@ -1,10 +1,10 @@
-import { SimilarNotesView } from "@/components/SimilarNotesView";
+import { NoteBottomView } from "@/components/NoteBottomView";
 import type { App } from "obsidian";
 import { MarkdownView, TFile } from "obsidian";
 import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 
 export class LeafViewCoordinator {
-    private noteBottomViewMap: Map<MarkdownView, SimilarNotesView> = new Map();
+    private noteBottomViewMap: Map<MarkdownView, NoteBottomView> = new Map();
 
     constructor(
         private app: App,
@@ -52,7 +52,7 @@ export class LeafViewCoordinator {
 
     private createAndAttachNoteBottomView(
         leaf: MarkdownView
-    ): SimilarNotesView | null {
+    ): NoteBottomView | null {
         // Find embedded backlinks container
         const embeddedBacklinksContainer = leaf.containerEl.querySelector(
             ".embedded-backlinks"
@@ -65,7 +65,7 @@ export class LeafViewCoordinator {
             return null;
         }
 
-        const similarNotesView = new SimilarNotesView(
+        const noteBottomView = new NoteBottomView(
             this.app.workspace,
             leaf,
             embeddedBacklinksContainer.parentElement,
@@ -73,12 +73,12 @@ export class LeafViewCoordinator {
         );
 
         // Move similar notes container before embedded backlinks container
-        const similarNotesContainer = similarNotesView.getContainerEl();
+        const noteBottomViewContainerEl = noteBottomView.getContainerEl();
         embeddedBacklinksContainer.parentElement.insertBefore(
-            similarNotesContainer,
+            noteBottomViewContainerEl,
             embeddedBacklinksContainer
         );
 
-        return similarNotesView;
+        return noteBottomView;
     }
 }

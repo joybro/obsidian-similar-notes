@@ -24,7 +24,7 @@ interface SimilarNotesContentProps {
     isCollapsed: boolean;
 }
 
-interface SimilarNotesViewProps {
+interface NoteBottomViewProps {
     workspace: Workspace;
     leaf: MarkdownView;
     bottomViewModelSubject$: Observable<NoteBottomViewModel>;
@@ -105,7 +105,7 @@ const SimilarNotesContent: React.FC<SimilarNotesContentProps> = ({
 };
 
 // Main Component
-const SimilarNotesViewReact: React.FC<SimilarNotesViewProps> = ({
+const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     workspace,
     leaf,
     bottomViewModelSubject$,
@@ -150,4 +150,4 @@ const SimilarNotesViewReact: React.FC<SimilarNotesViewProps> = ({
     );
 };
 
-export default SimilarNotesViewReact;
+export default NoteBottomViewReact;
