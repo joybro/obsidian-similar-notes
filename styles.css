@@ -1,7 +1,7 @@
 /* Similar Notes container style */
 .similar-notes-container {
     margin-bottom: 12px;
-    border-top: 2px solid var(--background-modifier-border);
+    border-top: 1px solid var(--background-modifier-border);
 }
 
 /* Header style */
@@ -40,7 +40,9 @@
 
 /* Similar note item */
 .similar-notes-item {
-    padding-left: 0px;
+    padding-left: 10px;
+    color: var(--nav-item-color);
+    font-size: max(var(--font-ui-small), var(--font-smaller));
 }
 
 /* Empty state message */

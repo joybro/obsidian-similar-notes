@@ -93,7 +93,9 @@ const SimilarNotesContent: React.FC<SimilarNotesContentProps> = ({
                     >
                         <div className="tree-item-inner">{note.title}</div>
                         <div className="tree-item-flair-outer">
-                            {note.similarity.toFixed(2)}
+                            <div className="tree-item-flair">
+                                {note.similarity.toFixed(2)}
+                            </div>
                         </div>
                     </div>
                 );
