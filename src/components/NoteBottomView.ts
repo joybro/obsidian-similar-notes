@@ -13,6 +13,7 @@ export class NoteBottomView extends Component {
 
     constructor(
         private workspace: Workspace,
+        private vaultName: string,
         private leaf: MarkdownView,
         private parentEl: HTMLElement,
         private bottomViewModelSubject$: Observable<NoteBottomViewModel>
@@ -29,6 +30,7 @@ export class NoteBottomView extends Component {
         this.root.render(
             React.createElement(NoteBottomViewReact, {
                 workspace: this.workspace,
+                vaultName: this.vaultName,
                 leaf: this.leaf,
                 bottomViewModelSubject$: this.bottomViewModelSubject$,
             })

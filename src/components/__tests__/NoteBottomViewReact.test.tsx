@@ -19,7 +19,11 @@ interface SimilarNote {
 describe("SimilarNotesViewReact", () => {
     let mockWorkspace: Partial<Workspace>;
     let mockLeaf: MarkdownView;
-    let mockOpenFile: (file: TFile) => void;
+    let mockOpenLinkText: (
+        linktext: string,
+        sourcePath: string,
+        newLeaf?: boolean
+    ) => Promise<void>;
     let bottomViewModelSubject$: BehaviorSubject<{
         currentFile: TFile;
         similarNoteEntries: SimilarNote[];
@@ -27,13 +31,13 @@ describe("SimilarNotesViewReact", () => {
     let currentFile: TFile;
 
     beforeEach(() => {
-        mockOpenFile = vi.fn();
+        mockOpenLinkText = vi.fn();
         mockLeaf = {
             file: undefined,
-            openFile: mockOpenFile,
         } as unknown as MarkdownView;
         mockWorkspace = {
             getLeaf: vi.fn().mockReturnValue(mockLeaf),
+            openLinkText: mockOpenLinkText,
         };
         currentFile = { path: "current-file.md" } as TFile;
         bottomViewModelSubject$ = new BehaviorSubject({
@@ -60,6 +64,7 @@ describe("SimilarNotesViewReact", () => {
                 workspace={mockWorkspace as unknown as Workspace}
                 leaf={mockLeaf as unknown as MarkdownView}
                 bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
             />
         );
 
@@ -73,6 +78,7 @@ describe("SimilarNotesViewReact", () => {
                 workspace={mockWorkspace as unknown as Workspace}
                 leaf={mockLeaf as unknown as MarkdownView}
                 bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
             />
         );
 
@@ -88,6 +94,7 @@ describe("SimilarNotesViewReact", () => {
                 workspace={mockWorkspace as unknown as Workspace}
                 leaf={mockLeaf as unknown as MarkdownView}
                 bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
             />
         );
 
@@ -106,6 +113,7 @@ describe("SimilarNotesViewReact", () => {
                 workspace={mockWorkspace as unknown as Workspace}
                 leaf={mockLeaf as unknown as MarkdownView}
                 bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
             />
         );
         expect(
@@ -119,10 +127,11 @@ describe("SimilarNotesViewReact", () => {
                 workspace={mockWorkspace as unknown as Workspace}
                 leaf={mockLeaf as unknown as MarkdownView}
                 bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
             />
         );
         const noteElement = await screen.findByText("Similar Note 1");
         fireEvent.click(noteElement);
-        expect(mockOpenFile).toHaveBeenCalledWith({ path: "similar1.md" });
+        expect(mockOpenLinkText).toHaveBeenCalledWith("similar1.md", "", false);
     });
 });

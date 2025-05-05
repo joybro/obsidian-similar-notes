@@ -1,4 +1,5 @@
 import type { MarkdownView, TFile, Workspace } from "obsidian";
+import { Menu } from "obsidian";
 import { useEffect, useState } from "react";
 import type { Observable } from "rxjs";
 
@@ -20,12 +21,14 @@ interface SimilarNotesHeaderProps {
 
 interface SimilarNotesContentProps {
     similarNotes: SimilarNoteEntry[];
-    onNoteClick: (file: TFile) => void;
+    onNoteClick: (e: React.MouseEvent, file: TFile) => void;
+    onContextMenu: (e: React.MouseEvent, file: TFile) => void;
     isCollapsed: boolean;
 }
 
 interface NoteBottomViewProps {
     workspace: Workspace;
+    vaultName: string;
     leaf: MarkdownView;
     bottomViewModelSubject$: Observable<NoteBottomViewModel>;
 }
@@ -63,6 +66,7 @@ const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
 const SimilarNotesContent: React.FC<SimilarNotesContentProps> = ({
     similarNotes,
     onNoteClick,
+    onContextMenu,
     isCollapsed,
 }) => {
     if (isCollapsed) {
@@ -78,20 +82,14 @@ const SimilarNotesContent: React.FC<SimilarNotesContentProps> = ({
     return (
         <div className="similar-notes-content">
             {similarNotes.map((note, i) => {
-                const handleKeyDown = (e: React.KeyboardEvent) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                        onNoteClick(note.file);
-                        e.preventDefault();
-                    }
-                };
-
                 return (
                     <div
                         key={note.file.path}
                         className="similar-notes-item tree-item-self is-clickable"
                         draggable="true"
-                        onClick={() => onNoteClick(note.file)}
-                        onKeyDown={handleKeyDown}
+                        onClick={(e) => onNoteClick(e, note.file)}
+                        onKeyDown={() => {}}
+                        onContextMenu={(e) => onContextMenu(e, note.file)}
                     >
                         <div className="tree-item-inner">{note.title}</div>
                         <div className="tree-item-flair-outer">
@@ -107,6 +105,7 @@ const SimilarNotesContent: React.FC<SimilarNotesContentProps> = ({
 // Main Component
 const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     workspace,
+    vaultName,
     leaf,
     bottomViewModelSubject$,
 }) => {
@@ -127,8 +126,36 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
         return () => sub.unsubscribe();
     }, [bottomViewModelSubject$]);
 
-    const handleNoteClick = (file: TFile) => {
-        workspace.getLeaf().openFile(file);
+    const openNote = (file: TFile, newTab = false) => {
+        workspace.openLinkText(file.path, "", newTab);
+    };
+
+    const handleNoteClick = (e: React.MouseEvent, file: TFile) => {
+        e.preventDefault();
+        openNote(file, e.ctrlKey || e.metaKey);
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, file: TFile) => {
+        e.preventDefault();
+        const menu = new Menu();
+        menu.addItem((item) =>
+            item.setTitle("Open link").onClick(() => {
+                openNote(file, false);
+            })
+        );
+        menu.addItem((item) =>
+            item.setTitle("Open in new tab").onClick(() => {
+                openNote(file, true);
+            })
+        );
+        menu.addSeparator();
+        menu.addItem((item) =>
+            item.setTitle("Copy Obsidian URL").onClick(() => {
+                const uri = `obsidian://open?vault=${vaultName}&file=${file.path}`;
+                navigator.clipboard.writeText(uri);
+            })
+        );
+        menu.showAtMouseEvent(e.nativeEvent);
     };
 
     const toggleCollapse = () => {
@@ -144,6 +171,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
             <SimilarNotesContent
                 similarNotes={similarNotes}
                 onNoteClick={handleNoteClick}
+                onContextMenu={handleContextMenu}
                 isCollapsed={collapsed}
             />
         </div>

@@ -70,6 +70,7 @@ export class LeafViewCoordinator {
 
         const noteBottomView = new NoteBottomView(
             this.app.workspace,
+            this.app.vault.getName(),
             view,
             embeddedBacklinksContainer.parentElement,
             this.similarNoteCoordinator.getNoteBottomViewModelObservable()
