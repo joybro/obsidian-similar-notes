@@ -5,6 +5,7 @@ export interface SimilarNotesSettings {
     autoSaveInterval: number; // in minutes
     fileMtimePath: string;
     modelId: string; // The model ID to use for embeddings
+    includeFrontmatter: boolean; // Whether to include frontmatter in indexing
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
@@ -12,6 +13,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     autoSaveInterval: 5,
     fileMtimePath: ".obsidian/similar-notes-file-mtimes.json",
     modelId: "sentence-transformers/all-MiniLM-L6-v2",
+    includeFrontmatter: false,
 };
 
 export class SettingsService {

@@ -12,6 +12,7 @@ interface MockSetting {
     setHeading: ReturnType<typeof vi.fn>;
     addText: ReturnType<typeof vi.fn>;
     addButton: ReturnType<typeof vi.fn>;
+    addToggle: ReturnType<typeof vi.fn>;
 }
 
 // Define the MockSettingImpl class
@@ -61,6 +62,20 @@ class MockSettingImpl {
         callback(mockButton);
         return this;
     }
+
+    addToggle(
+        callback: (toggle: {
+            setValue: (value: boolean) => void;
+            onChange: (value: boolean) => void;
+        }) => void
+    ) {
+        const mockToggle = {
+            setValue: vi.fn().mockReturnThis(),
+            onChange: vi.fn(),
+        };
+        callback(mockToggle);
+        return this;
+    }
 }
 
 // Mock the Obsidian module
@@ -76,6 +91,7 @@ vi.mock("obsidian", async () => {
             vi.spyOn(instance, "setHeading");
             vi.spyOn(instance, "addText");
             vi.spyOn(instance, "addButton");
+            vi.spyOn(instance, "addToggle");
             return instance as unknown as MockSetting;
         });
 
@@ -101,6 +117,7 @@ describe("SimilarNotesSettingTab", () => {
     let plugin: MainPlugin;
     let settingTab: SimilarNotesSettingTab;
     let mockSettingInstances: MockSetting[];
+    let settingsService: import("@/application/SettingsService").SettingsService;
 
     beforeEach(() => {
         // Clear all mocks before each test
@@ -112,17 +129,22 @@ describe("SimilarNotesSettingTab", () => {
             workspace: {},
         } as App;
 
-        // Mock Plugin with required methods
-        plugin = {
-            getSettings: vi.fn().mockReturnValue({
+        // Mock SettingsService
+        settingsService = {
+            get: vi.fn().mockReturnValue({
                 dbPath: ".obsidian/similar-notes.json",
                 autoSaveInterval: 5,
+                includeFrontmatter: false,
             }),
-            updateSettings: vi.fn(),
+            update: vi.fn(),
+        } as unknown as import("@/application/SettingsService").SettingsService;
+
+        // Mock Plugin with required methods
+        plugin = {
             reindexNotes: vi.fn(),
         } as unknown as MainPlugin;
 
-        settingTab = new SimilarNotesSettingTab(app, plugin);
+        settingTab = new SimilarNotesSettingTab(plugin, settingsService);
 
         // Mock containerEl with HTMLElement properties
         const mockDiv = document.createElement("div");
@@ -146,6 +168,9 @@ describe("SimilarNotesSettingTab", () => {
                 addButton: vi
                     .fn()
                     .mockImplementation(instance.addButton.bind(instance)),
+                addToggle: vi
+                    .fn()
+                    .mockImplementation(instance.addToggle.bind(instance)),
             } as MockSetting;
             mockSettingInstances.push(spiedInstance);
             return spiedInstance;
@@ -159,7 +184,7 @@ describe("SimilarNotesSettingTab", () => {
         expect(settingTab.containerEl.empty).toHaveBeenCalled();
 
         // Verify Setting was called for each setting
-        expect(Setting).toHaveBeenCalledTimes(4); // 3 settings + 1 heading
+        expect(Setting).toHaveBeenCalledTimes(5); // 4 settings + 1 heading
     });
 
     test("settings changes are propagated to plugin", async () => {
@@ -182,8 +207,8 @@ describe("SimilarNotesSettingTab", () => {
         const onChangeHandler = mockText.onChange.mock.calls[0][0];
         await onChangeHandler("/new/path.json");
 
-        // Verify updateSettings was called with correct value
-        expect(plugin.updateSettings).toHaveBeenCalledWith({
+        // Verify update was called with correct value
+        expect(settingsService.update).toHaveBeenCalledWith({
             dbPath: "/new/path.json",
         });
     });
@@ -192,7 +217,7 @@ describe("SimilarNotesSettingTab", () => {
         settingTab.display();
 
         // Get the last Setting instance
-        const mockSetting = mockSettingInstances[3];
+        const mockSetting = mockSettingInstances[4];
 
         // Get the mock button component from addButton call
         const mockButton = {
@@ -210,5 +235,37 @@ describe("SimilarNotesSettingTab", () => {
 
         // Verify reindexNotes was called
         expect(plugin.reindexNotes).toHaveBeenCalled();
+    });
+
+    // Test for the includeFrontmatter toggle
+    test("includeFrontmatter toggle is rendered and updates settings", async () => {
+        // Patch settingsService.get to include includeFrontmatter
+        settingsService.get = vi.fn().mockReturnValue({
+            dbPath: ".obsidian/similar-notes.json",
+            autoSaveInterval: 5,
+            includeFrontmatter: false,
+        });
+        settingTab.display();
+
+        // The third setting should be the toggle
+        const mockSetting = mockSettingInstances[3];
+        expect(mockSetting.setName).toHaveBeenCalledWith(
+            "Include frontmatter in indexing and search"
+        );
+        expect(mockSetting.setDesc).toHaveBeenCalledWith(
+            "If enabled, the frontmatter of each note will be included in the similarity index and search."
+        );
+        // Simulate toggle change
+        const onChangeCallback = mockSetting.addToggle.mock.calls[0][0];
+        const mockToggle = {
+            setValue: vi.fn().mockReturnThis(),
+            onChange: vi.fn(),
+        };
+        onChangeCallback(mockToggle);
+        const onChangeHandler = mockToggle.onChange.mock.calls[0][0];
+        await onChangeHandler(true);
+        expect(settingsService.update).toHaveBeenCalledWith({
+            includeFrontmatter: true,
+        });
     });
 });

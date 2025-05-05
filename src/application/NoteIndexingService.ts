@@ -1,3 +1,4 @@
+import type { SettingsService } from "@/application/SettingsService";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
@@ -14,7 +15,8 @@ export class NoteIndexingService {
         private noteChangeQueue: NoteChangeQueue,
         private statusBarItem: HTMLElement,
         private noteChunkingService: NoteChunkingService,
-        private embeddingService: EmbeddingService
+        private embeddingService: EmbeddingService,
+        private settingsService: SettingsService
     ) {}
 
     startLoop() {
@@ -61,7 +63,10 @@ export class NoteIndexingService {
     }
 
     private async processUpdatedNote(path: string) {
-        const note = await this.noteRepository.findByPath(path);
+        const note = await this.noteRepository.findByPath(
+            path,
+            !this.settingsService.get().includeFrontmatter
+        );
         if (!note || !note.content) {
             return;
         }

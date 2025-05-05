@@ -41,6 +41,21 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("Index").setHeading();
 
         new Setting(containerEl)
+            .setName("Include frontmatter in indexing and search")
+            .setDesc(
+                "If enabled, the frontmatter of each note will be included in the similarity index and search."
+            )
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(this.settingsService.get().includeFrontmatter)
+                    .onChange(async (value) => {
+                        await this.settingsService.update({
+                            includeFrontmatter: value,
+                        });
+                    });
+            });
+
+        new Setting(containerEl)
             .setName("Reindex notes")
             .setDesc("Rebuild the similarity index for all notes")
             .addButton((button) => {

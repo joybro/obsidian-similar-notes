@@ -68,7 +68,8 @@ export default class MainPlugin extends Plugin {
         this.similarNoteCoordinator = new SimilarNoteCoordinator(
             this.app.vault,
             this.noteRepository,
-            this.similarNoteFinder
+            this.similarNoteFinder,
+            this.settingsService
         );
 
         this.leafViewCoordinator = new LeafViewCoordinator(
@@ -119,7 +120,8 @@ export default class MainPlugin extends Plugin {
                 this.fileChangeQueue,
                 statusBarItem,
                 this.noteChunkingService,
-                this.modelService
+                this.modelService,
+                this.settingsService
             );
 
             this.noteIndexingService.startLoop();

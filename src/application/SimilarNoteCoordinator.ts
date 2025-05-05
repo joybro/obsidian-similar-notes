@@ -6,6 +6,7 @@ import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
 import type { TFile, Vault } from "obsidian";
 import { BehaviorSubject } from "rxjs";
+import type { SettingsService } from "./SettingsService";
 
 interface SimilarNoteCacheEntry {
     mtime: number;
@@ -24,7 +25,8 @@ export class SimilarNoteCoordinator {
     constructor(
         private readonly vault: Vault,
         private readonly noteRepository: NoteRepository,
-        private readonly similarNoteFinder: SimilarNoteFinder
+        private readonly similarNoteFinder: SimilarNoteFinder,
+        private readonly settingsService: SettingsService
     ) {}
 
     getNoteBottomViewModelObservable() {
@@ -53,7 +55,10 @@ export class SimilarNoteCoordinator {
             return cacheEntry.notes;
         }
 
-        const note = await this.noteRepository.findByFile(file);
+        const note = await this.noteRepository.findByFile(
+            file,
+            !this.settingsService.get().includeFrontmatter
+        );
         const similarNotes = await this.similarNoteFinder.findSimilarNotes(
             note
         );
