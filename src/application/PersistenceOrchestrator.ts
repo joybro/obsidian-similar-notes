@@ -45,6 +45,10 @@ export class PersistenceOrchestrator {
     }
 
     async closeStore() {
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+        }
+
         await this.noteChunkRepository.persist();
         await this.mTimeStore.persist();
     }
