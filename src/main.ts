@@ -1,6 +1,7 @@
 import log from "loglevel";
 import { Plugin } from "obsidian";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
+import { NoteIndexingService } from "./application/NoteIndexingService";
 import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
@@ -21,12 +22,11 @@ export default class MainPlugin extends Plugin {
     private autoSaveInterval: NodeJS.Timeout;
     private fileChangeQueue: NoteChangeQueue;
     private modelService: EmbeddingService;
-    private fileChangeLoop: () => Promise<void>;
-    private fileChangeLoopTimer: NodeJS.Timeout;
     private noteRepository: NoteRepository;
     private noteChunkingService: NoteChunkingService;
     private similarNoteFinder: SimilarNoteFinder;
     private similarNoteCoordinator: SimilarNoteCoordinator;
+    private noteIndexingService: NoteIndexingService;
 
     async onload() {
         log.setDefaultLevel(log.levels.DEBUG);
@@ -113,78 +113,22 @@ export default class MainPlugin extends Plugin {
 
             const statusBarItem = this.addStatusBarItem();
 
-            const processDeletedNote = async (path: string) => {
-                await this.noteChunkRepository.removeByPath(path);
-            };
+            this.noteIndexingService = new NoteIndexingService(
+                this.noteRepository,
+                this.noteChunkRepository,
+                this.fileChangeQueue,
+                statusBarItem,
+                this.noteChunkingService,
+                this.modelService
+            );
 
-            const processUpdatedNote = async (path: string) => {
-                const note = await this.noteRepository.findByPath(path);
-                if (!note || !note.content) {
-                    return;
-                }
-
-                const splitted = await this.noteChunkingService.split(note);
-                const noteChunks = await Promise.all(
-                    splitted.map(async (chunk) =>
-                        chunk.withEmbedding(
-                            await this.modelService.embedText(chunk.content)
-                        )
-                    )
-                );
-
-                log.info("chunks", noteChunks);
-
-                await this.noteChunkRepository.removeByPath(note.path);
-                await this.noteChunkRepository.putMulti(noteChunks);
-
-                log.info(
-                    "count of chunks in embedding store",
-                    this.noteChunkRepository.count()
-                );
-            };
-
-            this.fileChangeLoop = async () => {
-                const count = this.fileChangeQueue.getFileChangeCount();
-                if (count > 10) {
-                    statusBarItem.setText(`${count} to index`);
-                    statusBarItem.show();
-                } else {
-                    statusBarItem.hide();
-                }
-
-                const changes = await this.fileChangeQueue.pollFileChanges(1);
-                if (changes.length === 0) {
-                    this.fileChangeLoopTimer = setTimeout(
-                        this.fileChangeLoop,
-                        1000
-                    );
-                    return;
-                }
-
-                const change = changes[0];
-                log.info("processing change", change.path);
-
-                if (change.reason === "deleted") {
-                    await processDeletedNote(change.path);
-                } else {
-                    await processUpdatedNote(change.path);
-                }
-
-                await this.fileChangeQueue.markNoteChangeProcessed(change);
-
-                this.fileChangeLoop();
-            };
-
-            this.fileChangeLoop();
+            this.noteIndexingService.startLoop();
         });
     }
 
     async onunload() {
+        this.noteIndexingService.stopLoop();
         this.leafViewCoordinator.onUnload();
-
-        if (this.fileChangeLoopTimer) {
-            clearTimeout(this.fileChangeLoopTimer);
-        }
 
         // Clear auto-save interval
         if (this.autoSaveInterval) {
