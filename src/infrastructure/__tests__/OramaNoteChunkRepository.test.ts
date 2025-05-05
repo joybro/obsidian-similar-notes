@@ -85,12 +85,9 @@ describe("OramaNoteChunkRepository", () => {
 
     beforeEach(async () => {
         testDbPath = `test-db-path-${Date.now()}`;
-        repository = new OramaNoteChunkRepository(
-            mockVault,
-            vectorSize,
-            testDbPath
-        );
-        await repository.init();
+        repository = new OramaNoteChunkRepository(mockVault);
+        await repository.init(vectorSize, testDbPath);
+        await repository.restore();
         vi.clearAllMocks();
         prepareSampleChunks();
     });
@@ -173,11 +170,8 @@ describe("OramaNoteChunkRepository", () => {
         (persist as Mock).mockResolvedValue(mockFileContent);
 
         // Create new repository instance and load data
-        const newRepository = new OramaNoteChunkRepository(
-            mockVault,
-            vectorSize,
-            testDbPath
-        );
+        const newRepository = new OramaNoteChunkRepository(mockVault);
+        await newRepository.init(vectorSize, testDbPath);
         await newRepository.restore();
 
         // Verify that the mock functions were called

@@ -36,30 +36,26 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
     private hasChanges = false;
     private db: Orama<Schema> | null = null;
     private schema: Schema;
+    private vectorSize: number;
+    private filepath: string;
 
-    constructor(
-        private readonly vault: Vault,
-        private readonly vectorSize: number,
-        private readonly filepath: string
-    ) {
-        this.hasChanges = false;
+    constructor(private readonly vault: Vault) {}
+
+    async init(vectorSize: number, filepath: string): Promise<void> {
+        this.vectorSize = vectorSize;
+        this.filepath = filepath;
         this.db = null;
         this.schema = {
             path: "string",
             pathHash: "string",
             title: "string",
-            embedding: `vector[${vectorSize}]`,
+            embedding: `vector[${this.vectorSize}]`,
             lastUpdated: "number",
             content: "string",
             chunkIndex: "number",
             totalChunks: "number",
         } as const;
-    }
 
-    async init(): Promise<void> {
-        this.db = await create({
-            schema: this.schema,
-        });
         this.hasChanges = false;
     }
 

@@ -1,6 +1,8 @@
 import type { NoteChunk } from "@/domain/model/NoteChunk";
 
 export interface NoteChunkRepository {
+    init(vectorSize: number, filepath: string): Promise<void>;
+
     /**
      * Puts a NoteChunk.
      * If a chunk with the same chunkId exists, it will be overwritten.

@@ -20,7 +20,7 @@ export default class MainPlugin extends Plugin {
     private settingsService: SettingsService;
     private noteChunkRepository: NoteChunkRepository;
     private autoSaveInterval: NodeJS.Timeout;
-    private fileChangeQueue: NoteChangeQueue;
+    private noteChangeQueue: NoteChangeQueue;
     private modelService: EmbeddingService;
     private noteRepository: NoteRepository;
     private noteChunkingService: NoteChunkingService;
@@ -106,18 +106,18 @@ export default class MainPlugin extends Plugin {
 
         // Initialize file change queue
         this.app.workspace.onLayoutReady(async () => {
-            this.fileChangeQueue = new NoteChangeQueue({
+            this.noteChangeQueue = new NoteChangeQueue({
                 vault: this.app.vault,
             });
             const queueMetadata = await this.loadQueueMetadataFromDisk();
-            await this.fileChangeQueue.initialize(queueMetadata);
+            await this.noteChangeQueue.initialize(queueMetadata);
 
             const statusBarItem = this.addStatusBarItem();
 
             this.noteIndexingService = new NoteIndexingService(
                 this.noteRepository,
                 this.noteChunkRepository,
-                this.fileChangeQueue,
+                this.noteChangeQueue,
                 statusBarItem,
                 this.noteChunkingService,
                 this.modelService,
@@ -151,10 +151,10 @@ export default class MainPlugin extends Plugin {
             }
         }
         // Cleanup file change queue
-        if (this.fileChangeQueue) {
+        if (this.noteChangeQueue) {
             try {
                 await this.saveQueueMetadataToDisk();
-                this.fileChangeQueue.cleanup();
+                this.noteChangeQueue.cleanup();
             } catch (e) {
                 log.error("Error while closing file change queue:", e);
             }
@@ -163,17 +163,17 @@ export default class MainPlugin extends Plugin {
 
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
-        this.fileChangeQueue.enqueueAllNotes();
+        this.noteChangeQueue.enqueueAllNotes();
     }
 
     private async initializeStore(vectorSize: number, dbPath: string) {
         try {
             // Create store instance
             this.noteChunkRepository = new OramaNoteChunkRepository(
-                this.app.vault,
-                vectorSize,
-                dbPath
+                this.app.vault
             );
+
+            this.noteChunkRepository.init(vectorSize, dbPath);
 
             // Try to load existing database
             try {
@@ -219,7 +219,7 @@ export default class MainPlugin extends Plugin {
     }
 
     private async saveQueueMetadataToDisk(): Promise<void> {
-        const metadata = await this.fileChangeQueue.getMetadata();
+        const metadata = await this.noteChangeQueue.getMetadata();
         await this.app.vault.adapter.write(
             this.settingsService.get().fileMtimePath,
             JSON.stringify(metadata)
