@@ -23,10 +23,7 @@ export class SettingsService {
         Partial<SimilarNotesSettings>
     >();
 
-    constructor(
-        private plugin: Plugin,
-        private setupAutoSave: (interval: number) => void
-    ) {}
+    constructor(private plugin: Plugin) {}
 
     async load(): Promise<void> {
         const data = await this.plugin.loadData();
@@ -50,10 +47,5 @@ export class SettingsService {
         await this.save();
 
         this.newSettingsObservable$.next(newSettings);
-
-        // If auto-save interval changed, update the interval
-        if (newSettings.autoSaveInterval !== undefined) {
-            this.setupAutoSave(newSettings.autoSaveInterval);
-        }
     }
 }

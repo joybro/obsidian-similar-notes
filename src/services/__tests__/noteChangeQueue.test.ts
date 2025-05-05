@@ -1,3 +1,4 @@
+import type { MTimeStore } from "@/infrastructure/MTimeStore";
 import type { TFile, Vault } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { NoteChangeQueue } from "../noteChangeQueue";
@@ -7,6 +8,7 @@ type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on" | "offref">;
 
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
+    let mockMTimeStore: MTimeStore;
     let fileChangeQueue: NoteChangeQueue;
 
     const testFile1 = {
@@ -45,11 +47,17 @@ describe("FileChangeQueue", () => {
             }),
             offref: vi.fn(),
         };
-
+        mockMTimeStore = {
+            getMTime: vi.fn().mockReturnValue(undefined),
+            setMTime: vi.fn(),
+            deleteMTime: vi.fn(),
+            getAllPaths: vi.fn().mockReturnValue([]),
+        } as unknown as MTimeStore;
         // Create a new file change queue
-        fileChangeQueue = new NoteChangeQueue({
-            vault: mockVault as unknown as Vault,
-        });
+        fileChangeQueue = new NoteChangeQueue(
+            mockVault as unknown as Vault,
+            mockMTimeStore
+        );
     });
 
     test("should create a new file change queue", () => {
@@ -57,7 +65,7 @@ describe("FileChangeQueue", () => {
     });
 
     test("should initialize queue with new files", async () => {
-        await fileChangeQueue.initialize({});
+        await fileChangeQueue.initialize();
 
         // Should have 2 new files in the queue
         expect(fileChangeQueue.getFileChangeCount()).toBe(2);
@@ -87,10 +95,13 @@ describe("FileChangeQueue", () => {
     });
 
     test("should detect modified files", async () => {
-        await fileChangeQueue.initialize({
-            "file1.md": 999,
-            "file2.md": 1999,
+        // Set up previous mtimes
+        mockMTimeStore.getMTime = vi.fn((path: string) => {
+            if (path === "file1.md") return 999;
+            if (path === "file2.md") return 1999;
+            return -1;
         });
+        await fileChangeQueue.initialize();
 
         // Should have 2 modified files in the queue
         expect(fileChangeQueue.getFileChangeCount()).toBe(2);
@@ -105,11 +116,19 @@ describe("FileChangeQueue", () => {
     });
 
     test("should detect deleted files", async () => {
-        await fileChangeQueue.initialize({
-            "file1.md": 1000,
-            "file2.md": 2000,
-            "deleted.md": 3000,
+        // Set up previous mtimes
+        mockMTimeStore.getAllPaths = vi.fn(() => [
+            "file1.md",
+            "file2.md",
+            "deleted.md",
+        ]);
+        mockMTimeStore.getMTime = vi.fn((path: string) => {
+            if (path === "file1.md") return 1000;
+            if (path === "file2.md") return 2000;
+            if (path === "deleted.md") return 3000;
+            return -1;
         });
+        await fileChangeQueue.initialize();
 
         // Should have 1 deleted file in the queue
         expect(fileChangeQueue.getFileChangeCount()).toBe(1);
@@ -120,7 +139,7 @@ describe("FileChangeQueue", () => {
     });
 
     test("should enqueue all files", async () => {
-        await fileChangeQueue.initialize({});
+        await fileChangeQueue.initialize();
         await fileChangeQueue.enqueueAllNotes();
 
         // Should have all files in the queue
@@ -136,10 +155,14 @@ describe("FileChangeQueue", () => {
     });
 
     test("should poll changes from the queue", async () => {
-        await fileChangeQueue.initialize({
-            "file2.md": 1999,
-            "file3.md": 2999,
-        });
+        // Set up previous mtimes
+        mockMTimeStore.getAllPaths = vi.fn(() => ["file2.md", "file3.md"]);
+        mockMTimeStore.getMTime = vi.fn((path: string) => {
+            if (path === "file2.md") return 1999;
+            if (path === "file3.md") return 2999;
+            return undefined;
+        }) as unknown as (path: string) => number;
+        await fileChangeQueue.initialize();
 
         expect(fileChangeQueue.getFileChangeCount()).toBe(3);
 
@@ -186,11 +209,13 @@ describe("FileChangeQueue", () => {
 
             // Ensure offref is present for this mockVault
             mockVault.offref = vi.fn();
-
-            await fileChangeQueue.initialize({
-                "file1.md": 1000,
-                "file2.md": 2000,
+            mockMTimeStore.getAllPaths = vi.fn(() => ["file1.md", "file2.md"]);
+            mockMTimeStore.getMTime = vi.fn((path: string) => {
+                if (path === "file1.md") return 1000;
+                if (path === "file2.md") return 2000;
+                return -1;
             });
+            await fileChangeQueue.initialize();
         });
 
         test("should handle file creation events", async () => {
@@ -308,12 +333,12 @@ describe("FileChangeQueue", () => {
                 reason: "new" as const,
                 mtime: 1234,
             };
-
             // Mark the change as processed
             await fileChangeQueue.markNoteChangeProcessed(change);
-
-            const metadata = await fileChangeQueue.getMetadata();
-            expect(metadata["file1.md"]).toBe(1234);
+            expect(mockMTimeStore.setMTime).toHaveBeenCalledWith(
+                "file1.md",
+                1234
+            );
         });
 
         test("should update mtime store for modified files", async () => {
@@ -323,24 +348,20 @@ describe("FileChangeQueue", () => {
                 reason: "modified" as const,
                 mtime: 2345,
             };
-
             // Mark the change as processed
             await fileChangeQueue.markNoteChangeProcessed(change);
-
-            const metadata = await fileChangeQueue.getMetadata();
-            expect(metadata["file1.md"]).toBe(2345);
+            expect(mockMTimeStore.setMTime).toHaveBeenCalledWith(
+                "file1.md",
+                2345
+            );
         });
 
         test("should not update mtime store for deleted files", async () => {
             // Create a file change
             const change = { path: "file1.md", reason: "deleted" as const };
-
             // Mark the change as processed
             await fileChangeQueue.markNoteChangeProcessed(change);
-
-            // Should not have saved the updated mtimes
-            const metadata = await fileChangeQueue.getMetadata();
-            expect(metadata["file1.md"]).toBeUndefined();
+            expect(mockMTimeStore.deleteMTime).toHaveBeenCalledWith("file1.md");
         });
     });
 
@@ -373,30 +394,37 @@ describe("FileChangeQueue", () => {
                 }),
                 offref: vi.fn(),
             };
+            mockMTimeStore = {
+                getMTime: vi.fn(),
+                setMTime: vi.fn(),
+                deleteMTime: vi.fn(),
+                getAllPaths: vi.fn(),
+            } as unknown as MTimeStore;
         });
 
         test("should not re-queue unprocessed files after polling and re-initialization", async () => {
-            fileChangeQueue = new NoteChangeQueue({
-                vault: mockVault as unknown as Vault,
+            // Set up previous mtimes
+            mockMTimeStore.getAllPaths = vi.fn(() => ["file1.md", "file2.md"]);
+            mockMTimeStore.getMTime = vi.fn((path: string) => {
+                if (path === "file1.md") return 1500;
+                if (path === "file2.md") return 2500;
+                return -1;
             });
-            await fileChangeQueue.initialize({
-                "file1.md": 1500,
-                "file2.md": 2500,
-            });
-
+            fileChangeQueue = new NoteChangeQueue(
+                mockVault as unknown as Vault,
+                mockMTimeStore
+            );
+            await fileChangeQueue.initialize();
             let changes = fileChangeQueue.pollFileChanges(5);
             expect(changes).toHaveLength(2);
-
             // cleanup without marking the file as processed
-            const metadata = await fileChangeQueue.getMetadata();
             fileChangeQueue.cleanup();
-
             // initialize the queue again (= plugin reload)
-            fileChangeQueue = new NoteChangeQueue({
-                vault: mockVault as unknown as Vault,
-            });
-            await fileChangeQueue.initialize(metadata);
-
+            fileChangeQueue = new NoteChangeQueue(
+                mockVault as unknown as Vault,
+                mockMTimeStore
+            );
+            await fileChangeQueue.initialize();
             // the queue should have changes from the previous run
             // because they were not marked as processed
             changes = fileChangeQueue.pollFileChanges(5);

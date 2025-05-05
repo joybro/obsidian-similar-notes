@@ -1,13 +1,10 @@
+import type { MTimeStore } from "@/infrastructure/MTimeStore";
 import type { EventRef, TFile, Vault } from "obsidian";
 
 export type NoteChange = {
     path: string;
     reason: "new" | "modified" | "deleted";
     mtime?: number;
-};
-
-export type NoteChangeQueueOptions = {
-    vault: Vault;
 };
 
 /**
@@ -20,16 +17,6 @@ export class NoteChangeQueue {
     private queue: NoteChange[] = [];
 
     /**
-     * Current file hash map
-     */
-    private mtimes: Record<string, number> = {};
-
-    /**
-     * Options for the queue
-     */
-    private options: NoteChangeQueueOptions;
-
-    /**
      * Event references for cleanup
      */
     private eventRefs: EventRef[] = [];
@@ -37,21 +24,15 @@ export class NoteChangeQueue {
     /**
      * Creates a new file change queue
      */
-    constructor(options: NoteChangeQueueOptions) {
-        this.options = options;
-    }
+    constructor(private vault: Vault, private mTimeStore: MTimeStore) {}
 
     /**
      * Initializes the file change queue by comparing the vault with the previous state
      * and adding changed files to the queue
      */
-    public async initialize(metadata: Record<string, number>): Promise<void> {
-        this.mtimes = metadata;
-
-        const { vault } = this.options;
-
+    async initialize(): Promise<void> {
         // Get all markdown files in the vault
-        const files = vault.getMarkdownFiles();
+        const files = this.vault.getMarkdownFiles();
 
         // Calculate current hashes and detect changes
         const currentMtimes: Record<string, number> = {};
@@ -60,15 +41,16 @@ export class NoteChangeQueue {
         // Process existing files
         for (const file of files) {
             currentMtimes[file.path] = file.stat.mtime;
+            const mtime = await this.mTimeStore.getMTime(file.path);
 
             // Check if file is new or modified
-            if (!this.mtimes[file.path]) {
+            if (!mtime) {
                 newQueue.push({
                     path: file.path,
                     reason: "new",
                     mtime: file.stat.mtime,
                 });
-            } else if (this.mtimes[file.path] !== file.stat.mtime) {
+            } else if (mtime !== file.stat.mtime) {
                 newQueue.push({
                     path: file.path,
                     reason: "modified",
@@ -78,7 +60,7 @@ export class NoteChangeQueue {
         }
 
         // Check for deleted files
-        for (const path in this.mtimes) {
+        for (const path of this.mTimeStore.getAllPaths()) {
             if (!currentMtimes[path]) {
                 newQueue.push({ path, reason: "deleted" });
             }
@@ -95,13 +77,11 @@ export class NoteChangeQueue {
      * Registers callbacks for file change events in the Vault
      */
     private registerFileChangeCallbacks(): void {
-        const { vault } = this.options;
-
         // Clear any existing event refs
         this.unregisterFileChangeCallbacks();
 
         // Register callback for file creation
-        const createRef = vault.on("create", async (file: TFile) => {
+        const createRef = this.vault.on("create", async (file: TFile) => {
             if (file.extension === "md") {
                 // Add to queue with hash
                 this.queue.push({
@@ -114,7 +94,7 @@ export class NoteChangeQueue {
         this.eventRefs.push(createRef);
 
         // Register callback for file modification
-        const modifyRef = vault.on("modify", async (file: TFile) => {
+        const modifyRef = this.vault.on("modify", async (file: TFile) => {
             if (file.extension === "md") {
                 // Remove the file from the queue if it exists
                 this.queue = this.queue.filter(
@@ -132,7 +112,7 @@ export class NoteChangeQueue {
         this.eventRefs.push(modifyRef);
 
         // Register callback for file deletion
-        const deleteRef = vault.on("delete", (file: TFile) => {
+        const deleteRef = this.vault.on("delete", (file: TFile) => {
             if (file.extension === "md") {
                 // Remove the file from the queue if it exists
                 this.queue = this.queue.filter(
@@ -154,10 +134,8 @@ export class NoteChangeQueue {
      */
     private unregisterFileChangeCallbacks(): void {
         // Clear all event refs
-        const { vault } = this.options;
-
         for (const ref of this.eventRefs) {
-            vault.offref(ref);
+            this.vault.offref(ref);
         }
 
         this.eventRefs = [];
@@ -167,18 +145,16 @@ export class NoteChangeQueue {
      * Cleans up the file change queue by unregistering all callbacks
      * This should be called when the queue is no longer needed
      */
-    public cleanup(): void {
+    cleanup(): void {
         this.unregisterFileChangeCallbacks();
     }
 
     /**
      * Adds all files to the queue regardless of whether they've changed
      */
-    public async enqueueAllNotes(): Promise<void> {
-        const { vault } = this.options;
-
+    async enqueueAllNotes(): Promise<void> {
         // Get all markdown files in the vault
-        const files = vault.getMarkdownFiles();
+        const files = this.vault.getMarkdownFiles();
 
         // Add all files to the queue with their current hashes
         const newQueue: NoteChange[] = [];
@@ -202,7 +178,7 @@ export class NoteChangeQueue {
      * to ensure the hash store is updated, preventing reprocessing if the application
      * restarts before the hash store is updated.
      */
-    public pollFileChanges(maxCount: number): NoteChange[] {
+    pollFileChanges(maxCount: number): NoteChange[] {
         const changes = this.queue.slice(0, maxCount);
         this.queue = this.queue.slice(maxCount);
         return changes;
@@ -211,7 +187,7 @@ export class NoteChangeQueue {
     /**
      * Returns the number of changes remaining in the queue
      */
-    public getFileChangeCount(): number {
+    getFileChangeCount(): number {
         return this.queue.length;
     }
 
@@ -220,16 +196,12 @@ export class NoteChangeQueue {
      * This should be called after processing a file change to ensure it's not reprocessed
      * if the application restarts before the hash store is updated
      */
-    public async markNoteChangeProcessed(change: NoteChange): Promise<void> {
+    async markNoteChangeProcessed(change: NoteChange): Promise<void> {
         if (change.reason === "deleted") {
-            delete this.mtimes[change.path];
+            this.mTimeStore.deleteMTime(change.path);
         } else if (change.mtime) {
             // Update the hash store with the processed hash
-            this.mtimes[change.path] = change.mtime;
+            this.mTimeStore.setMTime(change.path, change.mtime);
         }
-    }
-
-    public getMetadata(): Record<string, number> {
-        return this.mtimes;
     }
 }

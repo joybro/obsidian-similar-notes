@@ -2,6 +2,7 @@ import log from "loglevel";
 import { Plugin } from "obsidian";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
 import { NoteIndexingService } from "./application/NoteIndexingService";
+import { PersistenceOrchestrator } from "./application/PersistenceOrchestrator";
 import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
@@ -11,6 +12,7 @@ import { EmbeddingService } from "./domain/service/EmbeddingService";
 import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
 import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
 import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
+import { MTimeStore } from "./infrastructure/MTimeStore";
 import { OramaNoteChunkRepository } from "./infrastructure/OramaNoteChunkRepository";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
@@ -27,12 +29,14 @@ export default class MainPlugin extends Plugin {
     private similarNoteFinder: SimilarNoteFinder;
     private similarNoteCoordinator: SimilarNoteCoordinator;
     private noteIndexingService: NoteIndexingService;
+    private persistenceOrchestrator: PersistenceOrchestrator;
+    private mTimeStore: MTimeStore;
 
     async onload() {
         log.setDefaultLevel(log.levels.DEBUG);
         log.info("Loading Similar Notes plugin");
 
-        this.settingsService = new SettingsService(this, this.setupAutoSave);
+        this.settingsService = new SettingsService(this);
         await this.settingsService.load();
 
         this.noteRepository = new VaultNoteRepository(this.app);
@@ -49,14 +53,22 @@ export default class MainPlugin extends Plugin {
             log.error("Failed to initialize model service:", error);
         }
 
-        this.noteChunkingService = new LangchainNoteChunkingService(
-            this.modelService
+        this.noteChunkRepository = new OramaNoteChunkRepository(this.app.vault);
+
+        this.mTimeStore = new MTimeStore(this.app.vault, this.settingsService);
+
+        this.persistenceOrchestrator = new PersistenceOrchestrator(
+            this.noteChunkRepository,
+            this.mTimeStore,
+            this.settingsService
         );
 
-        // Initialize store
-        await this.initializeStore(
-            this.modelService.getVectorSize(),
-            this.settingsService.get().dbPath
+        await this.persistenceOrchestrator.initializeStore(
+            this.modelService.getVectorSize()
+        );
+
+        this.noteChunkingService = new LangchainNoteChunkingService(
+            this.modelService
         );
 
         this.similarNoteFinder = new SimilarNoteFinder(
@@ -76,9 +88,6 @@ export default class MainPlugin extends Plugin {
             this.app,
             this.similarNoteCoordinator
         );
-
-        // Setup auto-save interval
-        this.setupAutoSave(this.settingsService.get().autoSaveInterval);
 
         // Add settings tab
         this.addSettingTab(
@@ -106,11 +115,11 @@ export default class MainPlugin extends Plugin {
 
         // Initialize file change queue
         this.app.workspace.onLayoutReady(async () => {
-            this.noteChangeQueue = new NoteChangeQueue({
-                vault: this.app.vault,
-            });
-            const queueMetadata = await this.loadQueueMetadataFromDisk();
-            await this.noteChangeQueue.initialize(queueMetadata);
+            this.noteChangeQueue = new NoteChangeQueue(
+                this.app.vault,
+                this.mTimeStore
+            );
+            await this.noteChangeQueue.initialize();
 
             const statusBarItem = this.addStatusBarItem();
 
@@ -142,101 +151,13 @@ export default class MainPlugin extends Plugin {
             this.modelService.dispose();
         }
 
-        // Save any pending changes and close store
-        if (this.noteChunkRepository) {
-            try {
-                await this.noteChunkRepository.persist();
-            } catch (e) {
-                log.error("Error while closing note chunk repository:", e);
-            }
-        }
-        // Cleanup file change queue
-        if (this.noteChangeQueue) {
-            try {
-                await this.saveQueueMetadataToDisk();
-                this.noteChangeQueue.cleanup();
-            } catch (e) {
-                log.error("Error while closing file change queue:", e);
-            }
-        }
+        this.noteChangeQueue.cleanup();
+
+        this.persistenceOrchestrator.closeStore();
     }
 
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
         this.noteChangeQueue.enqueueAllNotes();
-    }
-
-    private async initializeStore(vectorSize: number, dbPath: string) {
-        try {
-            // Create store instance
-            this.noteChunkRepository = new OramaNoteChunkRepository(
-                this.app.vault
-            );
-
-            this.noteChunkRepository.init(vectorSize, dbPath);
-
-            // Try to load existing database
-            try {
-                await this.noteChunkRepository.restore();
-                const count = this.noteChunkRepository.count();
-                log.info(
-                    "Successfully loaded existing database from",
-                    dbPath,
-                    "with",
-                    count,
-                    "chunks"
-                );
-            } catch (e) {
-                log.info(
-                    "No existing database found at",
-                    dbPath,
-                    "- starting fresh"
-                );
-            }
-        } catch (e) {
-            log.error("Failed to initialize store:", e);
-            throw e;
-        }
-    }
-
-    private setupAutoSave(interval: number) {
-        // Clear any existing interval
-        if (this.autoSaveInterval) {
-            clearInterval(this.autoSaveInterval);
-        }
-
-        // Set up new auto-save interval
-        const intervalMs = interval * 60 * 1000;
-        this.autoSaveInterval = setInterval(async () => {
-            try {
-                await this.noteChunkRepository.persist();
-                await this.saveQueueMetadataToDisk();
-                log.info("Auto-saved databases");
-            } catch (e) {
-                log.error("Failed to auto-save database:", e);
-            }
-        }, intervalMs);
-    }
-
-    private async saveQueueMetadataToDisk(): Promise<void> {
-        const metadata = await this.noteChangeQueue.getMetadata();
-        await this.app.vault.adapter.write(
-            this.settingsService.get().fileMtimePath,
-            JSON.stringify(metadata)
-        );
-    }
-
-    private async loadQueueMetadataFromDisk(): Promise<Record<string, number>> {
-        const exist = await this.app.vault.adapter.exists(
-            this.settingsService.get().fileMtimePath
-        );
-
-        if (!exist) {
-            return {};
-        }
-        const content = await this.app.vault.adapter.read(
-            this.settingsService.get().fileMtimePath
-        );
-        return JSON.parse(content);
     }
 }
