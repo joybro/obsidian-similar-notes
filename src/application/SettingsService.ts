@@ -1,4 +1,5 @@
 import type { Plugin } from "obsidian";
+import { type Observable, Subject } from "rxjs";
 
 export interface SimilarNotesSettings {
     dbPath: string;
@@ -18,6 +19,9 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
 
 export class SettingsService {
     private settings: SimilarNotesSettings;
+    private newSettingsObservable$ = new Subject<
+        Partial<SimilarNotesSettings>
+    >();
 
     constructor(
         private plugin: Plugin,
@@ -37,9 +41,15 @@ export class SettingsService {
         return this.settings;
     }
 
+    getNewSettingsObservable(): Observable<Partial<SimilarNotesSettings>> {
+        return this.newSettingsObservable$.asObservable();
+    }
+
     async update(newSettings: Partial<SimilarNotesSettings>): Promise<void> {
         this.settings = { ...this.settings, ...newSettings };
         await this.save();
+
+        this.newSettingsObservable$.next(newSettings);
 
         // If auto-save interval changed, update the interval
         if (newSettings.autoSaveInterval !== undefined) {

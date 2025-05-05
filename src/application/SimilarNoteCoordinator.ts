@@ -27,7 +27,15 @@ export class SimilarNoteCoordinator {
         private readonly noteRepository: NoteRepository,
         private readonly similarNoteFinder: SimilarNoteFinder,
         private readonly settingsService: SettingsService
-    ) {}
+    ) {
+        this.settingsService
+            .getNewSettingsObservable()
+            .subscribe((newSettings) => {
+                if (newSettings.includeFrontmatter !== undefined) {
+                    this.cache.clear();
+                }
+            });
+    }
 
     getNoteBottomViewModelObservable() {
         return this.noteBottomViewModel$.asObservable();
