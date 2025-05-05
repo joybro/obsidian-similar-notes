@@ -1,6 +1,7 @@
 import log from "loglevel";
 import { Plugin } from "obsidian";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
+import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
@@ -12,23 +13,10 @@ import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChun
 import { OramaNoteChunkRepository } from "./infrastructure/OramaNoteChunkRepository";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
-interface SimilarNotesSettings {
-    dbPath: string;
-    autoSaveInterval: number; // in minutes
-    fileMtimePath: string;
-    modelId: string; // The model ID to use for embeddings
-}
-
-const DEFAULT_SETTINGS: SimilarNotesSettings = {
-    dbPath: ".obsidian/similar-notes.json",
-    autoSaveInterval: 5,
-    fileMtimePath: ".obsidian/similar-notes-file-mtimes.json",
-    modelId: "sentence-transformers/all-MiniLM-L6-v2",
-};
 
 export default class MainPlugin extends Plugin {
     private leafViewCoordinator: LeafViewCoordinator;
-    private settings: SimilarNotesSettings;
+    private settingsService: SettingsService;
     private noteChunkRepository: NoteChunkRepository;
     private autoSaveInterval: NodeJS.Timeout;
     private fileChangeQueue: NoteChangeQueue;
@@ -44,19 +32,17 @@ export default class MainPlugin extends Plugin {
         log.setDefaultLevel(log.levels.DEBUG);
         log.info("Loading Similar Notes plugin");
 
-        this.noteRepository = new VaultNoteRepository(this.app);
+        this.settingsService = new SettingsService(this, this.setupAutoSave);
+        await this.settingsService.load();
 
-        // Load settings
-        this.settings = Object.assign(
-            {},
-            DEFAULT_SETTINGS,
-            await this.loadData()
-        );
+        this.noteRepository = new VaultNoteRepository(this.app);
 
         // Initialize model service
         try {
             this.modelService = new EmbeddingService();
-            await this.modelService.loadModel(this.settings.modelId);
+            await this.modelService.loadModel(
+                this.settingsService.get().modelId
+            );
 
             log.info("Model service initialized successfully");
         } catch (error) {
@@ -68,7 +54,10 @@ export default class MainPlugin extends Plugin {
         );
 
         // Initialize store
-        await this.initializeStore(this.modelService.getVectorSize());
+        await this.initializeStore(
+            this.modelService.getVectorSize(),
+            this.settingsService.get().dbPath
+        );
 
         this.similarNoteFinder = new SimilarNoteFinder(
             this.noteChunkRepository,
@@ -88,10 +77,12 @@ export default class MainPlugin extends Plugin {
         );
 
         // Setup auto-save interval
-        this.setupAutoSave();
+        this.setupAutoSave(this.settingsService.get().autoSaveInterval);
 
         // Add settings tab
-        this.addSettingTab(new SimilarNotesSettingTab(this.app, this));
+        this.addSettingTab(
+            new SimilarNotesSettingTab(this, this.settingsService)
+        );
 
         // Register event when current open file changes
         this.registerEvent(
@@ -229,13 +220,13 @@ export default class MainPlugin extends Plugin {
         this.fileChangeQueue.enqueueAllNotes();
     }
 
-    private async initializeStore(vectorSize: number) {
+    private async initializeStore(vectorSize: number, dbPath: string) {
         try {
             // Create store instance
             this.noteChunkRepository = new OramaNoteChunkRepository(
                 this.app.vault,
                 vectorSize,
-                this.settings.dbPath
+                dbPath
             );
 
             // Try to load existing database
@@ -244,7 +235,7 @@ export default class MainPlugin extends Plugin {
                 const count = this.noteChunkRepository.count();
                 log.info(
                     "Successfully loaded existing database from",
-                    this.settings.dbPath,
+                    dbPath,
                     "with",
                     count,
                     "chunks"
@@ -252,7 +243,7 @@ export default class MainPlugin extends Plugin {
             } catch (e) {
                 log.info(
                     "No existing database found at",
-                    this.settings.dbPath,
+                    dbPath,
                     "- starting fresh"
                 );
             }
@@ -262,14 +253,14 @@ export default class MainPlugin extends Plugin {
         }
     }
 
-    private setupAutoSave() {
+    private setupAutoSave(interval: number) {
         // Clear any existing interval
         if (this.autoSaveInterval) {
             clearInterval(this.autoSaveInterval);
         }
 
         // Set up new auto-save interval
-        const intervalMs = this.settings.autoSaveInterval * 60 * 1000;
+        const intervalMs = interval * 60 * 1000;
         this.autoSaveInterval = setInterval(async () => {
             try {
                 await this.noteChunkRepository.persist();
@@ -281,45 +272,24 @@ export default class MainPlugin extends Plugin {
         }, intervalMs);
     }
 
-    async saveSettings() {
-        await this.saveData(this.settings);
-    }
-
-    // Public methods for settings access
-    getSettings(): SimilarNotesSettings {
-        return { ...this.settings };
-    }
-
-    async updateSettings(
-        updates: Partial<SimilarNotesSettings>
-    ): Promise<void> {
-        this.settings = { ...this.settings, ...updates };
-        await this.saveSettings();
-
-        // If auto-save interval changed, update the interval
-        if (updates.autoSaveInterval !== undefined) {
-            this.setupAutoSave();
-        }
-    }
-
     private async saveQueueMetadataToDisk(): Promise<void> {
         const metadata = await this.fileChangeQueue.getMetadata();
         await this.app.vault.adapter.write(
-            this.settings.fileMtimePath,
+            this.settingsService.get().fileMtimePath,
             JSON.stringify(metadata)
         );
     }
 
     private async loadQueueMetadataFromDisk(): Promise<Record<string, number>> {
         const exist = await this.app.vault.adapter.exists(
-            this.settings.fileMtimePath
+            this.settingsService.get().fileMtimePath
         );
 
         if (!exist) {
             return {};
         }
         const content = await this.app.vault.adapter.read(
-            this.settings.fileMtimePath
+            this.settingsService.get().fileMtimePath
         );
         return JSON.parse(content);
     }

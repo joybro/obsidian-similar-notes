@@ -1,9 +1,13 @@
-import { type App, PluginSettingTab, Setting } from "obsidian";
+import type { SettingsService } from "@/application/SettingsService";
+import { PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
 
 export class SimilarNotesSettingTab extends PluginSettingTab {
-    constructor(app: App, private plugin: MainPlugin) {
-        super(app, plugin);
+    constructor(
+        private plugin: MainPlugin,
+        private settingsService: SettingsService
+    ) {
+        super(plugin.app, plugin);
     }
 
     display(): void {
@@ -14,9 +18,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             .setName("Database path")
             .setDesc("Path where the similarity database will be stored")
             .addText((text) => {
-                text.setValue(this.plugin.getSettings().dbPath).onChange(
+                text.setValue(this.settingsService.get().dbPath).onChange(
                     async (value) => {
-                        await this.plugin.updateSettings({ dbPath: value });
+                        await this.settingsService.update({ dbPath: value });
                     }
                 );
             });
@@ -26,9 +30,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             .setDesc("How often to save changes to disk (in minutes)")
             .addText((text) => {
                 text.setValue(
-                    this.plugin.getSettings().autoSaveInterval.toString()
+                    this.settingsService.get().autoSaveInterval.toString()
                 ).onChange(async (value) => {
-                    await this.plugin.updateSettings({
+                    await this.settingsService.update({
                         autoSaveInterval: Number.parseInt(value, 10),
                     });
                 });
