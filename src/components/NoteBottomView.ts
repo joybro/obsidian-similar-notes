@@ -41,5 +41,6 @@ export class NoteBottomView extends Component {
 
     public unload(): void {
         this.root.unmount();
+        this.containerEl.remove();
     }
 }
