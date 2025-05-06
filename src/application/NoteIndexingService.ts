@@ -6,6 +6,7 @@ import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { NoteChangeQueue } from "@/services/noteChangeQueue";
 import log from "loglevel";
 import { type Observable, Subject } from "rxjs";
+import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 
 export class NoteIndexingService {
     private fileChangeLoopTimer: NodeJS.Timeout;
@@ -17,6 +18,7 @@ export class NoteIndexingService {
         private noteChangeQueue: NoteChangeQueue,
         private noteChunkingService: NoteChunkingService,
         private embeddingService: EmbeddingService,
+        private similarNoteCoordinator: SimilarNoteCoordinator,
         private settingsService: SettingsService
     ) {}
 
@@ -89,5 +91,8 @@ export class NoteIndexingService {
             "count of chunks in embedding store",
             this.noteChunkRepository.count()
         );
+
+        // TODO: this should be refactored with an event driven approach
+        this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(note.path);
     }
 }

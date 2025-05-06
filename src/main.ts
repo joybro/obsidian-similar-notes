@@ -129,6 +129,7 @@ export default class MainPlugin extends Plugin {
                 this.noteChangeQueue,
                 this.noteChunkingService,
                 this.modelService,
+                this.similarNoteCoordinator,
                 this.settingsService
             );
 

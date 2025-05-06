@@ -49,6 +49,15 @@ export class SimilarNoteCoordinator {
         this.emitNoteBottomViewModel(file);
     }
 
+    async emitNoteBottomViewModelFromPath(path: string) {
+        const file = this.vault.getFileByPath(path);
+        if (!file) {
+            return;
+        }
+
+        this.emitNoteBottomViewModel(file);
+    }
+
     async emitNoteBottomViewModel(file: TFile) {
         const similarNotes = await this.getSimilarNotes(file);
         this.noteBottomViewModel$.next({
