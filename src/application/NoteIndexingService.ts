@@ -74,6 +74,10 @@ export class NoteIndexingService {
         }
 
         const splitted = await this.noteChunkingService.split(note);
+        if (splitted.length === 0) {
+            return;
+        }
+
         const noteChunks = await Promise.all(
             splitted.map(async (chunk) =>
                 chunk.withEmbedding(

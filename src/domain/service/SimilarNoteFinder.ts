@@ -19,6 +19,10 @@ export class SimilarNoteFinder {
         }
 
         const chunks = await this.noteChunkingService.split(note);
+        if (chunks.length === 0) {
+            return [];
+        }
+
         const embeddings = await this.modelService.embedTexts(
             chunks.map((chunk) => chunk.content)
         );
