@@ -5,15 +5,16 @@ import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { NoteChangeQueue } from "@/services/noteChangeQueue";
 import log from "loglevel";
+import { type Observable, Subject } from "rxjs";
 
 export class NoteIndexingService {
     private fileChangeLoopTimer: NodeJS.Timeout;
+    private noteChangeCount$ = new Subject<number>();
 
     constructor(
         private noteRepository: NoteRepository,
         private noteChunkRepository: NoteChunkRepository,
         private noteChangeQueue: NoteChangeQueue,
-        private statusBarItem: HTMLElement,
         private noteChunkingService: NoteChunkingService,
         private embeddingService: EmbeddingService,
         private settingsService: SettingsService
@@ -22,12 +23,7 @@ export class NoteIndexingService {
     startLoop() {
         const fileChangeLoop = async () => {
             const count = this.noteChangeQueue.getFileChangeCount();
-            if (count > 10) {
-                this.statusBarItem.setText(`${count} to index`);
-                this.statusBarItem.show();
-            } else {
-                this.statusBarItem.hide();
-            }
+            this.noteChangeCount$.next(count);
 
             const changes = await this.noteChangeQueue.pollFileChanges(1);
             if (changes.length === 0) {
@@ -56,6 +52,10 @@ export class NoteIndexingService {
         if (this.fileChangeLoopTimer) {
             clearTimeout(this.fileChangeLoopTimer);
         }
+    }
+
+    getNoteChangeCount$(): Observable<number> {
+        return this.noteChangeCount$.asObservable();
     }
 
     private async processDeletedNote(path: string) {

@@ -6,6 +6,7 @@ import { PersistenceOrchestrator } from "./application/PersistenceOrchestrator";
 import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
+import { StatusBarView } from "./components/StatusBarView";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
@@ -31,6 +32,7 @@ export default class MainPlugin extends Plugin {
     private noteIndexingService: NoteIndexingService;
     private persistenceOrchestrator: PersistenceOrchestrator;
     private mTimeStore: MTimeStore;
+    private statusBarView: StatusBarView;
 
     async onload() {
         log.setDefaultLevel(log.levels.DEBUG);
@@ -121,16 +123,19 @@ export default class MainPlugin extends Plugin {
             );
             await this.noteChangeQueue.initialize();
 
-            const statusBarItem = this.addStatusBarItem();
-
             this.noteIndexingService = new NoteIndexingService(
                 this.noteRepository,
                 this.noteChunkRepository,
                 this.noteChangeQueue,
-                statusBarItem,
                 this.noteChunkingService,
                 this.modelService,
                 this.settingsService
+            );
+
+            this.statusBarView = new StatusBarView(
+                this,
+                this.noteIndexingService.getNoteChangeCount$(),
+                this.modelService.getModelBusy$()
             );
 
             this.noteIndexingService.startLoop();
@@ -138,6 +143,7 @@ export default class MainPlugin extends Plugin {
     }
 
     async onunload() {
+        this.statusBarView.dispose();
         this.noteIndexingService.stopLoop();
         this.leafViewCoordinator.onUnload();
 

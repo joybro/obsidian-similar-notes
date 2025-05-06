@@ -1,5 +1,6 @@
 import * as Comlink from "comlink";
 import log from "loglevel";
+import { type Observable, Subject } from "rxjs";
 import type { TransformersWorker } from "./transformers.worker";
 // @ts-ignore
 import InlineWorker from "./transformers.worker";
@@ -9,8 +10,9 @@ export class EmbeddingService {
     private modelId: string | null = null;
     private vectorSize: number | null = null;
     private maxTokens: number | null = null;
+    private modelBusy$ = new Subject<boolean>();
 
-    public async loadModel(modelId: string): Promise<void> {
+    async loadModel(modelId: string): Promise<void> {
         log.info("Loading model", modelId);
         const WorkerWrapper = Comlink.wrap(new InlineWorker());
         // @ts-ignore
@@ -28,7 +30,7 @@ export class EmbeddingService {
         this.maxTokens = response.maxTokens;
     }
 
-    public async unloadModel(): Promise<void> {
+    async unloadModel(): Promise<void> {
         if (!this.worker) {
             return;
         }
@@ -40,23 +42,33 @@ export class EmbeddingService {
         this.maxTokens = null;
     }
 
-    public async embedText(text: string): Promise<number[]> {
+    getModelBusy$(): Observable<boolean> {
+        return this.modelBusy$.asObservable();
+    }
+
+    async embedText(text: string): Promise<number[]> {
         if (!this.worker || !this.modelId) {
             throw new Error("Model not loaded");
         }
 
-        return await this.worker.handleEmbed(text);
+        this.modelBusy$.next(true);
+        const result = await this.worker.handleEmbed(text);
+        this.modelBusy$.next(false);
+        return result;
     }
 
-    public async embedTexts(texts: string[]): Promise<number[][]> {
+    async embedTexts(texts: string[]): Promise<number[][]> {
         if (!this.worker || !this.modelId) {
             throw new Error("Model not loaded");
         }
 
-        return await this.worker.handleEmbedBatch(texts);
+        this.modelBusy$.next(true);
+        const result = await this.worker.handleEmbedBatch(texts);
+        this.modelBusy$.next(false);
+        return result;
     }
 
-    public async countTokens(text: string): Promise<number> {
+    async countTokens(text: string): Promise<number> {
         if (!this.worker || !this.modelId) {
             throw new Error("Model not loaded");
         }
