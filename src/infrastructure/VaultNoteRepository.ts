@@ -13,7 +13,7 @@ export class VaultNoteRepository implements NoteRepository {
             ? await this.readContentWithoutFrontmatter(file)
             : await this.app.vault.cachedRead(file);
         const links = this.extractLinks(file);
-        return new Note(file.path, file.name, content, links);
+        return new Note(file.path, file.basename, content, links);
     }
 
     async findByPath(
