@@ -6,6 +6,7 @@ import type { Observable } from "rxjs";
 export interface SimilarNoteEntry {
     file: TFile;
     title: string;
+    preview: string;
     similarity: number;
 }
 
@@ -17,13 +18,6 @@ export interface NoteBottomViewModel {
 interface SimilarNotesHeaderProps {
     collapsed: boolean;
     onToggleCollapse: () => void;
-}
-
-interface SimilarNotesContentProps {
-    similarNotes: SimilarNoteEntry[];
-    onNoteClick: (e: React.MouseEvent, file: TFile) => void;
-    onContextMenu: (e: React.MouseEvent, file: TFile) => void;
-    isCollapsed: boolean;
 }
 
 interface NoteBottomViewProps {
@@ -62,17 +56,90 @@ const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
     );
 };
 
+const SimilarNotesItem = ({
+    note,
+    onNoteClick,
+    onContextMenu,
+}: {
+    note: SimilarNoteEntry;
+    onNoteClick: (e: React.MouseEvent, file: TFile) => void;
+    onContextMenu: (e: React.MouseEvent, file: TFile) => void;
+}) => {
+    const [isCollapsed, setIsCollapsed] = useState(true);
+
+    const toggleCollapse = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsCollapsed((prev) => !prev);
+    };
+
+    return (
+        <div
+            className={
+                isCollapsed
+                    ? "tree-item search-result is-collapsed"
+                    : "tree-item search-result"
+            }
+        >
+            <div
+                className="tree-item-self search-result-file-title is-clickable"
+                draggable="true"
+                onClick={(e) => onNoteClick(e, note.file)}
+                onKeyDown={() => {}}
+                onContextMenu={(e) => onContextMenu(e, note.file)}
+            >
+                <div
+                    className={
+                        isCollapsed
+                            ? "tree-item-icon collapse-icon is-collapsed"
+                            : "tree-item-icon collapse-icon"
+                    }
+                    onKeyDown={() => {}}
+                    onClick={toggleCollapse}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="svg-icon right-triangle"
+                    >
+                        <title>collapse-icon</title>
+                        <path d="M3 8L12 17L21 8" />
+                    </svg>
+                </div>
+                <div className="tree-item-inner">{note.title}</div>
+                <div className="tree-item-flair-outer">
+                    <div className="tree-item-flair">
+                        {note.similarity.toFixed(2)}
+                    </div>
+                </div>
+            </div>
+            {!isCollapsed && (
+                <div className="search-result-file-matches">
+                    <div className="search-result-file-match tappable">
+                        {note.preview}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // Content Component
-const SimilarNotesContent: React.FC<SimilarNotesContentProps> = ({
+const SimilarNotesContent = ({
     similarNotes,
     onNoteClick,
     onContextMenu,
-    isCollapsed,
+}: {
+    similarNotes: SimilarNoteEntry[];
+    onNoteClick: (e: React.MouseEvent, file: TFile) => void;
+    onContextMenu: (e: React.MouseEvent, file: TFile) => void;
 }) => {
-    if (isCollapsed) {
-        return null;
-    }
-
     if (similarNotes.length === 0) {
         return (
             <div className="similar-notes-empty">No similar notes found</div>
@@ -80,26 +147,17 @@ const SimilarNotesContent: React.FC<SimilarNotesContentProps> = ({
     }
 
     return (
-        <div className="similar-notes-content">
-            {similarNotes.map((note, i) => {
-                return (
-                    <div
+        <div className="search-results-container">
+            <div className="search-results-children">
+                {similarNotes.map((note, i) => (
+                    <SimilarNotesItem
                         key={note.file.path}
-                        className="similar-notes-item tree-item-self is-clickable"
-                        draggable="true"
-                        onClick={(e) => onNoteClick(e, note.file)}
-                        onKeyDown={() => {}}
-                        onContextMenu={(e) => onContextMenu(e, note.file)}
-                    >
-                        <div className="tree-item-inner">{note.title}</div>
-                        <div className="tree-item-flair-outer">
-                            <div className="tree-item-flair">
-                                {note.similarity.toFixed(2)}
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
+                        note={note}
+                        onNoteClick={onNoteClick}
+                        onContextMenu={onContextMenu}
+                    />
+                ))}
+            </div>
         </div>
     );
 };
@@ -170,12 +228,13 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 collapsed={collapsed}
                 onToggleCollapse={toggleCollapse}
             />
-            <SimilarNotesContent
-                similarNotes={similarNotes}
-                onNoteClick={handleNoteClick}
-                onContextMenu={handleContextMenu}
-                isCollapsed={collapsed}
-            />
+            {!collapsed && (
+                <SimilarNotesContent
+                    similarNotes={similarNotes}
+                    onNoteClick={handleNoteClick}
+                    onContextMenu={handleContextMenu}
+                />
+            )}
         </div>
     );
 };

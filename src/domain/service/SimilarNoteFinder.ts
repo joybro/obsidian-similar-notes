@@ -65,6 +65,7 @@ export class SimilarNoteFinder {
                 new SimilarNote(
                     result.chunk.title,
                     result.chunk.path,
+                    result.chunk.content,
                     result.score
                 )
         );

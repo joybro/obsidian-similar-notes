@@ -84,6 +84,7 @@ export class SimilarNoteCoordinator {
             .map((similarNote) => ({
                 file: this.vault.getFileByPath(similarNote.path),
                 title: similarNote.title,
+                preview: similarNote.similarPart,
                 similarity: similarNote.similarity,
             }))
             .filter(

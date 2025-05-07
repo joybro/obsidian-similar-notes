@@ -31,24 +31,15 @@
     padding-bottom: 10px;
 }
 
-/* Similar notes list */
-.similar-notes-list {
-    margin: 0;
-    padding: 0;
-    list-style-type: none;
-}
-
-/* Similar note item */
-.similar-notes-item {
-    padding-left: 10px;
-    color: var(--nav-item-color);
-    font-size: max(var(--font-ui-small), var(--font-smaller));
-}
-
 /* Empty state message */
 .similar-notes-empty {
     padding: 10px 0;
     color: var(--text-muted);
     font-style: italic;
     font-size: var(--font-smallest);
+}
+
+.similar-notes-container .tree-item-self {
+    font-size: max(var(--font-ui-small), var(--font-smaller));
+    align-items: center;
 }
