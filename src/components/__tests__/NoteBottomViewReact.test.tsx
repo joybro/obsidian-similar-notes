@@ -13,6 +13,7 @@ vi.mock("obsidian");
 interface SimilarNote {
     file: TFile;
     title: string;
+    preview: string;
     similarity: number;
 }
 
@@ -46,11 +47,13 @@ describe("SimilarNotesViewReact", () => {
                 {
                     file: { path: "similar1.md" } as TFile,
                     title: "Similar Note 1",
+                    preview: "Preview of Similar Note 1",
                     similarity: 0.95,
                 },
                 {
                     file: { path: "similar2.md" } as TFile,
                     title: "Similar Note 2",
+                    preview: "Preview of Similar Note 2",
                     similarity: 0.85,
                 },
             ],
