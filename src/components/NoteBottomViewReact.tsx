@@ -1,6 +1,7 @@
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { Menu } from "obsidian";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { CSSTransition } from "react-transition-group";
 import type { Observable } from "rxjs";
 
 export interface SimilarNoteEntry {
@@ -56,7 +57,92 @@ const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
     );
 };
 
-const SimilarNotesItem = ({
+const SearchResultPreview = ({
+    preview,
+    isOpen,
+}: {
+    preview: string;
+    isOpen: boolean;
+}) => {
+    const nodeRef = useRef<HTMLDivElement>(null);
+    const duration = 100;
+
+    const onEnter = () => {
+        const el = nodeRef.current;
+        if (el) {
+            el.style.height = "0px";
+            el.style.overflow = "hidden";
+        }
+    };
+
+    const onEntering = () => {
+        const el = nodeRef.current;
+        if (el) {
+            el.style.height = `${el.scrollHeight}px`;
+        }
+    };
+
+    const onEntered = () => {
+        const el = nodeRef.current;
+        if (el) {
+            el.style.height = "";
+            el.style.overflow = "";
+        }
+    };
+
+    const onExit = () => {
+        const el = nodeRef.current;
+        if (el) {
+            el.style.height = `${el.scrollHeight}px`;
+            el.style.overflow = "hidden";
+        }
+    };
+
+    const onExiting = () => {
+        const el = nodeRef.current;
+        if (el) {
+            el.style.height = "0px";
+        }
+    };
+
+    const onExited = () => {
+        const el = nodeRef.current;
+        if (el) {
+            el.style.height = "";
+            el.style.overflow = "";
+        }
+    };
+
+    return (
+        <CSSTransition
+            in={isOpen}
+            timeout={duration}
+            classNames="dynamic"
+            nodeRef={nodeRef}
+            onEnter={onEnter}
+            onEntering={onEntering}
+            onEntered={onEntered}
+            onExit={onExit}
+            onExiting={onExiting}
+            onExited={onExited}
+            unmountOnExit
+        >
+            <div
+                ref={nodeRef}
+                className="search-result-file-matches"
+                style={{
+                    transition: `height ${duration}ms cubic-bezier(0.02, 0.01, 0.47, 1)`,
+                }}
+            >
+                <div className="search-result-file-match tappable">
+                    {preview}
+                </div>
+            </div>
+        </CSSTransition>
+    );
+};
+
+const SearchResult = ({
     note,
     onNoteClick,
     onContextMenu,
@@ -119,19 +205,12 @@ const SimilarNotesItem = ({
                     </div>
                 </div>
             </div>
-            {!isCollapsed && (
-                <div className="search-result-file-matches">
-                    <div className="search-result-file-match tappable">
-                        {note.preview}
-                    </div>
-                </div>
-            )}
+            <SearchResultPreview preview={note.preview} isOpen={!isCollapsed} />
         </div>
     );
 };
 
-// Content Component
-const SimilarNotesContent = ({
+const SearchResultsContainer = ({
     similarNotes,
     onNoteClick,
     onContextMenu,
@@ -150,7 +229,7 @@ const SimilarNotesContent = ({
         <div className="search-results-container">
             <div className="search-results-children">
                 {similarNotes.map((note, i) => (
-                    <SimilarNotesItem
+                    <SearchResult
                         key={note.file.path}
                         note={note}
                         onNoteClick={onNoteClick}
@@ -229,7 +308,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 onToggleCollapse={toggleCollapse}
             />
             {!collapsed && (
-                <SimilarNotesContent
+                <SearchResultsContainer
                     similarNotes={similarNotes}
                     onNoteClick={handleNoteClick}
                     onContextMenu={handleContextMenu}
