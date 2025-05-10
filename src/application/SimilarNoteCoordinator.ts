@@ -80,12 +80,17 @@ export class SimilarNoteCoordinator {
             note
         );
 
+        const showSourceChunk = this.settingsService.get().showSourceChunk;
+
         const similarNoteEntries = similarNotes
             .map((similarNote) => ({
                 file: this.vault.getFileByPath(similarNote.path),
                 title: similarNote.title,
-                preview: similarNote.similarPart,
                 similarity: similarNote.similarity,
+                preview: similarNote.similarChunk,
+                sourceChunk: showSourceChunk
+                    ? similarNote.sourceChunk
+                    : undefined,
             }))
             .filter(
                 (viewModel) => viewModel.file !== null

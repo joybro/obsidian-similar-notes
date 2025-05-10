@@ -184,7 +184,7 @@ describe("SimilarNotesSettingTab", () => {
         expect(settingTab.containerEl.empty).toHaveBeenCalled();
 
         // Verify Setting was called for each setting
-        expect(Setting).toHaveBeenCalledTimes(5); // 4 settings + 1 heading
+        expect(Setting).toHaveBeenCalledTimes(7);
     });
 
     test("settings changes are propagated to plugin", async () => {

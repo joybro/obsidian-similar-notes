@@ -7,8 +7,9 @@ import type { Observable } from "rxjs";
 export interface SimilarNoteEntry {
     file: TFile;
     title: string;
-    preview: string;
     similarity: number;
+    preview: string;
+    sourceChunk?: string;
 }
 
 export interface NoteBottomViewModel {
@@ -59,9 +60,11 @@ const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
 
 const SearchResultPreview = ({
     preview,
+    sourceChunk,
     isOpen,
 }: {
     preview: string;
+    sourceChunk?: string;
     isOpen: boolean;
 }) => {
     const nodeRef = useRef<HTMLDivElement>(null);
@@ -137,6 +140,16 @@ const SearchResultPreview = ({
                 <div className="search-result-file-match tappable">
                     {preview}
                 </div>
+                {sourceChunk && (
+                    <div className="search-result-file-match tappable">
+                        <div
+                            style={{ fontWeight: "bold", textAlign: "center" }}
+                        >
+                            Source
+                        </div>
+                        <div style={{ textAlign: "left" }}>{sourceChunk}</div>
+                    </div>
+                )}
             </div>
         </CSSTransition>
     );
@@ -205,7 +218,11 @@ const SearchResult = ({
                     </div>
                 </div>
             </div>
-            <SearchResultPreview preview={note.preview} isOpen={!isCollapsed} />
+            <SearchResultPreview
+                preview={note.preview}
+                sourceChunk={note.sourceChunk}
+                isOpen={!isCollapsed}
+            />
         </div>
     );
 };

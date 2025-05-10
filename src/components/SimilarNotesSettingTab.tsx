@@ -63,5 +63,22 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     await this.plugin.reindexNotes();
                 });
             });
+
+        new Setting(containerEl).setName("Debug").setHeading();
+
+        new Setting(containerEl)
+            .setName("Show source chunk in results")
+            .setDesc(
+                "If enabled, the source chunk (the part of your current note used for similarity search) will be shown in the results"
+            )
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(this.settingsService.get().showSourceChunk)
+                    .onChange(async (value) => {
+                        await this.settingsService.update({
+                            showSourceChunk: value,
+                        });
+                    });
+            });
     }
 }

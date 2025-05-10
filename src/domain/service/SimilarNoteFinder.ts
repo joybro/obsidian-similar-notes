@@ -18,23 +18,34 @@ export class SimilarNoteFinder {
             return [];
         }
 
-        const chunks = await this.noteChunkingService.split(note);
-        if (chunks.length === 0) {
+        const splitted = await this.noteChunkingService.split(note);
+        if (splitted.length === 0) {
             return [];
         }
 
-        const embeddings = await this.modelService.embedTexts(
-            chunks.map((chunk) => chunk.content)
+        const noteChunks = await Promise.all(
+            splitted.map(async (chunk) =>
+                chunk.withEmbedding(
+                    await this.modelService.embedText(chunk.content)
+                )
+            )
         );
 
         // Get search results for each embedding and flatten them into a single array
         const searchResultsArrays = await Promise.all(
-            embeddings.map((embedding) =>
-                this.noteChunkRepository.findSimilarChunks(embedding, 10, 0, [
-                    note.path,
-                    ...note.links,
-                ])
-            )
+            noteChunks.map(async ({ content, embedding }) => {
+                const results =
+                    await this.noteChunkRepository.findSimilarChunks(
+                        embedding,
+                        10,
+                        0,
+                        [note.path, ...note.links]
+                    );
+                return results.map((result) => ({
+                    ...result,
+                    sourceChunk: content,
+                }));
+            })
         );
 
         // Flatten the array of arrays into a single array of SearchResult objects
@@ -49,7 +60,7 @@ export class SimilarNoteFinder {
                 acc[result.chunk.path] = result;
             }
             return acc;
-        }, {} as Record<string, { chunk: NoteChunk; score: number }>);
+        }, {} as Record<string, { chunk: NoteChunk; sourceChunk: string; score: number }>);
 
         // Convert uniqueResults object to array
         const uniqueResultsArray = Object.values(uniqueResults);
@@ -65,8 +76,9 @@ export class SimilarNoteFinder {
                 new SimilarNote(
                     result.chunk.title,
                     result.chunk.path,
+                    result.score,
                     result.chunk.content,
-                    result.score
+                    result.sourceChunk
                 )
         );
 

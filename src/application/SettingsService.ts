@@ -7,6 +7,7 @@ export interface SimilarNotesSettings {
     fileMtimePath: string;
     modelId: string; // The model ID to use for embeddings
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
+    showSourceChunk: boolean; // Whether to show the original chunk in the results
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     fileMtimePath: ".obsidian/similar-notes-file-mtimes.json",
     modelId: "sentence-transformers/all-MiniLM-L6-v2",
     includeFrontmatter: false,
+    showSourceChunk: false,
 };
 
 export class SettingsService {
