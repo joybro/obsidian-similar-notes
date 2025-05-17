@@ -2,7 +2,6 @@ import log from "loglevel";
 import { Plugin } from "obsidian";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
 import { NoteIndexingService } from "./application/NoteIndexingService";
-import { PersistenceOrchestrator } from "./application/PersistenceOrchestrator";
 import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
@@ -30,7 +29,6 @@ export default class MainPlugin extends Plugin {
     private similarNoteFinder: SimilarNoteFinder;
     private similarNoteCoordinator: SimilarNoteCoordinator;
     private noteIndexingService: NoteIndexingService;
-    private persistenceOrchestrator: PersistenceOrchestrator;
     private mTimeStore: MTimeStore;
     private statusBarView: StatusBarView;
 
@@ -43,31 +41,13 @@ export default class MainPlugin extends Plugin {
 
         this.noteRepository = new VaultNoteRepository(this.app);
 
-        // Initialize model service
-        try {
-            this.modelService = new EmbeddingService();
-            await this.modelService.loadModel(
-                this.settingsService.get().modelId
-            );
-
-            log.info("Model service initialized successfully");
-        } catch (error) {
-            log.error("Failed to initialize model service:", error);
-        }
+        this.modelService = new EmbeddingService();
 
         this.noteChunkRepository = new OramaNoteChunkRepository(this.app.vault);
 
         this.mTimeStore = new MTimeStore(this.app.vault, this.settingsService);
 
-        this.persistenceOrchestrator = new PersistenceOrchestrator(
-            this.noteChunkRepository,
-            this.mTimeStore,
-            this.settingsService
-        );
-
-        await this.persistenceOrchestrator.initializeStore(
-            this.modelService.getVectorSize()
-        );
+        await this.mTimeStore.restore();
 
         this.noteChunkingService = new LangchainNoteChunkingService(
             this.modelService
@@ -139,7 +119,7 @@ export default class MainPlugin extends Plugin {
                 this.modelService.getModelBusy$()
             );
 
-            this.noteIndexingService.startLoop();
+            this.init(this.settingsService.get().modelId, true, false);
         });
     }
 
@@ -160,11 +140,100 @@ export default class MainPlugin extends Plugin {
 
         this.noteChangeQueue.cleanup();
 
-        this.persistenceOrchestrator.closeStore();
+        this.closeStore();
+    }
+
+    async init(
+        modelId: string,
+        firstTime: boolean,
+        newModel: boolean
+    ): Promise<void> {
+        this.noteIndexingService.stopLoop();
+
+        try {
+            if (newModel) {
+                await this.modelService.unloadModel();
+            }
+
+            if (firstTime || newModel) {
+                await this.modelService.loadModel(modelId);
+                log.info("Model service initialized successfully");
+
+                this.noteChunkingService.init();
+            }
+        } catch (error) {
+            log.error("Failed to initialize model service:", error);
+            return;
+        }
+
+        const vectorSize = this.modelService.getVectorSize();
+        const dbPath = this.settingsService.get().dbPath;
+        await this.noteChunkRepository.init(vectorSize, dbPath);
+
+        if (firstTime) {
+            await this.noteChunkRepository.restore();
+            const count = this.noteChunkRepository.count();
+            log.info(
+                "Successfully loaded existing database from",
+                dbPath,
+                "with",
+                count,
+                "chunks"
+            );
+
+            this.setupAutoSave(this.settingsService.get().autoSaveInterval);
+
+            this.settingsService
+                .getNewSettingsObservable()
+                .subscribe((newSettings) => {
+                    // If auto-save interval changed, update the interval
+                    if (newSettings.autoSaveInterval !== undefined) {
+                        this.setupAutoSave(newSettings.autoSaveInterval);
+                    }
+                });
+        }
+
+        if (!firstTime) {
+            this.noteChangeQueue.enqueueAllNotes();
+        }
+
+        this.noteIndexingService.startLoop();
     }
 
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
-        this.noteChangeQueue.enqueueAllNotes();
+        await this.init(this.settingsService.get().modelId, false, false);
+    }
+
+    async changeModel(modelId: string): Promise<void> {
+        await this.init(modelId, false, true);
+    }
+
+    async closeStore() {
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+        }
+
+        await this.noteChunkRepository.persist();
+        await this.mTimeStore.persist();
+    }
+
+    private setupAutoSave(interval: number) {
+        // Clear any existing interval
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+        }
+
+        // Set up new auto-save interval
+        const intervalMs = interval * 60 * 1000;
+        this.autoSaveInterval = setInterval(async () => {
+            try {
+                await this.noteChunkRepository.persist();
+                await this.mTimeStore.persist();
+                log.info("Auto-saved databases");
+            } catch (e) {
+                log.error("Failed to auto-save database:", e);
+            }
+        }, intervalMs);
     }
 }

@@ -6,9 +6,11 @@ import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import log from "loglevel";
 
 export class LangchainNoteChunkingService implements NoteChunkingService {
-    private readonly splitter: RecursiveCharacterTextSplitter;
+    private splitter: RecursiveCharacterTextSplitter | null = null;
 
-    constructor(private readonly embeddingService: EmbeddingService) {
+    constructor(private readonly embeddingService: EmbeddingService) {}
+
+    async init() {
         this.splitter = RecursiveCharacterTextSplitter.fromLanguage(
             "markdown",
             {
@@ -21,6 +23,10 @@ export class LangchainNoteChunkingService implements NoteChunkingService {
     }
 
     async split(note: Note): Promise<NoteChunk[]> {
+        if (!this.splitter) {
+            throw new Error("Splitter not initialized");
+        }
+
         const chunks = await this.splitter.splitText(note.content);
         if (log.getLevel() <= log.levels.DEBUG) {
             const tokens = await Promise.all(
