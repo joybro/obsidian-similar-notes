@@ -1,6 +1,7 @@
 import type { SettingsService } from "@/application/SettingsService";
 import { PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
+import { LoadModelModal } from "./LoadModelModal";
 
 export class SimilarNotesSettingTab extends PluginSettingTab {
     constructor(
@@ -11,6 +12,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     }
 
     display(): void {
+        const settings = this.settingsService.get();
         const { containerEl } = this;
         containerEl.empty();
 
@@ -18,23 +20,91 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             .setName("Database path")
             .setDesc("Path where the similarity database will be stored")
             .addText((text) => {
-                text.setValue(this.settingsService.get().dbPath).onChange(
-                    async (value) => {
-                        await this.settingsService.update({ dbPath: value });
-                    }
-                );
+                text.setValue(settings.dbPath).onChange(async (value) => {
+                    await this.settingsService.update({ dbPath: value });
+                });
             });
 
         new Setting(containerEl)
             .setName("Auto-save interval")
             .setDesc("How often to save changes to disk (in minutes)")
             .addText((text) => {
-                text.setValue(
-                    this.settingsService.get().autoSaveInterval.toString()
-                ).onChange(async (value) => {
-                    await this.settingsService.update({
-                        autoSaveInterval: Number.parseInt(value, 10),
-                    });
+                text.setValue(settings.autoSaveInterval.toString()).onChange(
+                    async (value) => {
+                        await this.settingsService.update({
+                            autoSaveInterval: Number.parseInt(value, 10),
+                        });
+                    }
+                );
+            });
+
+        new Setting(containerEl).setName("Model").setHeading();
+
+        new Setting(containerEl)
+            .setName("Current Model")
+            .setDesc(settings.modelId);
+
+        const recommendedModels = [
+            "sentence-transformers/all-MiniLM-L6-v2",
+            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        ];
+
+        let selectedModel = settings.modelId;
+
+        new Setting(containerEl)
+            .setName("Recommended Models")
+            .setDesc("Select from recommended embedding models")
+            .addDropdown((dropdown) => {
+                for (const model of recommendedModels) {
+                    dropdown.addOption(model, model);
+                }
+                dropdown.setValue(settings.modelId);
+                dropdown.onChange(async (value) => {
+                    selectedModel = value;
+                });
+            })
+            .addButton((button) => {
+                button.setButtonText("Load").onClick(async () => {
+                    console.log(selectedModel);
+                    new LoadModelModal(
+                        this.app,
+                        async () => {
+                            await this.settingsService.update({
+                                modelId: selectedModel,
+                            });
+                            this.plugin.changeModel(selectedModel);
+                        },
+                        () => {}
+                    ).open();
+                });
+            });
+
+        let customModel = "";
+
+        new Setting(containerEl)
+            .setName("Custom Model")
+            .setDesc("Enter a custom model ID from Hugging Face")
+            .addText((text) => {
+                text.onChange(async (value) => {
+                    customModel = value;
+                });
+            })
+            .addButton((button) => {
+                button.setButtonText("Load").onClick(async () => {
+                    if (customModel.length === 0) {
+                        return;
+                    }
+                    console.log(customModel);
+                    new LoadModelModal(
+                        this.app,
+                        async () => {
+                            await this.settingsService.update({
+                                modelId: customModel,
+                            });
+                            this.plugin.changeModel(customModel);
+                        },
+                        () => {}
+                    ).open();
                 });
             });
 
@@ -47,7 +117,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             )
             .addToggle((toggle) => {
                 toggle
-                    .setValue(this.settingsService.get().includeFrontmatter)
+                    .setValue(settings.includeFrontmatter)
                     .onChange(async (value) => {
                         await this.settingsService.update({
                             includeFrontmatter: value,
@@ -73,7 +143,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             )
             .addToggle((toggle) => {
                 toggle
-                    .setValue(this.settingsService.get().showSourceChunk)
+                    .setValue(settings.showSourceChunk)
                     .onChange(async (value) => {
                         await this.settingsService.update({
                             showSourceChunk: value,
