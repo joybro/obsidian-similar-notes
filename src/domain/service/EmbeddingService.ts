@@ -11,6 +11,7 @@ export class EmbeddingService {
     private vectorSize: number | null = null;
     private maxTokens: number | null = null;
     private modelBusy$ = new Subject<boolean>();
+    private downloadProgress$ = new Subject<number>();
 
     async loadModel(modelId: string): Promise<void> {
         log.info("Loading model", modelId);
@@ -22,7 +23,12 @@ export class EmbeddingService {
             throw new Error("Worker not initialized");
         }
 
-        const response = await this.worker.handleLoad(modelId);
+        const response = await this.worker.handleLoad(
+            modelId,
+            Comlink.proxy((progress: number) => {
+                this.downloadProgress$.next(progress);
+            })
+        );
         log.info("Model loaded", response);
 
         this.modelId = modelId;
@@ -44,6 +50,10 @@ export class EmbeddingService {
 
     getModelBusy$(): Observable<boolean> {
         return this.modelBusy$.asObservable();
+    }
+
+    getDownloadProgress$(): Observable<number> {
+        return this.downloadProgress$.asObservable();
     }
 
     async embedText(text: string): Promise<number[]> {
