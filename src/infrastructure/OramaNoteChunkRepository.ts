@@ -59,6 +59,12 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         this.hasChanges = false;
     }
 
+    async reset(): Promise<void> {
+        this.db = await create({
+            schema: this.schema,
+        });
+    }
+
     async persist(): Promise<void> {
         if (!this.filepath) {
             throw new Error("No filepath specified for saving");

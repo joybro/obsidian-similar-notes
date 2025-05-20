@@ -191,9 +191,8 @@ export default class MainPlugin extends Plugin {
                         this.setupAutoSave(newSettings.autoSaveInterval);
                     }
                 });
-        }
-
-        if (!firstTime) {
+        } else {
+            await this.noteChunkRepository.reset();
             this.noteChangeQueue.enqueueAllNotes();
         }
 
