@@ -13,6 +13,7 @@ interface MockSetting {
     addText: ReturnType<typeof vi.fn>;
     addButton: ReturnType<typeof vi.fn>;
     addToggle: ReturnType<typeof vi.fn>;
+    addDropdown: ReturnType<typeof vi.fn>;
 }
 
 // Define the MockSettingImpl class
@@ -76,6 +77,22 @@ class MockSettingImpl {
         callback(mockToggle);
         return this;
     }
+
+    addDropdown(
+        callback: (dropdown: {
+            addOption: (value: string, display: string) => void;
+            setValue: (value: string) => void;
+            onChange: (value: string) => void;
+        }) => void
+    ) {
+        const mockDropdown = {
+            addOption: vi.fn().mockReturnThis(),
+            setValue: vi.fn().mockReturnThis(),
+            onChange: vi.fn(),
+        };
+        callback(mockDropdown);
+        return this;
+    }
 }
 
 // Mock the Obsidian module
@@ -92,12 +109,21 @@ vi.mock("obsidian", async () => {
             vi.spyOn(instance, "addText");
             vi.spyOn(instance, "addButton");
             vi.spyOn(instance, "addToggle");
+            vi.spyOn(instance, "addDropdown");
             return instance as unknown as MockSetting;
         });
 
     return {
         ...actual,
         Setting: MockSettingClass,
+        Modal: class {
+            constructor(app: App) {
+                this.app = app;
+            }
+            app: App;
+            open(): void {}
+            close(): void {}
+        },
         PluginSettingTab: class {
             constructor(app: App, plugin: MainPlugin) {
                 this.app = app;
@@ -171,6 +197,9 @@ describe("SimilarNotesSettingTab", () => {
                 addToggle: vi
                     .fn()
                     .mockImplementation(instance.addToggle.bind(instance)),
+                addDropdown: vi
+                    .fn()
+                    .mockImplementation(instance.addDropdown.bind(instance)),
             } as MockSetting;
             mockSettingInstances.push(spiedInstance);
             return spiedInstance;
@@ -184,7 +213,7 @@ describe("SimilarNotesSettingTab", () => {
         expect(settingTab.containerEl.empty).toHaveBeenCalled();
 
         // Verify Setting was called for each setting
-        expect(Setting).toHaveBeenCalledTimes(7);
+        expect(Setting).toHaveBeenCalledTimes(11);
     });
 
     test("settings changes are propagated to plugin", async () => {
@@ -216,8 +245,8 @@ describe("SimilarNotesSettingTab", () => {
     test("reindex button triggers reindexNotes", async () => {
         settingTab.display();
 
-        // Get the last Setting instance
-        const mockSetting = mockSettingInstances[4];
+        // Get the correct Setting instance for reindex button (index 8)
+        const mockSetting = mockSettingInstances[8];
 
         // Get the mock button component from addButton call
         const mockButton = {
@@ -247,8 +276,8 @@ describe("SimilarNotesSettingTab", () => {
         });
         settingTab.display();
 
-        // The third setting should be the toggle
-        const mockSetting = mockSettingInstances[3];
+        // The correct setting should be the toggle (index 7)
+        const mockSetting = mockSettingInstances[7];
         expect(mockSetting.setName).toHaveBeenCalledWith(
             "Include frontmatter in indexing and search"
         );
