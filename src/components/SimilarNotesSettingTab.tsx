@@ -1,4 +1,5 @@
 import type { SettingsService } from "@/application/SettingsService";
+import log from "loglevel";
 import { PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
 import { LoadModelModal } from "./LoadModelModal";
@@ -148,6 +149,23 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         await this.settingsService.update({
                             showSourceChunk: value,
                         });
+                    });
+            });
+
+        new Setting(containerEl)
+            .setName("Log Level")
+            .setDesc("Set the logging level for debugging purposes")
+            .addDropdown((dropdown) => {
+                dropdown
+                    .addOption(log.levels.TRACE.toString(), "TRACE")
+                    .addOption(log.levels.DEBUG.toString(), "DEBUG")
+                    .addOption(log.levels.INFO.toString(), "INFO")
+                    .addOption(log.levels.WARN.toString(), "WARN")
+                    .addOption(log.levels.ERROR.toString(), "ERROR")
+                    .addOption(log.levels.SILENT.toString(), "SILENT")
+                    .setValue(log.getLevel().toString())
+                    .onChange((value) => {
+                        log.setLevel(Number(value) as log.LogLevelDesc);
                     });
             });
     }

@@ -33,7 +33,7 @@ export default class MainPlugin extends Plugin {
     private statusBarView: StatusBarView;
 
     async onload() {
-        log.setDefaultLevel(log.levels.DEBUG);
+        log.setDefaultLevel(log.levels.ERROR);
         log.info("Loading Similar Notes plugin");
 
         this.settingsService = new SettingsService(this);
