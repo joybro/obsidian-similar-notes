@@ -124,11 +124,6 @@ class TransformersWorker {
         const testEmbedding = tensor.tolist();
         this.vectorSize = testEmbedding[0].length;
 
-        console.log(
-            "== model_max_length",
-            this.extractor.tokenizer.model_max_length
-        );
-
         // Get max tokens from the tokenizer
         this.maxTokens = this.extractor.tokenizer.model_max_length ?? 512;
 
