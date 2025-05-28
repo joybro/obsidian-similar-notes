@@ -66,6 +66,9 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
     }
 
     async persist(): Promise<void> {
+        const startTime = performance.now();
+        log.info("Starting persist() operation");
+
         if (!this.filepath) {
             throw new Error("No filepath specified for saving");
         }
@@ -84,6 +87,12 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
             await adapter.writeBinary(this.filepath, JSONIndex);
         }
         this.hasChanges = false;
+
+        const endTime = performance.now();
+        const elapsedTime = endTime - startTime;
+        log.info(
+            `Completed persist() operation in ${elapsedTime.toFixed(2)}ms`
+        );
     }
 
     async restore(): Promise<void> {
