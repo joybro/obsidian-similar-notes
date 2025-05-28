@@ -14,7 +14,10 @@ describe("TransformersWorker", () => {
             enqueue: async <T>(task: () => Promise<T>) => {
                 return task();
             },
-            handleLoad: async (modelId: string) => {
+            handleLoad: async (
+                modelId: string,
+                progress_callback: (progress: number) => void
+            ) => {
                 return {
                     vectorSize: 384, // Mock vector size
                     maxTokens: 512, // Mock max tokens
@@ -38,7 +41,8 @@ describe("TransformersWorker", () => {
 
     it("should load the model successfully and return vector size and max tokens", async () => {
         const response = await workerInstance.handleLoad(
-            "sentence-transformers/all-MiniLM-L6-v2"
+            "sentence-transformers/all-MiniLM-L6-v2",
+            () => {}
         );
 
         expect(response).toEqual({
@@ -52,7 +56,8 @@ describe("TransformersWorker", () => {
 
         // First load the model
         await workerInstance.handleLoad(
-            "sentence-transformers/all-MiniLM-L6-v2"
+            "sentence-transformers/all-MiniLM-L6-v2",
+            () => {}
         );
 
         // Then embed texts
@@ -69,7 +74,8 @@ describe("TransformersWorker", () => {
     it("should handle unload successfully", async () => {
         // First load the model
         await workerInstance.handleLoad(
-            "sentence-transformers/all-MiniLM-L6-v2"
+            "sentence-transformers/all-MiniLM-L6-v2",
+            () => {}
         );
 
         // Then unload it
@@ -88,7 +94,10 @@ describe("TransformersWorker", () => {
             enqueue: async <T>(task: () => Promise<T>) => {
                 return task();
             },
-            handleLoad: async (modelId: string) => {
+            handleLoad: async (
+                modelId: string,
+                progress_callback: (progress: number) => void
+            ) => {
                 return {
                     vectorSize: 384,
                     maxTokens: 512,
@@ -113,7 +122,8 @@ describe("TransformersWorker", () => {
     it("should count tokens correctly after model is loaded", async () => {
         // First load the model
         await workerInstance.handleLoad(
-            "sentence-transformers/all-MiniLM-L6-v2"
+            "sentence-transformers/all-MiniLM-L6-v2",
+            () => {}
         );
 
         // Then count tokens
@@ -135,7 +145,10 @@ describe("TransformersWorker", () => {
             enqueue: async <T>(task: () => Promise<T>) => {
                 return task();
             },
-            handleLoad: async (modelId: string) => {
+            handleLoad: async (
+                modelId: string,
+                progress_callback: (progress: number) => void
+            ) => {
                 return {
                     vectorSize: 384,
                     maxTokens: 512,
