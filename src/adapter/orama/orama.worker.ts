@@ -1,6 +1,5 @@
 import { NoteChunk } from "@/domain/model/NoteChunk";
 import type { NoteChunkDTO } from "@/domain/model/NoteChunkDTO";
-import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import {
     type Orama,
     type SearchParams,
@@ -13,6 +12,7 @@ import {
     search,
 } from "@orama/orama";
 import { persist, restore } from "@orama/plugin-data-persistence";
+import * as comlink from "comlink";
 import log from "loglevel";
 import type { Vault } from "obsidian";
 
@@ -32,7 +32,7 @@ type NoteChunkInternal = NoteChunkDTO & {
     pathHash: string;
 };
 
-export class OramaNoteChunkRepository implements NoteChunkRepository {
+export class OramaWorker {
     private hasChanges = false;
     private db: Orama<Schema> | null = null;
     private schema: Schema;
@@ -41,7 +41,11 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
 
     constructor(private readonly vault: Vault) {}
 
-    async init(vectorSize: number, filepath: string): Promise<void> {
+    async init(
+        vectorSize: number,
+        filepath: string,
+        loadFromFile: boolean
+    ): Promise<void> {
         this.vectorSize = vectorSize;
         this.filepath = filepath;
         this.db = null;
@@ -56,13 +60,21 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
             totalChunks: "number",
         } as const;
 
-        this.hasChanges = false;
-    }
-
-    async reset(): Promise<void> {
-        this.db = await create({
-            schema: this.schema,
-        });
+        try {
+            const adapter = this.vault.adapter;
+            const exists = await adapter.exists(this.filepath);
+            if (exists && loadFromFile) {
+                const JSONIndex = await adapter.read(this.filepath);
+                this.db = (await restore("json", JSONIndex)) as Orama<Schema>;
+            } else {
+                this.db = await create({
+                    schema: this.schema,
+                });
+            }
+            this.hasChanges = false;
+        } catch (error) {
+            log.error("Failed to load OramaNoteChunkRepository", error);
+        }
     }
 
     async persist(): Promise<void> {
@@ -93,24 +105,6 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         log.info(
             `Completed persist() operation in ${elapsedTime.toFixed(2)}ms`
         );
-    }
-
-    async restore(): Promise<void> {
-        try {
-            const adapter = this.vault.adapter;
-            const exists = await adapter.exists(this.filepath);
-            if (!exists) {
-                this.db = await create({
-                    schema: this.schema,
-                });
-            } else {
-                const JSONIndex = await adapter.read(this.filepath);
-                this.db = (await restore("json", JSONIndex)) as Orama<Schema>;
-            }
-            this.hasChanges = false;
-        } catch (error) {
-            log.error("Failed to load OramaNoteChunkRepository", error);
-        }
     }
 
     async put(noteChunk: NoteChunk): Promise<void> {
@@ -253,3 +247,5 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         return count(this.db);
     }
 }
+
+comlink.expose(OramaWorker);

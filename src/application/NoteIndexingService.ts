@@ -93,7 +93,7 @@ export class NoteIndexingService {
 
         log.info(
             "count of chunks in embedding store",
-            this.noteChunkRepository.count()
+            await this.noteChunkRepository.count()
         );
 
         // TODO: this should be refactored with an event driven approach

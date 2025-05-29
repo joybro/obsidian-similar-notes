@@ -6,9 +6,12 @@ const esbuild = require("esbuild");
 
 esbuild
     .build({
-        entryPoints: ["src/domain/service/transformers.worker.ts"],
+        entryPoints: [
+            "src/domain/service/transformers.worker.ts",
+            "src/adapter/orama/orama.worker.ts",
+        ],
         bundle: true,
-        outfile: "public/transformers.worker.js",
+        outdir: "public",
         format: "iife",
         platform: "browser",
         target: "es2020",

@@ -1,9 +1,7 @@
 import type { NoteChunk } from "@/domain/model/NoteChunk";
 
 export interface NoteChunkRepository {
-    init(vectorSize: number, filepath: string): Promise<void>;
-
-    reset(): Promise<void>;
+    init(vectorSize: number, filepath: string, restore: boolean): Promise<void>;
 
     /**
      * Puts a NoteChunk.
@@ -37,15 +35,10 @@ export interface NoteChunkRepository {
     /**
      * Returns the total number of stored NoteChunks.
      */
-    count(): number;
+    count(): Promise<number>;
 
     /**
      * Persists NoteChunks in memory to disk.
      */
     persist(): Promise<void>;
-
-    /**
-     * Restores NoteChunks from disk into memory.
-     */
-    restore(): Promise<void>;
 }

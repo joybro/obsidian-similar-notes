@@ -1,5 +1,6 @@
 import log from "loglevel";
 import { Plugin } from "obsidian";
+import { OramaNoteChunkRepository } from "./adapter/orama/OramaNoteChunkRepository";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
 import { NoteIndexingService } from "./application/NoteIndexingService";
 import { SettingsService } from "./application/SettingsService";
@@ -13,7 +14,6 @@ import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
 import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
 import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { MTimeStore } from "./infrastructure/MTimeStore";
-import { OramaNoteChunkRepository } from "./infrastructure/OramaNoteChunkRepository";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
 
@@ -169,11 +169,11 @@ export default class MainPlugin extends Plugin {
 
         const vectorSize = this.modelService.getVectorSize();
         const dbPath = this.settingsService.get().dbPath;
-        await this.noteChunkRepository.init(vectorSize, dbPath);
+        // await this.noteChunkRepository.init(vectorSize, dbPath);
 
         if (firstTime) {
-            await this.noteChunkRepository.restore();
-            const count = this.noteChunkRepository.count();
+            await this.noteChunkRepository.init(vectorSize, dbPath, true);
+            const count = await this.noteChunkRepository.count();
             log.info(
                 "Successfully loaded existing database from",
                 dbPath,
@@ -193,7 +193,7 @@ export default class MainPlugin extends Plugin {
                     }
                 });
         } else {
-            await this.noteChunkRepository.reset();
+            await this.noteChunkRepository.init(vectorSize, dbPath, false);
             this.noteChangeQueue.enqueueAllNotes();
         }
 
