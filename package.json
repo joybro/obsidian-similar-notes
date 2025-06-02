@@ -7,8 +7,7 @@
         "dev": "node esbuild.config.mjs",
         "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
         "version": "node version-bump.mjs && git add manifest.json versions.json",
-        "build:worker": "node esbuild.worker.mjs",
-        "test": "npm run build:worker && vitest run",
+        "test": "node esbuild.config.mjs workers-only && vitest run",
         "test:watch": "vitest"
     },
     "keywords": [
