@@ -73,10 +73,10 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         );
     }
 
-    count(): number {
+    async count(): Promise<number> {
         if (!this.worker) {
             throw new Error("Worker not initialized");
         }
-        return this.worker.count();
+        return await this.worker.count();
     }
 }

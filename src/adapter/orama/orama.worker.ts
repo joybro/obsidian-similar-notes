@@ -32,7 +32,7 @@ type NoteChunkInternal = NoteChunkDTO & {
     pathHash: string;
 };
 
-export class OramaWorker {
+class OramaWorker {
     private hasChanges = false;
     private db: Orama<Schema> | null = null;
     private schema: Schema;
@@ -247,5 +247,7 @@ export class OramaWorker {
         return count(this.db);
     }
 }
+
+export type { OramaWorker };
 
 comlink.expose(OramaWorker);

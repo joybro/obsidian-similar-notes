@@ -1,4 +1,5 @@
-const esbuild = require("esbuild");
+import builtins from "builtin-modules";
+import esbuild from "esbuild";
 
 // This is a workaround to build the worker file for the tests
 // for production, we build the worker file with esbuild-plugin-inline-worker plugin
@@ -21,6 +22,6 @@ esbuild
             "process.versions": "undefined",
             process: "undefined",
         },
-        external: ["node:worker_threads"],
+        external: ["node:worker_threads", ...builtins],
     })
     .catch(() => process.exit(1));

@@ -1,6 +1,7 @@
 import builtins from "builtin-modules";
 import esbuild from "esbuild";
 import inlineWorkerPlugin from "esbuild-plugin-inline-worker";
+import { polyfillNode } from "esbuild-plugin-polyfill-node";
 import process from "node:process";
 
 const prod = process.argv[2] === "production";
@@ -10,12 +11,23 @@ const buildOptions = {
     bundle: true,
     external: ["obsidian", "electron", ...builtins],
     format: "cjs",
+    platform: "browser",
     target: "es2020",
     logLevel: "info",
     sourcemap: prod ? false : "inline",
     treeShaking: true,
     outfile: "main.js",
-    plugins: [inlineWorkerPlugin()],
+    plugins: [
+        inlineWorkerPlugin({
+            plugins: [
+                polyfillNode({
+                    modules: {
+                        stream: true,
+                    },
+                }),
+            ],
+        }),
+    ],
 };
 
 if (prod) {
