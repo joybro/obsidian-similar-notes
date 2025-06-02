@@ -1,4 +1,4 @@
-import type { NoteChunk } from "@/domain/model/NoteChunk";
+import { NoteChunk } from "@/domain/model/NoteChunk";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import * as Comlink from "comlink";
 import log from "loglevel";
@@ -25,7 +25,12 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
             throw new Error("Worker not initialized");
         }
 
-        await this.worker.init(vectorSize, filepath, loadFromFile);
+        await this.worker.init(
+            Comlink.proxy(this.vault.adapter),
+            vectorSize,
+            filepath,
+            loadFromFile
+        );
     }
 
     async persist(): Promise<void> {
@@ -39,14 +44,14 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         if (!this.worker) {
             throw new Error("Worker not initialized");
         }
-        await this.worker.put(noteChunk);
+        await this.worker.put(noteChunk.toDTO());
     }
 
     async putMulti(chunks: NoteChunk[]): Promise<void> {
         if (!this.worker) {
             throw new Error("Worker not initialized");
         }
-        await this.worker.putMulti(chunks);
+        await this.worker.putMulti(chunks.map((chunk) => chunk.toDTO()));
     }
 
     async removeByPath(path: string): Promise<void> {
@@ -65,12 +70,14 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         if (!this.worker) {
             throw new Error("Worker not initialized");
         }
-        return await this.worker.findSimilarChunks(
-            queryEmbedding,
-            limit,
-            minScore,
-            excludePaths
-        );
+        return await this.worker
+            .findSimilarChunks(queryEmbedding, limit, minScore, excludePaths)
+            .then((chunks) =>
+                chunks.map((chunk) => ({
+                    ...chunk,
+                    chunk: NoteChunk.fromDTO(chunk.chunk),
+                }))
+            );
     }
 
     async count(): Promise<number> {

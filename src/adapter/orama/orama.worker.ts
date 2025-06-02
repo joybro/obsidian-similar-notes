@@ -1,4 +1,3 @@
-import { NoteChunk } from "@/domain/model/NoteChunk";
 import type { NoteChunkDTO } from "@/domain/model/NoteChunkDTO";
 import {
     type Orama,
@@ -14,7 +13,7 @@ import {
 import { persist, restore } from "@orama/plugin-data-persistence";
 import * as comlink from "comlink";
 import log from "loglevel";
-import type { Vault } from "obsidian";
+import type { DataAdapter } from "obsidian";
 
 type Schema = {
     path: "string";
@@ -38,14 +37,15 @@ class OramaWorker {
     private schema: Schema;
     private vectorSize: number;
     private filepath: string;
-
-    constructor(private readonly vault: Vault) {}
+    private adapter: DataAdapter;
 
     async init(
+        adapter: DataAdapter,
         vectorSize: number,
         filepath: string,
         loadFromFile: boolean
     ): Promise<void> {
+        this.adapter = adapter;
         this.vectorSize = vectorSize;
         this.filepath = filepath;
         this.db = null;
@@ -61,10 +61,9 @@ class OramaWorker {
         } as const;
 
         try {
-            const adapter = this.vault.adapter;
-            const exists = await adapter.exists(this.filepath);
+            const exists = await this.adapter.exists(this.filepath);
             if (exists && loadFromFile) {
-                const JSONIndex = await adapter.read(this.filepath);
+                const JSONIndex = await this.adapter.read(this.filepath);
                 this.db = (await restore("json", JSONIndex)) as Orama<Schema>;
             } else {
                 this.db = await create({
@@ -73,7 +72,7 @@ class OramaWorker {
             }
             this.hasChanges = false;
         } catch (error) {
-            log.error("Failed to load OramaNoteChunkRepository", error);
+            log.error("Failed to load database", error);
         }
     }
 
@@ -88,15 +87,14 @@ class OramaWorker {
             return;
         }
         const JSONIndex = await persist(this.db, "json");
-        const adapter = this.vault.adapter;
         if (JSONIndex === undefined) {
-            throw new Error("Failed to persist OramaNoteChunkRepository");
+            throw new Error("Failed to persist database");
         }
 
         if (typeof JSONIndex === "string") {
-            await adapter.write(this.filepath, JSONIndex);
+            await this.adapter.write(this.filepath, JSONIndex);
         } else {
-            await adapter.writeBinary(this.filepath, JSONIndex);
+            await this.adapter.writeBinary(this.filepath, JSONIndex);
         }
         this.hasChanges = false;
 
@@ -107,26 +105,26 @@ class OramaWorker {
         );
     }
 
-    async put(noteChunk: NoteChunk): Promise<void> {
+    async put(noteChunk: NoteChunkDTO): Promise<void> {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
         const pathHash = await this.calculatePathHash(noteChunk.path);
         const internalNoteChunk: NoteChunkInternal = {
-            ...noteChunk.toDTO(),
+            ...noteChunk,
             pathHash,
         };
         await insert(this.db, internalNoteChunk as Doc);
         this.hasChanges = true;
     }
 
-    async putMulti(chunks: NoteChunk[]): Promise<void> {
+    async putMulti(chunks: NoteChunkDTO[]): Promise<void> {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
         const internalChunks = await Promise.all(
             chunks.map(async (chunk) => ({
-                ...chunk.toDTO(),
+                ...chunk,
                 pathHash: await this.calculatePathHash(chunk.path),
             }))
         );
@@ -172,14 +170,14 @@ class OramaWorker {
         limit: number,
         minScore?: number,
         excludePaths?: string[]
-    ): Promise<{ chunk: NoteChunk; score: number }[]> {
+    ): Promise<{ chunk: NoteChunkDTO; score: number }[]> {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
 
         const batchSize = limit * 2;
         let offset = 0;
-        let allResults: { chunk: NoteChunk; score: number }[] = [];
+        let allResults: { chunk: NoteChunkDTO; score: number }[] = [];
 
         while (true) {
             const searchParams: SearchParams<Orama<Schema>> = {
@@ -221,7 +219,7 @@ class OramaWorker {
                         embedding: doc.embedding as unknown as number[],
                     };
                     return {
-                        chunk: NoteChunk.fromDTO(dto),
+                        chunk: dto,
                         score: hit.score,
                     };
                 })
