@@ -5,6 +5,7 @@ import type {
     ProgressInfo,
 } from "@huggingface/transformers";
 import * as comlink from "comlink";
+import log from "loglevel";
 
 interface Transformers {
     pipeline(
@@ -76,6 +77,11 @@ class TransformersWorker {
     vectorSize: number | null = null;
     maxTokens: number | null = null;
     private embeddingQueue: Promise<unknown> = Promise.resolve();
+
+    setLogLevel(level: log.LogLevelDesc): void {
+        log.setLevel(level);
+        log.info(`TransformersWorker log level set to: ${log.getLevel()}`);
+    }
 
     constructor() {
         this.extractor = null;

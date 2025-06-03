@@ -39,6 +39,11 @@ class OramaWorker {
     private filepath: string;
     private adapter: DataAdapter;
 
+    setLogLevel(level: log.LogLevelDesc): void {
+        log.setLevel(level);
+        log.info(`Worker log level set to: ${log.getLevel()}`);
+    }
+
     async init(
         adapter: DataAdapter,
         vectorSize: number,

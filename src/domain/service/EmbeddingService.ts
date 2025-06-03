@@ -23,6 +23,8 @@ export class EmbeddingService {
             throw new Error("Worker not initialized");
         }
 
+        await this.worker.setLogLevel(log.getLevel());
+
         const response = await this.worker.handleLoad(
             modelId,
             Comlink.proxy((progress: number) => {
@@ -111,5 +113,18 @@ export class EmbeddingService {
         this.modelId = null;
         this.vectorSize = null;
         this.maxTokens = null;
+    }
+
+    public setLogLevel(level: log.LogLevelDesc): void {
+        if (this.worker) {
+            this.worker
+                .setLogLevel(level)
+                .catch((err) =>
+                    log.error(
+                        "Failed to set log level on TransformersWorker",
+                        err
+                    )
+                );
+        }
     }
 }

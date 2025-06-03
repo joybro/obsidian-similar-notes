@@ -25,6 +25,8 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
             throw new Error("Worker not initialized");
         }
 
+        await this.worker.setLogLevel(log.getLevel());
+
         await this.worker.init(
             Comlink.proxy(this.vault.adapter),
             vectorSize,
@@ -85,5 +87,20 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
             throw new Error("Worker not initialized");
         }
         return await this.worker.count();
+    }
+
+    public setLogLevel(level: log.LogLevelDesc): void {
+        log.setLevel(level);
+        log.info(
+            `OramaNoteChunkRepository log level set to: ${log.getLevel()}`
+        );
+
+        if (this.worker) {
+            this.worker
+                .setLogLevel(level)
+                .catch((err) =>
+                    log.error("Failed to set log level on OramaWorker", err)
+                );
+        }
     }
 }

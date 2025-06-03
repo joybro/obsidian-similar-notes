@@ -144,6 +144,22 @@ export default class MainPlugin extends Plugin {
         this.closeStore();
     }
 
+    public setLogLevel(level: log.LogLevelDesc): void {
+        log.setLevel(level);
+        log.info(`Main thread log level set to: ${log.getLevel()}`);
+
+        if (this.modelService) {
+            this.modelService.setLogLevel(level);
+        }
+
+        if (this.noteChunkRepository) {
+            const repository = this.noteChunkRepository as any;
+            if (typeof repository.setLogLevel === "function") {
+                repository.setLogLevel(level);
+            }
+        }
+    }
+
     async init(
         modelId: string,
         firstTime: boolean,

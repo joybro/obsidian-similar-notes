@@ -66,7 +66,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             })
             .addButton((button) => {
                 button.setButtonText("Load").onClick(async () => {
-                    console.log(selectedModel);
                     new LoadModelModal(
                         this.app,
                         async () => {
@@ -95,7 +94,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     if (customModel.length === 0) {
                         return;
                     }
-                    console.log(customModel);
                     new LoadModelModal(
                         this.app,
                         async () => {
@@ -165,7 +163,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     .addOption(log.levels.SILENT.toString(), "SILENT")
                     .setValue(log.getLevel().toString())
                     .onChange((value) => {
-                        log.setLevel(Number(value) as log.LogLevelDesc);
+                        this.plugin.setLogLevel(
+                            Number(value) as log.LogLevelDesc
+                        );
                     });
             });
     }
