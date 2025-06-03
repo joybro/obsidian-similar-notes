@@ -14,8 +14,9 @@ interface Transformers {
     ): Promise<Pipeline>;
 }
 
-const isTest =
-    typeof process === "undefined" || process.versions?.electron === undefined;
+// __IS_TEST__ 는 빌드 시 esbuild에 의해 주입됩니다
+declare const __IS_TEST__: string;
+const isTest = __IS_TEST__ === "true";
 
 const createMockPipeline = () => {
     const mockPipeline = async (text: string | string[]) => {

@@ -3,12 +3,18 @@ import esbuild from "esbuild";
 import inlineWorkerPlugin from "esbuild-plugin-inline-worker";
 import { polyfillNode } from "esbuild-plugin-polyfill-node";
 import process from "node:process";
-import path from "node:path";
 
 // Check if we should build workers only (for tests)
 const buildWorkersOnly = process.argv[2] === "workers-only";
 
 const prod = process.argv[2] === "production";
+
+const polyfillPlugin = polyfillNode({
+    globals: false,
+    polyfills: {
+        stream: true,
+    },
+});
 
 const buildOptions = {
     entryPoints: ["src/main.ts"],
@@ -23,13 +29,10 @@ const buildOptions = {
     outfile: "main.js",
     plugins: [
         inlineWorkerPlugin({
-            plugins: [
-                polyfillNode({
-                    modules: {
-                        stream: true,
-                    },
-                }),
-            ],
+            define: {
+                __IS_TEST__: "false", // Production build is not test
+            },
+            plugins: [polyfillPlugin],
         }),
     ],
 };
@@ -47,18 +50,10 @@ const workerBuildOptions = {
     target: "es2020",
     minify: true,
     define: {
-        "process.versions.node": "undefined",
-        "process.versions": "undefined",
-        process: "undefined",
+        __IS_TEST__: "true", // Worker-only build is test environment
     },
     external: ["node:worker_threads", ...builtins],
-    plugins: [
-        polyfillNode({
-            modules: {
-                stream: true,
-            },
-        }),
-    ],
+    plugins: [polyfillPlugin],
 };
 
 // Decide which build to perform based on arguments
