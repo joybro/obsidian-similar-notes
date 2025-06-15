@@ -29,7 +29,7 @@ export class VaultNoteRepository implements NoteRepository {
 
     private extractLinks(file: TFile): string[] {
         const linkRecords = this.app.metadataCache.resolvedLinks[file.path];
-        return Object.keys(linkRecords);
+        return linkRecords ? Object.keys(linkRecords) : [];
     }
 
     private async readContentWithoutFrontmatter(file: TFile): Promise<string> {
