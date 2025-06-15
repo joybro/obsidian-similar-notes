@@ -36,19 +36,57 @@ export default class MainPlugin extends Plugin {
         log.setDefaultLevel(log.levels.ERROR);
         log.info("Loading Similar Notes plugin");
 
+        // Only initialize settings during onload
         this.settingsService = new SettingsService(this);
         await this.settingsService.load();
 
+        // Add settings tab
+        this.addSettingTab(
+            new SimilarNotesSettingTab(this, this.settingsService)
+        );
+
+        // Register essential events
+        this.registerEvents();
+        
+        // Defer all other initialization to onLayoutReady
+        this.app.workspace.onLayoutReady(() => this.initializeServices());
+    }
+
+    private registerEvents() {
+        // Register events that need to be available early
+        this.registerEvent(
+            this.app.workspace.on("file-open", async (file) => {
+                // Use optional chaining as the coordinator may not be initialized yet
+                await this.similarNoteCoordinator?.onFileOpen(file);
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on("layout-change", async () => {
+                this.leafViewCoordinator?.onLayoutChange();
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on("active-leaf-change", async (leaf) => {
+                this.leafViewCoordinator?.onActiveLeafChange(leaf);
+            })
+        );
+    }
+
+    private async initializeServices() {
+        // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
-
-        this.modelService = new EmbeddingService();
-
-        this.noteChunkRepository = new OramaNoteChunkRepository(this.app.vault);
-
         this.mTimeStore = new MTimeStore(this.app.vault, this.settingsService);
-
+        
+        // Create services in proper dependency order
+        this.modelService = new EmbeddingService();
+        this.noteChunkRepository = new OramaNoteChunkRepository(this.app.vault);
+        
+        // Restore persisted data
         await this.mTimeStore.restore();
-
+        
+        // Initialize dependent services
         this.noteChunkingService = new LangchainNoteChunkingService(
             this.modelService
         );
@@ -71,57 +109,32 @@ export default class MainPlugin extends Plugin {
             this.similarNoteCoordinator
         );
 
-        // Add settings tab
-        this.addSettingTab(
-            new SimilarNotesSettingTab(this, this.settingsService)
-        );
-
-        // Register event when current open file changes
-        this.registerEvent(
-            this.app.workspace.on("file-open", async (file) => {
-                await this.similarNoteCoordinator.onFileOpen(file);
-            })
-        );
-
-        this.registerEvent(
-            this.app.workspace.on("layout-change", async () => {
-                this.leafViewCoordinator.onLayoutChange();
-            })
-        );
-
-        this.registerEvent(
-            this.app.workspace.on("active-leaf-change", async (leaf) => {
-                this.leafViewCoordinator.onActiveLeafChange(leaf);
-            })
-        );
-
         // Initialize file change queue
-        this.app.workspace.onLayoutReady(async () => {
-            this.noteChangeQueue = new NoteChangeQueue(
-                this.app.vault,
-                this.mTimeStore
-            );
-            await this.noteChangeQueue.initialize();
+        this.noteChangeQueue = new NoteChangeQueue(
+            this.app.vault,
+            this.mTimeStore
+        );
+        await this.noteChangeQueue.initialize();
 
-            this.noteIndexingService = new NoteIndexingService(
-                this.noteRepository,
-                this.noteChunkRepository,
-                this.noteChangeQueue,
-                this.noteChunkingService,
-                this.modelService,
-                this.similarNoteCoordinator,
-                this.settingsService
-            );
+        this.noteIndexingService = new NoteIndexingService(
+            this.noteRepository,
+            this.noteChunkRepository,
+            this.noteChangeQueue,
+            this.noteChunkingService,
+            this.modelService,
+            this.similarNoteCoordinator,
+            this.settingsService
+        );
 
-            this.statusBarView = new StatusBarView(
-                this,
-                this.noteIndexingService.getNoteChangeCount$(),
-                this.modelService.getModelBusy$(),
-                this.modelService.getDownloadProgress$()
-            );
+        this.statusBarView = new StatusBarView(
+            this,
+            this.noteIndexingService.getNoteChangeCount$(),
+            this.modelService.getModelBusy$(),
+            this.modelService.getDownloadProgress$()
+        );
 
-            this.init(this.settingsService.get().modelId, true, false);
-        });
+        // Complete initialization
+        await this.init(this.settingsService.get().modelId, true, false);
     }
 
     async onunload() {
