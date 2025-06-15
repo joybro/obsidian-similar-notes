@@ -6,6 +6,7 @@ main.js
 *.js.map
 public
 *.build.js
+meta.json
 
 # obsidian
 data.json
