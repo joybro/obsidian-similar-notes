@@ -26,7 +26,11 @@ const buildOptions = {
     logLevel: "info",
     sourcemap: prod ? false : "inline",
     treeShaking: true,
+    minify: prod ? true : false,
     outfile: "main.js",
+    define: {
+        "process.env.NODE_ENV": prod ? "\"production\"" : "\"development\"",
+    },
     plugins: [
         inlineWorkerPlugin({
             define: {
