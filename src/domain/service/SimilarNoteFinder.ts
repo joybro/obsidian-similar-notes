@@ -37,7 +37,7 @@ export class SimilarNoteFinder {
                 const results =
                     await this.noteChunkRepository.findSimilarChunks(
                         embedding,
-                        10,
+                        15,
                         0,
                         [note.path, ...note.links]
                     );
