@@ -20,7 +20,7 @@ export class NoteBottomView extends Component {
     ) {
         super();
         this.containerEl = parentEl.createDiv({
-            cls: "similar-notes-container-wrapper",
+            cls: "embedded-similar-notes",
         });
         this.root = createRoot(this.containerEl);
         this.render();

@@ -1,17 +1,31 @@
 /* Similar Notes container style */
-.similar-notes-container {
-    margin-bottom: 12px;
+
+.embedded-similar-notes {
     border-top: 1px solid var(--background-modifier-border);
 }
 
-/* Header style */
-.similar-notes-header {
-    cursor: pointer;
-    padding: 6px 0;
-    font-size: var(--font-adaptive-small);
-    color: var(--text-muted);
-    display: flex;
+.embedded-similar-notes .nav-header {
+    padding: var(--size-4-3) 0 0 0;
+}
+
+.similar-notes-pane {
+    margin-bottom: 12px;
+}
+
+.similar-notes-pane .tree-item-self {
+    font-size: max(var(--font-ui-small), var(--font-smaller));
     align-items: center;
+}
+
+.similar-notes-pane > .tree-item-self {
+    font-size: max(var(--font-ui-small), 1em);
+    width: fit-content;
+    color: var(--nav-heading-color);
+    padding-inline-start: var(--size-4-2);
+}
+
+.similar-notes-pane .search-result-container {
+    padding: var(--size-4-1) 1px var(--size-4-1);
 }
 
 .similar-notes-title {
@@ -26,20 +40,7 @@
     color: var(--nav-heading-color-collapsed);
 }
 
-/* Content area */
-.similar-notes-content {
-    padding-bottom: 10px;
-}
-
 /* Empty state message */
-.similar-notes-empty {
-    padding: 10px 0;
-    color: var(--text-muted);
-    font-style: italic;
-    font-size: var(--font-smallest);
-}
-
-.similar-notes-container .tree-item-self {
+.similar-notes-pane .search-empty-state {
     font-size: max(var(--font-ui-small), var(--font-smaller));
-    align-items: center;
 }

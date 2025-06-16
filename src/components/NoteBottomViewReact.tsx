@@ -43,7 +43,7 @@ const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
 
     return (
         <div
-            className="similar-notes-header nav-header"
+            className="tree-item-self is-clickable"
             onClick={onToggleCollapse}
             onKeyDown={handleKeyDown}
         >
@@ -52,7 +52,7 @@ const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
                     collapsed ? "is-collapsed" : ""
                 }`}
             >
-                <div className="similar-notes-title-text">Similar notes</div>
+                <div className="tree-item-inner">Similar notes</div>
             </div>
         </div>
     );
@@ -238,12 +238,16 @@ const SearchResultsContainer = ({
 }) => {
     if (similarNotes.length === 0) {
         return (
-            <div className="similar-notes-empty">No similar notes found</div>
+            <div className="search-result-container">
+                <div className="search-empty-state">
+                    No similar notes found.
+                </div>
+            </div>
         );
     }
 
     return (
-        <div className="search-results-container">
+        <div className="search-result-container">
             <div className="search-results-children">
                 {similarNotes.map((note, i) => (
                     <SearchResult
@@ -319,19 +323,22 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     };
 
     return (
-        <div className="similar-notes-container">
-            <SimilarNotesHeader
-                collapsed={collapsed}
-                onToggleCollapse={toggleCollapse}
-            />
-            {!collapsed && (
-                <SearchResultsContainer
-                    similarNotes={similarNotes}
-                    onNoteClick={handleNoteClick}
-                    onContextMenu={handleContextMenu}
+        <>
+            <div className="nav-header" />
+            <div className="similar-notes-pane">
+                <SimilarNotesHeader
+                    collapsed={collapsed}
+                    onToggleCollapse={toggleCollapse}
                 />
-            )}
-        </div>
+                {!collapsed && (
+                    <SearchResultsContainer
+                        similarNotes={similarNotes}
+                        onNoteClick={handleNoteClick}
+                        onContextMenu={handleContextMenu}
+                    />
+                )}
+            </div>
+        </>
     );
 };
 
