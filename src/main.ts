@@ -31,6 +31,7 @@ export default class MainPlugin extends Plugin {
     private noteIndexingService: NoteIndexingService;
     private mTimeStore: MTimeStore;
     private statusBarView: StatusBarView;
+    private settingTab: SimilarNotesSettingTab;
 
     async onload() {
         log.setDefaultLevel(log.levels.ERROR);
@@ -40,14 +41,16 @@ export default class MainPlugin extends Plugin {
         this.settingsService = new SettingsService(this);
         await this.settingsService.load();
 
-        // Add settings tab
-        this.addSettingTab(
-            new SimilarNotesSettingTab(this, this.settingsService)
+        // Add settings tab (without noteIndexingService which is initialized later)
+        this.settingTab = new SimilarNotesSettingTab(
+            this,
+            this.settingsService
         );
+        this.addSettingTab(this.settingTab);
 
         // Register essential events
         this.registerEvents();
-        
+
         // Defer all other initialization to onLayoutReady
         this.app.workspace.onLayoutReady(() => this.initializeServices());
     }
@@ -78,14 +81,14 @@ export default class MainPlugin extends Plugin {
         // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
         this.mTimeStore = new MTimeStore(this.app.vault, this.settingsService);
-        
+
         // Create services in proper dependency order
         this.modelService = new EmbeddingService();
         this.noteChunkRepository = new OramaNoteChunkRepository(this.app.vault);
-        
+
         // Restore persisted data
         await this.mTimeStore.restore();
-        
+
         // Initialize dependent services
         this.noteChunkingService = new LangchainNoteChunkingService(
             this.modelService
@@ -125,6 +128,9 @@ export default class MainPlugin extends Plugin {
             this.similarNoteCoordinator,
             this.settingsService
         );
+
+        // Now that noteIndexingService is initialized, set it in the settings tab
+        this.settingTab.setNoteIndexingService(this.noteIndexingService);
 
         this.statusBarView = new StatusBarView(
             this,
@@ -226,6 +232,8 @@ export default class MainPlugin extends Plugin {
             this.noteChangeQueue.enqueueAllNotes();
         }
 
+        // Initialize the noteIndexingService to get the initial indexed note count
+        await this.noteIndexingService.initialize();
         this.noteIndexingService.startLoop();
     }
 

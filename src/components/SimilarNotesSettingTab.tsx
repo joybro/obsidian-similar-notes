@@ -1,3 +1,4 @@
+import type { NoteIndexingService } from "@/application/NoteIndexingService";
 import type { SettingsService } from "@/application/SettingsService";
 import log from "loglevel";
 import { PluginSettingTab, Setting } from "obsidian";
@@ -5,11 +6,46 @@ import type MainPlugin from "../main";
 import { LoadModelModal } from "./LoadModelModal";
 
 export class SimilarNotesSettingTab extends PluginSettingTab {
+    private indexedNoteCount: number = 0;
+    private noteIndexingService?: NoteIndexingService;
+    private subscription: { unsubscribe: () => void } | null = null;
+    
     constructor(
         private plugin: MainPlugin,
-        private settingsService: SettingsService
+        private settingsService: SettingsService,
+        noteIndexingService?: NoteIndexingService
     ) {
         super(plugin.app, plugin);
+        
+        // If noteIndexingService is provided during construction, set it up now
+        if (noteIndexingService) {
+            this.setNoteIndexingService(noteIndexingService);
+        }
+    }
+    
+    /**
+     * Set the noteIndexingService and update subscriptions.
+     * This allows the service to be initialized after the tab is created.
+     */
+    setNoteIndexingService(noteIndexingService: NoteIndexingService): void {
+        // Clean up existing subscription if any
+        if (this.subscription) {
+            this.subscription.unsubscribe();
+        }
+        
+        this.noteIndexingService = noteIndexingService;
+        
+        // Get the initial count
+        this.indexedNoteCount = this.noteIndexingService.getCurrentIndexedNoteCount();
+        
+        // Subscribe to count changes
+        this.subscription = this.noteIndexingService.getIndexedNoteCount$().subscribe(count => {
+            this.indexedNoteCount = count;
+            // Redraw the settings tab if it's active
+            if (this.containerEl.isShown()) {
+                this.display();
+            }
+        });
     }
 
     display(): void {
@@ -123,6 +159,10 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         });
                     });
             });
+            
+        new Setting(containerEl)
+            .setName("Indexed Notes")
+            .setDesc(`Number of notes currently in the similarity index: ${this.indexedNoteCount}`);
 
         new Setting(containerEl)
             .setName("Reindex notes")

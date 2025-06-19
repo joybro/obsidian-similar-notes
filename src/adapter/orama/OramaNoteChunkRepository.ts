@@ -56,11 +56,11 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         await this.worker.putMulti(chunks.map((chunk) => chunk.toDTO()));
     }
 
-    async removeByPath(path: string): Promise<void> {
+    async removeByPath(path: string): Promise<boolean> {
         if (!this.worker) {
             throw new Error("Worker not initialized");
         }
-        await this.worker.removeByPath(path);
+        return await this.worker.removeByPath(path);
     }
 
     async findSimilarChunks(
@@ -87,6 +87,13 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
             throw new Error("Worker not initialized");
         }
         return await this.worker.count();
+    }
+
+    async countUniqueNotes(): Promise<number> {
+        if (!this.worker) {
+            throw new Error("Worker not initialized");
+        }
+        return await this.worker.countUniqueNotes();
     }
 
     public setLogLevel(level: log.LogLevelDesc): void {

@@ -16,8 +16,9 @@ export interface NoteChunkRepository {
 
     /**
      * Removes all NoteChunks associated with a specific file path.
+     * @returns A boolean indicating whether any chunks were actually removed
      */
-    removeByPath(path: string): Promise<void>;
+    removeByPath(path: string): Promise<boolean>;
 
     /**
      * Finds and returns NoteChunks that are most similar to the given embedding vector.
@@ -36,6 +37,12 @@ export interface NoteChunkRepository {
      * Returns the total number of stored NoteChunks.
      */
     count(): Promise<number>;
+
+    /**
+     * Returns the number of unique notes (documents) in the index.
+     * This counts each note once, regardless of how many chunks it contains.
+     */
+    countUniqueNotes(): Promise<number>;
 
     /**
      * Persists NoteChunks in memory to disk.

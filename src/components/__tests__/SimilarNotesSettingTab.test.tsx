@@ -143,6 +143,7 @@ describe("SimilarNotesSettingTab", () => {
     let plugin: MainPlugin;
     let settingTab: SimilarNotesSettingTab;
     let mockSettingInstances: MockSetting[];
+    let mockNoteIndexingService: any;
     let settingsService: import("@/application/SettingsService").SettingsService;
 
     beforeEach(() => {
@@ -169,8 +170,24 @@ describe("SimilarNotesSettingTab", () => {
         plugin = {
             reindexNotes: vi.fn(),
         } as unknown as MainPlugin;
+        
+        // Mock NoteIndexingService with required methods
+        mockNoteIndexingService = {
+            getCurrentIndexedNoteCount: vi.fn().mockReturnValue(0),
+            getIndexedNoteCount$: vi.fn().mockReturnValue({
+                subscribe: vi.fn().mockImplementation((callback) => {
+                    // Optional: call the callback immediately with some value
+                    callback(0);
+                    return { unsubscribe: vi.fn() };
+                })
+            })
+        };
 
+        // Create the tab first without noteIndexingService
         settingTab = new SimilarNotesSettingTab(plugin, settingsService);
+        
+        // Then set the noteIndexingService (same pattern as in main.ts)
+        settingTab.setNoteIndexingService(mockNoteIndexingService);
 
         // Mock containerEl with HTMLElement properties
         const mockDiv = document.createElement("div");
