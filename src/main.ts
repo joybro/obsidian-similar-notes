@@ -12,10 +12,13 @@ import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
 import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
 import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
-import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { IndexedNoteMTimeStore } from "./infrastructure/IndexedNoteMTimeStore";
+import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
+
+const dbFileName = "similar-notes.json";
+const fileMtimeFileName = "similar-notes-file-mtimes.json";
 
 export default class MainPlugin extends Plugin {
     private leafViewCoordinator: LeafViewCoordinator;
@@ -78,13 +81,16 @@ export default class MainPlugin extends Plugin {
     }
 
     private async initializeServices() {
+        const fileMtimePath =
+            this.app.vault.configDir + "/" + fileMtimeFileName;
+
         // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
         this.indexedNotesMTimeStore = new IndexedNoteMTimeStore(
             this.app.vault,
-            this.settingsService
+            fileMtimePath
         );
-        
+
         // Now that mTimeStore is initialized, set it in the settings tab
         this.settingTab.setMTimeStore(this.indexedNotesMTimeStore);
 
@@ -208,8 +214,7 @@ export default class MainPlugin extends Plugin {
         }
 
         const vectorSize = this.modelService.getVectorSize();
-        const dbPath = this.settingsService.get().dbPath;
-        // await this.noteChunkRepository.init(vectorSize, dbPath);
+        const dbPath = this.app.vault.configDir + "/" + dbFileName;
 
         if (firstTime) {
             await this.noteChunkRepository.init(vectorSize, dbPath, true);

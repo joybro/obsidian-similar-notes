@@ -64,15 +64,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         new Setting(containerEl)
-            .setName("Database path")
-            .setDesc("Path where the similarity database will be stored")
-            .addText((text) => {
-                text.setValue(settings.dbPath).onChange(async (value) => {
-                    await this.settingsService.update({ dbPath: value });
-                });
-            });
-
-        new Setting(containerEl)
             .setName("Auto-save interval")
             .setDesc("How often to save changes to disk (in minutes)")
             .addText((text) => {

@@ -1,17 +1,13 @@
 import log from "loglevel";
 import type { Vault } from "obsidian";
-import type { SettingsService } from "../application/SettingsService";
 import { BehaviorSubject, type Observable } from "rxjs";
 
 export class IndexedNoteMTimeStore {
     private mtimes: Record<string, number> = {};
     private indexedNoteCount$ = new BehaviorSubject<number>(0);
 
-    constructor(
-        private vault: Vault,
-        private settingsService: SettingsService
-    ) {}
-    
+    constructor(private vault: Vault, private fileMtimePath: string) {}
+
     /**
      * Clears all stored modification times
      * Used when reindexing all notes
@@ -29,7 +25,7 @@ export class IndexedNoteMTimeStore {
     setMTime(path: string, mtime: number): void {
         const isNewPath = this.mtimes[path] === undefined;
         this.mtimes[path] = mtime;
-        
+
         // If this is a new path, increment the count
         if (isNewPath) {
             const currentCount = this.indexedNoteCount$.getValue();
@@ -40,7 +36,7 @@ export class IndexedNoteMTimeStore {
     deleteMTime(path: string): void {
         const existed = this.mtimes[path] !== undefined;
         delete this.mtimes[path];
-        
+
         // If the path existed, decrement the count
         if (existed) {
             const currentCount = this.indexedNoteCount$.getValue();
@@ -54,7 +50,7 @@ export class IndexedNoteMTimeStore {
 
     async persist(): Promise<void> {
         await this.vault.adapter.write(
-            this.settingsService.get().fileMtimePath,
+            this.fileMtimePath,
             JSON.stringify(this.mtimes)
         );
     }
@@ -65,27 +61,23 @@ export class IndexedNoteMTimeStore {
     getIndexedNoteCount$(): Observable<number> {
         return this.indexedNoteCount$;
     }
-    
+
     /**
      * Get the current indexed note count
      */
     getCurrentIndexedNoteCount(): number {
         return this.indexedNoteCount$.getValue();
     }
-    
+
     async restore(): Promise<void> {
-        const exist = await this.vault.adapter.exists(
-            this.settingsService.get().fileMtimePath
-        );
+        const exist = await this.vault.adapter.exists(this.fileMtimePath);
 
         if (!exist) {
             this.mtimes = {};
             return;
         }
 
-        const data = await this.vault.adapter.read(
-            this.settingsService.get().fileMtimePath
-        );
+        const data = await this.vault.adapter.read(this.fileMtimePath);
         try {
             this.mtimes = JSON.parse(data);
             const noteCount = Object.keys(this.mtimes).length;

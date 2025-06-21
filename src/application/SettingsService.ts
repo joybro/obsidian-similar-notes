@@ -2,18 +2,14 @@ import type { Plugin } from "obsidian";
 import { type Observable, Subject } from "rxjs";
 
 export interface SimilarNotesSettings {
-    dbPath: string;
     autoSaveInterval: number; // in minutes
-    fileMtimePath: string;
     modelId: string; // The model ID to use for embeddings
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
     showSourceChunk: boolean; // Whether to show the original chunk in the results
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
-    dbPath: ".obsidian/similar-notes.json",
     autoSaveInterval: 10,
-    fileMtimePath: ".obsidian/similar-notes-file-mtimes.json",
     modelId: "sentence-transformers/all-MiniLM-L6-v2",
     includeFrontmatter: false,
     showSourceChunk: false,
