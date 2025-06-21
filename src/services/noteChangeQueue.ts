@@ -1,4 +1,5 @@
 import type { MTimeStore } from "@/infrastructure/MTimeStore";
+import log from "loglevel";
 import type { EventRef, TFile, Vault } from "obsidian";
 
 export type NoteChange = {
@@ -68,6 +69,7 @@ export class NoteChangeQueue {
 
         // Update state
         this.queue = newQueue;
+        log.info("queue size", this.queue.length);
 
         // Register file change event callbacks
         this.registerFileChangeCallbacks();

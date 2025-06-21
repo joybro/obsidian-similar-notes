@@ -239,6 +239,8 @@ export default class MainPlugin extends Plugin {
 
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
+        // Clear the mTime store to ensure all notes are reindexed
+        this.mTimeStore.clear();
         await this.init(this.settingsService.get().modelId, false, false);
     }
 

@@ -1,3 +1,4 @@
+import log from "loglevel";
 import type { Vault } from "obsidian";
 import type { SettingsService } from "../application/SettingsService";
 
@@ -8,6 +9,15 @@ export class MTimeStore {
         private vault: Vault,
         private settingsService: SettingsService
     ) {}
+    
+    /**
+     * Clears all stored modification times
+     * Used when reindexing all notes
+     */
+    clear(): void {
+        this.mtimes = {};
+        log.info("Cleared all stored modification times");
+    }
 
     getMTime(path: string): number {
         return this.mtimes[path];
@@ -46,5 +56,6 @@ export class MTimeStore {
             this.settingsService.get().fileMtimePath
         );
         this.mtimes = JSON.parse(data);
+        log.info("restored mtimes count", Object.keys(this.mtimes).length);
     }
 }
