@@ -252,48 +252,7 @@ class OramaWorker {
         return count(this.db);
     }
 
-    async countUniqueNotes(): Promise<number> {
-        if (!this.db) {
-            throw new Error("Database not loaded");
-        }
-        
-        // For efficiency, use a Set to track unique paths
-        const uniquePaths = new Set<string>();
-        
-        // Use paging to process results in batches
-        const batchSize = 1000;
-        let offset = 0;
-        let hasMoreResults = true;
-        
-        while (hasMoreResults) {
-            const results = await search(this.db, {
-                term: "", // Empty search term to get all documents
-                limit: batchSize,
-                offset: offset,
-            });
-            
-            // If no hits, we've reached the end
-            if (results.hits.length === 0) {
-                hasMoreResults = false;
-                break;
-            }
-            
-            // Extract unique paths from this batch
-            for (const hit of results.hits) {
-                uniquePaths.add(hit.document.path);
-            }
-            
-            // If we got fewer results than requested, we've reached the end
-            if (results.hits.length < batchSize) {
-                hasMoreResults = false;
-            }
-            
-            // Increment offset for next batch
-            offset += batchSize;
-        }
-        
-        return uniquePaths.size;
-    }
+
 }
 
 export type { OramaWorker };

@@ -41,7 +41,7 @@ export default class MainPlugin extends Plugin {
         this.settingsService = new SettingsService(this);
         await this.settingsService.load();
 
-        // Add settings tab (without noteIndexingService which is initialized later)
+        // Add settings tab (MTimeStore will be set later)
         this.settingTab = new SimilarNotesSettingTab(
             this,
             this.settingsService
@@ -84,6 +84,9 @@ export default class MainPlugin extends Plugin {
             this.app.vault,
             this.settingsService
         );
+        
+        // Now that mTimeStore is initialized, set it in the settings tab
+        this.settingTab.setMTimeStore(this.indexedNotesMTimeStore);
 
         // Create services in proper dependency order
         this.modelService = new EmbeddingService();
@@ -132,8 +135,7 @@ export default class MainPlugin extends Plugin {
             this.settingsService
         );
 
-        // Now that noteIndexingService is initialized, set it in the settings tab
-        this.settingTab.setNoteIndexingService(this.noteIndexingService);
+        // noteIndexingService is now initialized
 
         this.statusBarView = new StatusBarView(
             this,
@@ -235,8 +237,7 @@ export default class MainPlugin extends Plugin {
             this.noteChangeQueue.enqueueAllNotes();
         }
 
-        // Initialize the noteIndexingService to get the initial indexed note count
-        await this.noteIndexingService.initialize();
+        // Start the noteIndexingService loop
         this.noteIndexingService.startLoop();
     }
 

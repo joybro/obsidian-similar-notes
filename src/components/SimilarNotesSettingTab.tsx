@@ -1,5 +1,5 @@
-import type { NoteIndexingService } from "@/application/NoteIndexingService";
 import type { SettingsService } from "@/application/SettingsService";
+import type { MTimeStore } from "@/infrastructure/MTimeStore";
 import log from "loglevel";
 import { PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
@@ -7,45 +7,55 @@ import { LoadModelModal } from "./LoadModelModal";
 
 export class SimilarNotesSettingTab extends PluginSettingTab {
     private indexedNoteCount: number = 0;
-    private noteIndexingService?: NoteIndexingService;
     private subscription: { unsubscribe: () => void } | null = null;
-    
+    private mTimeStore?: MTimeStore;
+
     constructor(
         private plugin: MainPlugin,
         private settingsService: SettingsService,
-        noteIndexingService?: NoteIndexingService
+        mTimeStore?: MTimeStore
     ) {
         super(plugin.app, plugin);
-        
-        // If noteIndexingService is provided during construction, set it up now
-        if (noteIndexingService) {
-            this.setNoteIndexingService(noteIndexingService);
+
+        // If mTimeStore is provided during construction, set it up now
+        if (mTimeStore) {
+            this.setMTimeStore(mTimeStore);
         }
     }
-    
+
     /**
-     * Set the noteIndexingService and update subscriptions.
-     * This allows the service to be initialized after the tab is created.
+     * Set the MTimeStore and update subscriptions.
+     * This allows the MTimeStore to be initialized after the tab is created.
      */
-    setNoteIndexingService(noteIndexingService: NoteIndexingService): void {
+    setMTimeStore(mTimeStore: MTimeStore): void {
         // Clean up existing subscription if any
         if (this.subscription) {
             this.subscription.unsubscribe();
         }
-        
-        this.noteIndexingService = noteIndexingService;
-        
+
+        this.mTimeStore = mTimeStore;
+
         // Get the initial count
-        this.indexedNoteCount = this.noteIndexingService.getCurrentIndexedNoteCount();
-        
+        this.indexedNoteCount = this.mTimeStore.getCurrentIndexedNoteCount();
+
         // Subscribe to count changes
-        this.subscription = this.noteIndexingService.getIndexedNoteCount$().subscribe(count => {
-            this.indexedNoteCount = count;
-            // Redraw the settings tab if it's active
-            if (this.containerEl.isShown()) {
-                this.display();
-            }
-        });
+        this.subscription = this.mTimeStore
+            .getIndexedNoteCount$()
+            .subscribe((count) => {
+                this.indexedNoteCount = count;
+                // Redraw the settings tab if it's active
+                if (this.containerEl.isShown()) {
+                    this.display();
+                }
+            });
+    }
+
+    onClose() {
+        // Clean up subscription when the settings tab is closed
+        if (this.subscription) {
+            this.subscription.unsubscribe();
+            this.subscription = null;
+        }
     }
 
     display(): void {
@@ -159,10 +169,12 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         });
                     });
             });
-            
+
         new Setting(containerEl)
             .setName("Indexed Notes")
-            .setDesc(`Number of notes currently in the similarity index: ${this.indexedNoteCount}`);
+            .setDesc(
+                `Number of notes currently in the similarity index: ${this.indexedNoteCount}`
+            );
 
         new Setting(containerEl)
             .setName("Reindex notes")

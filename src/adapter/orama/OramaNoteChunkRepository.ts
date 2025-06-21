@@ -89,12 +89,6 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         return await this.worker.count();
     }
 
-    async countUniqueNotes(): Promise<number> {
-        if (!this.worker) {
-            throw new Error("Worker not initialized");
-        }
-        return await this.worker.countUniqueNotes();
-    }
 
     public setLogLevel(level: log.LogLevelDesc): void {
         log.setLevel(level);

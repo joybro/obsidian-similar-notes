@@ -38,11 +38,6 @@ export interface NoteChunkRepository {
      */
     count(): Promise<number>;
 
-    /**
-     * Returns the number of unique notes (documents) in the index.
-     * This counts each note once, regardless of how many chunks it contains.
-     */
-    countUniqueNotes(): Promise<number>;
 
     /**
      * Persists NoteChunks in memory to disk.

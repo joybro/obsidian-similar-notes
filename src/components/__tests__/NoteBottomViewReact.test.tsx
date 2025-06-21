@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { BehaviorSubject } from "rxjs";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -119,9 +119,11 @@ describe("SimilarNotesViewReact", () => {
                 vaultName="test-vault"
             />
         );
-        expect(
-            await screen.findByText("No similar notes found")
-        ).toBeInTheDocument();
+        // 클래스 이름으로 빈 상태 요소를 찾음
+        await waitFor(() => {
+            const emptyStateEl = screen.getByText('No similar notes found.');
+            expect(emptyStateEl).toBeInTheDocument();
+        });
     });
 
     test("calls openFile when note is clicked", async () => {

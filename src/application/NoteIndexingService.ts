@@ -11,7 +11,6 @@ import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 export class NoteIndexingService {
     private fileChangeLoopTimer: NodeJS.Timeout | null = null;
     private noteChangeCount$ = new BehaviorSubject<number>(0);
-    private indexedNoteCount$ = new BehaviorSubject<number>(0);
 
     constructor(
         private noteRepository: NoteRepository,
@@ -23,16 +22,7 @@ export class NoteIndexingService {
         private settingsService: SettingsService
     ) {}
     
-    /**
-     * Initialize the service and count indexed notes
-     * Should be called after construction but before using the service
-     */
-    async initialize(): Promise<void> {
-        // Get the initial count of unique indexed notes
-        const count = await this.noteChunkRepository.countUniqueNotes();
-        this.indexedNoteCount$.next(count);
-        log.info(`Initialized with ${count} indexed notes`);
-    }
+
 
     startLoop() {
         const fileChangeLoop = async () => {
@@ -72,22 +62,10 @@ export class NoteIndexingService {
         return this.noteChangeCount$.asObservable();
     }
     
-    getIndexedNoteCount$(): Observable<number> {
-        return this.indexedNoteCount$.asObservable();
-    }
-    
-    getCurrentIndexedNoteCount(): number {
-        return this.indexedNoteCount$.getValue();
-    }
+
 
     private async processDeletedNote(path: string) {
-        const wasRemoved = await this.noteChunkRepository.removeByPath(path);
-        
-        // If chunks were actually removed, decrement the indexed note count
-        if (wasRemoved) {
-            const currentCount = this.indexedNoteCount$.getValue();
-            this.indexedNoteCount$.next(Math.max(0, currentCount - 1)); // Ensure count doesn't go below 0
-        }
+        await this.noteChunkRepository.removeByPath(path);
     }
 
     private async processUpdatedNote(path: string) {
@@ -117,12 +95,6 @@ export class NoteIndexingService {
         const wasRemoved = await this.noteChunkRepository.removeByPath(note.path);
         await this.noteChunkRepository.putMulti(noteChunks);
         
-        // If this is a new note (not previously indexed), increment the count
-        if (!wasRemoved) {
-            const currentCount = this.indexedNoteCount$.getValue();
-            this.indexedNoteCount$.next(currentCount + 1);
-        }
-
         log.info(
             "count of chunks in embedding store",
             await this.noteChunkRepository.count()

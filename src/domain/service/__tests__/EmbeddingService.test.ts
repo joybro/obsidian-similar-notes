@@ -9,6 +9,9 @@ vi.mock("comlink", async () => {
         ...actual,
         wrap: vi.fn(() => {
             return class {
+                setLogLevel() {
+                    return Promise.resolve();
+                }
                 handleLoad() {
                     return {
                         vectorSize: 384,
