@@ -3,6 +3,21 @@ import type { TFile, Vault } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { NoteChangeQueue } from "../noteChangeQueue";
 
+// Helper function to create mock TFile objects
+const createMockTFile = (path: string, mtime: number): TFile => ({
+    path,
+    name: path.split('/').pop() || '',
+    extension: path.split('.').pop() || '',
+    basename: path.split('/').pop()?.split('.')[0] || '',
+    stat: { 
+        mtime, 
+        ctime: mtime, // 일반적으로 ctime은 mtime과 같거나 그 이전
+        size: 100 // 임의의 파일 크기
+    },
+    vault: {} as any,
+    parent: {} as any
+});
+
 // Mock Vault with only the methods we need
 type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on" | "offref">;
 
@@ -11,26 +26,10 @@ describe("FileChangeQueue", () => {
     let mockMTimeStore: IndexedNoteMTimeStore;
     let fileChangeQueue: NoteChangeQueue;
 
-    const testFile1 = {
-        path: "file1.md",
-        extension: "md",
-        stat: { mtime: 1000 },
-    } as TFile;
-    const testFile2 = {
-        path: "file2.md",
-        extension: "md",
-        stat: { mtime: 2000 },
-    } as TFile;
-    const testFile3 = {
-        path: "file3.md",
-        extension: "md",
-        stat: { mtime: 3000 },
-    } as TFile;
-    const nonMarkdownFile = {
-        path: "image.png",
-        extension: "png",
-        stat: { mtime: 4000 },
-    } as TFile;
+    const testFile1 = createMockTFile("file1.md", 1000);
+    const testFile2 = createMockTFile("file2.md", 2000);
+    const testFile3 = createMockTFile("file3.md", 3000);
+    const nonMarkdownFile = createMockTFile("image.png", 4000);
 
     beforeEach(() => {
         // Reset mocks
@@ -366,16 +365,8 @@ describe("FileChangeQueue", () => {
     });
 
     describe("persistence of unprocessed files", () => {
-        const testFile1 = {
-            path: "file1.md",
-            extension: "md",
-            stat: { mtime: 1000 },
-        } as TFile;
-        const testFile2 = {
-            path: "file2.md",
-            extension: "md",
-            stat: { mtime: 2000 },
-        } as TFile;
+        const testFile1 = createMockTFile("file1.md", 1000);
+        const testFile2 = createMockTFile("file2.md", 2000);
 
         beforeEach(async () => {
             // Reset mocks

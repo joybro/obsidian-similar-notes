@@ -1,9 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "@testing-library/jest-dom/vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { BehaviorSubject } from "rxjs";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+
+// Helper function to create mock TFile objects
+const createMockTFile = (path: string): TFile => ({
+    path,
+    name: path.split('/').pop() || '',
+    extension: path.split('.').pop() || '',
+    basename: path.split('/').pop()?.split('.')[0] || '',
+    stat: { 
+        mtime: Date.now(), 
+        ctime: Date.now(), 
+        size: 100 
+    },
+    vault: {} as any,
+    parent: {} as any
+});
 import NoteBottomViewReact from "../NoteBottomViewReact";
 
 // Vitest will automatically use the mock from src/__mocks__/obsidian.ts
@@ -40,18 +55,18 @@ describe("SimilarNotesViewReact", () => {
             getLeaf: vi.fn().mockReturnValue(mockLeaf),
             openLinkText: mockOpenLinkText,
         };
-        currentFile = { path: "current-file.md" } as TFile;
+        currentFile = createMockTFile("current-file.md");
         bottomViewModelSubject$ = new BehaviorSubject({
             currentFile,
             similarNoteEntries: [
                 {
-                    file: { path: "similar1.md" } as TFile,
+                    file: createMockTFile("similar1.md"),
                     title: "Similar Note 1",
                     preview: "Preview of Similar Note 1",
                     similarity: 0.95,
                 },
                 {
-                    file: { path: "similar2.md" } as TFile,
+                    file: createMockTFile("similar2.md"),
                     title: "Similar Note 2",
                     preview: "Preview of Similar Note 2",
                     similarity: 0.85,
@@ -121,7 +136,7 @@ describe("SimilarNotesViewReact", () => {
         );
         // 클래스 이름으로 빈 상태 요소를 찾음
         await waitFor(() => {
-            const emptyStateEl = screen.getByText('No similar notes found.');
+            const emptyStateEl = screen.getByText("No similar notes found.");
             expect(emptyStateEl).toBeInTheDocument();
         });
     });
