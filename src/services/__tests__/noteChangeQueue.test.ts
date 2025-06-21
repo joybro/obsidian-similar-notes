@@ -1,4 +1,4 @@
-import type { MTimeStore } from "@/infrastructure/MTimeStore";
+import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import type { TFile, Vault } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { NoteChangeQueue } from "../noteChangeQueue";
@@ -8,7 +8,7 @@ type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on" | "offref">;
 
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
-    let mockMTimeStore: MTimeStore;
+    let mockMTimeStore: IndexedNoteMTimeStore;
     let fileChangeQueue: NoteChangeQueue;
 
     const testFile1 = {
@@ -52,7 +52,7 @@ describe("FileChangeQueue", () => {
             setMTime: vi.fn(),
             deleteMTime: vi.fn(),
             getAllPaths: vi.fn().mockReturnValue([]),
-        } as unknown as MTimeStore;
+        } as unknown as IndexedNoteMTimeStore;
         // Create a new file change queue
         fileChangeQueue = new NoteChangeQueue(
             mockVault as unknown as Vault,
@@ -399,7 +399,7 @@ describe("FileChangeQueue", () => {
                 setMTime: vi.fn(),
                 deleteMTime: vi.fn(),
                 getAllPaths: vi.fn(),
-            } as unknown as MTimeStore;
+            } as unknown as IndexedNoteMTimeStore;
         });
 
         test("should not re-queue unprocessed files after polling and re-initialization", async () => {

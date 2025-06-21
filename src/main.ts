@@ -13,7 +13,7 @@ import { EmbeddingService } from "./domain/service/EmbeddingService";
 import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
 import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
 import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
-import { MTimeStore } from "./infrastructure/MTimeStore";
+import { IndexedNoteMTimeStore } from "./infrastructure/IndexedNoteMTimeStore";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
 
@@ -29,7 +29,7 @@ export default class MainPlugin extends Plugin {
     private similarNoteFinder: SimilarNoteFinder;
     private similarNoteCoordinator: SimilarNoteCoordinator;
     private noteIndexingService: NoteIndexingService;
-    private indexedNotesMTimeStore: MTimeStore;
+    private indexedNotesMTimeStore: IndexedNoteMTimeStore;
     private statusBarView: StatusBarView;
     private settingTab: SimilarNotesSettingTab;
 
@@ -41,7 +41,7 @@ export default class MainPlugin extends Plugin {
         this.settingsService = new SettingsService(this);
         await this.settingsService.load();
 
-        // Add settings tab (MTimeStore will be set later)
+        // Add settings tab (IndexedNoteMTimeStore will be set later)
         this.settingTab = new SimilarNotesSettingTab(
             this,
             this.settingsService
@@ -80,7 +80,7 @@ export default class MainPlugin extends Plugin {
     private async initializeServices() {
         // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
-        this.indexedNotesMTimeStore = new MTimeStore(
+        this.indexedNotesMTimeStore = new IndexedNoteMTimeStore(
             this.app.vault,
             this.settingsService
         );

@@ -1,4 +1,4 @@
-import type { MTimeStore } from "@/infrastructure/MTimeStore";
+import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import log from "loglevel";
 import type { EventRef, TFile, Vault } from "obsidian";
 
@@ -25,7 +25,7 @@ export class NoteChangeQueue {
     /**
      * Creates a new file change queue
      */
-    constructor(private vault: Vault, private mTimeStore: MTimeStore) {}
+    constructor(private vault: Vault, private mTimeStore: IndexedNoteMTimeStore) {}
 
     /**
      * Initializes the file change queue by comparing the vault with the previous state

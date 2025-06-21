@@ -1,5 +1,5 @@
 import type { SettingsService } from "@/application/SettingsService";
-import type { MTimeStore } from "@/infrastructure/MTimeStore";
+import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import log from "loglevel";
 import { PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
@@ -8,12 +8,12 @@ import { LoadModelModal } from "./LoadModelModal";
 export class SimilarNotesSettingTab extends PluginSettingTab {
     private indexedNoteCount: number = 0;
     private subscription: { unsubscribe: () => void } | null = null;
-    private mTimeStore?: MTimeStore;
+    private mTimeStore?: IndexedNoteMTimeStore;
 
     constructor(
         private plugin: MainPlugin,
         private settingsService: SettingsService,
-        mTimeStore?: MTimeStore
+        mTimeStore?: IndexedNoteMTimeStore
     ) {
         super(plugin.app, plugin);
 
@@ -24,10 +24,10 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     }
 
     /**
-     * Set the MTimeStore and update subscriptions.
-     * This allows the MTimeStore to be initialized after the tab is created.
+     * Set the IndexedNoteMTimeStore and update subscriptions.
+     * This allows the IndexedNoteMTimeStore to be initialized after the tab is created.
      */
-    setMTimeStore(mTimeStore: MTimeStore): void {
+    setMTimeStore(mTimeStore: IndexedNoteMTimeStore): void {
         // Clean up existing subscription if any
         if (this.subscription) {
             this.subscription.unsubscribe();

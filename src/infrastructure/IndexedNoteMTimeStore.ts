@@ -3,7 +3,7 @@ import type { Vault } from "obsidian";
 import type { SettingsService } from "../application/SettingsService";
 import { BehaviorSubject, type Observable } from "rxjs";
 
-export class MTimeStore {
+export class IndexedNoteMTimeStore {
     private mtimes: Record<string, number> = {};
     private indexedNoteCount$ = new BehaviorSubject<number>(0);
 
