@@ -44,3 +44,14 @@
 .similar-notes-pane .search-empty-state {
     font-size: max(var(--font-ui-small), var(--font-smaller));
 }
+
+/* Animation transition for search result previews */
+.search-result-file-matches {
+    max-height: 1000px; /* 충분히 큰 값으로 설정 */
+    transition: max-height 200ms cubic-bezier(0.02, 0.01, 0.47, 1);
+    overflow: hidden;
+}
+
+.search-result-file-matches.is-collapsed {
+    max-height: 0;
+}

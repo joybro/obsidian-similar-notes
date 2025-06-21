@@ -1,7 +1,6 @@
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { Menu } from "obsidian";
-import { useEffect, useRef, useState } from "react";
-import { CSSTransition } from "react-transition-group";
+import { useEffect, useState } from "react";
 import type { Observable } from "rxjs";
 
 export interface SimilarNoteEntry {
@@ -67,91 +66,23 @@ const SearchResultPreview = ({
     sourceChunk?: string;
     isOpen: boolean;
 }) => {
-    const nodeRef = useRef<HTMLDivElement>(null);
-    const duration = 100;
-
-    const onEnter = () => {
-        const el = nodeRef.current;
-        if (el) {
-            el.style.height = "0px";
-            el.style.overflow = "hidden";
-        }
-    };
-
-    const onEntering = () => {
-        const el = nodeRef.current;
-        if (el) {
-            el.style.height = `${el.scrollHeight}px`;
-        }
-    };
-
-    const onEntered = () => {
-        const el = nodeRef.current;
-        if (el) {
-            el.style.height = "";
-            el.style.overflow = "";
-        }
-    };
-
-    const onExit = () => {
-        const el = nodeRef.current;
-        if (el) {
-            el.style.height = `${el.scrollHeight}px`;
-            el.style.overflow = "hidden";
-        }
-    };
-
-    const onExiting = () => {
-        const el = nodeRef.current;
-        if (el) {
-            el.style.height = "0px";
-        }
-    };
-
-    const onExited = () => {
-        const el = nodeRef.current;
-        if (el) {
-            el.style.height = "";
-            el.style.overflow = "";
-        }
-    };
-
+    // CSS-only animation approach, no need for React Transition Group
     return (
-        <CSSTransition
-            in={isOpen}
-            timeout={duration}
-            classNames="dynamic"
-            nodeRef={nodeRef}
-            onEnter={onEnter}
-            onEntering={onEntering}
-            onEntered={onEntered}
-            onExit={onExit}
-            onExiting={onExiting}
-            onExited={onExited}
-            unmountOnExit
+        <div
+            className={`search-result-file-matches ${
+                !isOpen ? "is-collapsed" : ""
+            }`}
         >
-            <div
-                ref={nodeRef}
-                className="search-result-file-matches"
-                style={{
-                    transition: `height ${duration}ms cubic-bezier(0.02, 0.01, 0.47, 1)`,
-                }}
-            >
+            <div className="search-result-file-match tappable">{preview}</div>
+            {sourceChunk && (
                 <div className="search-result-file-match tappable">
-                    {preview}
-                </div>
-                {sourceChunk && (
-                    <div className="search-result-file-match tappable">
-                        <div
-                            style={{ fontWeight: "bold", textAlign: "center" }}
-                        >
-                            Source
-                        </div>
-                        <div style={{ textAlign: "left" }}>{sourceChunk}</div>
+                    <div style={{ fontWeight: "bold", textAlign: "center" }}>
+                        Source
                     </div>
-                )}
-            </div>
-        </CSSTransition>
+                    <div style={{ textAlign: "left" }}>{sourceChunk}</div>
+                </div>
+            )}
+        </div>
     );
 };
 
@@ -165,6 +96,39 @@ const SearchResult = ({
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
 }) => {
     const [isCollapsed, setIsCollapsed] = useState(true);
+    // Separate state to control whether the component is rendered in the DOM
+    const [shouldRender, setShouldRender] = useState(false);
+    // Additional state for animation when expanding
+    const [isAnimating, setIsAnimating] = useState(false);
+
+    // Animation duration (must match the value in styles.css)
+    const animationDuration = 200;
+
+    // Execute when isCollapsed state changes
+    useEffect(() => {
+        if (isCollapsed) {
+            // When collapsing: Start the animation
+            setIsAnimating(true);
+
+            // Remove from DOM after animation completes
+            const timer = setTimeout(() => {
+                setShouldRender(false);
+                setIsAnimating(false);
+            }, animationDuration);
+            return () => clearTimeout(timer);
+        } else {
+            // When expanding:
+            // 1. First render in collapsed state
+            setShouldRender(true);
+            setIsAnimating(true);
+
+            // 2. Start animation in the next frame
+            const timer = setTimeout(() => {
+                setIsAnimating(false);
+            }, 20); // Short delay to ensure browser has time to render the collapsed state
+            return () => clearTimeout(timer);
+        }
+    }, [isCollapsed]);
 
     const toggleCollapse = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -218,11 +182,13 @@ const SearchResult = ({
                     </div>
                 </div>
             </div>
-            <SearchResultPreview
-                preview={note.preview}
-                sourceChunk={note.sourceChunk}
-                isOpen={!isCollapsed}
-            />
+            {shouldRender && (
+                <SearchResultPreview
+                    preview={note.preview}
+                    sourceChunk={note.sourceChunk}
+                    isOpen={!isAnimating}
+                />
+            )}
         </div>
     );
 };
