@@ -29,7 +29,7 @@ export default class MainPlugin extends Plugin {
     private similarNoteFinder: SimilarNoteFinder;
     private similarNoteCoordinator: SimilarNoteCoordinator;
     private noteIndexingService: NoteIndexingService;
-    private mTimeStore: MTimeStore;
+    private indexedNotesMTimeStore: MTimeStore;
     private statusBarView: StatusBarView;
     private settingTab: SimilarNotesSettingTab;
 
@@ -80,14 +80,17 @@ export default class MainPlugin extends Plugin {
     private async initializeServices() {
         // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
-        this.mTimeStore = new MTimeStore(this.app.vault, this.settingsService);
+        this.indexedNotesMTimeStore = new MTimeStore(
+            this.app.vault,
+            this.settingsService
+        );
 
         // Create services in proper dependency order
         this.modelService = new EmbeddingService();
         this.noteChunkRepository = new OramaNoteChunkRepository(this.app.vault);
 
         // Restore persisted data
-        await this.mTimeStore.restore();
+        await this.indexedNotesMTimeStore.restore();
 
         // Initialize dependent services
         this.noteChunkingService = new LangchainNoteChunkingService(
@@ -115,7 +118,7 @@ export default class MainPlugin extends Plugin {
         // Initialize file change queue
         this.noteChangeQueue = new NoteChangeQueue(
             this.app.vault,
-            this.mTimeStore
+            this.indexedNotesMTimeStore
         );
         await this.noteChangeQueue.initialize();
 
@@ -240,7 +243,7 @@ export default class MainPlugin extends Plugin {
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
         // Clear the mTime store to ensure all notes are reindexed
-        this.mTimeStore.clear();
+        this.indexedNotesMTimeStore.clear();
         await this.init(this.settingsService.get().modelId, false, false);
     }
 
@@ -254,7 +257,7 @@ export default class MainPlugin extends Plugin {
         }
 
         await this.noteChunkRepository.persist();
-        await this.mTimeStore.persist();
+        await this.indexedNotesMTimeStore.persist();
     }
 
     private setupAutoSave(interval: number) {
@@ -268,7 +271,7 @@ export default class MainPlugin extends Plugin {
         this.autoSaveInterval = setInterval(async () => {
             try {
                 await this.noteChunkRepository.persist();
-                await this.mTimeStore.persist();
+                await this.indexedNotesMTimeStore.persist();
                 log.info("Auto-saved databases");
             } catch (e) {
                 log.error("Failed to auto-save database:", e);
