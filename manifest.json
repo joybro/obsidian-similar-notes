@@ -1,7 +1,7 @@
 {
     "id": "similar-notes",
     "name": "Similar Notes",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "minAppVersion": "0.15.0",
     "description": "Recommends semantically similar notes to the currently viewed note.",
     "author": "Young Lee",
