@@ -2,7 +2,7 @@
 
 Similar Notes is an Obsidian plugin that uses language models to find and recommend semantically similar notes. As shown below, the plugin analyzes your content in real-time and displays the most relevant related notes at the bottom of your current note. This makes it easy to discover connections between your ideas and reference related content while writing.
 
-![Similar Notes Example](images/similar-notes-example.png)
+![Demo](images/demo.gif)
 
 ## Features
 
