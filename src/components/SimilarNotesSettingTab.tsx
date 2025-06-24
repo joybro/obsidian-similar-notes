@@ -144,6 +144,21 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 });
             });
 
+        new Setting(containerEl)
+            .setName("Use GPU Acceleration")
+            .setDesc("If enabled, WebGPU will be used for model inference. Disable if you experience issues with GPU acceleration.")
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(settings.useGPU)
+                    .onChange(async (value) => {
+                        await this.settingsService.update({
+                            useGPU: value,
+                        });
+                        // Only reload model with new GPU setting without reindexing
+                        this.plugin.reloadModel();
+                    });
+            });
+
         new Setting(containerEl).setName("Index").setHeading();
 
         new Setting(containerEl)

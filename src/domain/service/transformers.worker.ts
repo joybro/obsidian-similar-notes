@@ -103,7 +103,8 @@ class TransformersWorker {
 
     async handleLoad(
         modelId: string,
-        progress_callback: (progress: number) => void
+        progress_callback: (progress: number) => void,
+        useGPU: boolean = true
     ): Promise<{ vectorSize: number; maxTokens: number }> {
         const transformers = await importTransformers();
         this.extractor = await transformers.pipeline(
@@ -112,7 +113,7 @@ class TransformersWorker {
             {
                 // @ts-ignore
                 dtype: "fp32",
-                device: "webgpu",
+                device: useGPU ? "webgpu" : "wasm", // Use WebGPU if enabled, otherwise fall back to WASM
                 progress_callback: (progress: ProgressInfo) => {
                     if (progress.status === "progress") {
                         if (progress.file.includes("onnx")) {

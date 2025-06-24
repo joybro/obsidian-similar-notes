@@ -13,8 +13,8 @@ export class EmbeddingService {
     private modelBusy$ = new Subject<boolean>();
     private downloadProgress$ = new Subject<number>();
 
-    async loadModel(modelId: string): Promise<void> {
-        log.info("Loading model", modelId);
+    async loadModel(modelId: string, useGPU: boolean = true): Promise<void> {
+        log.info("Loading model", modelId, "with GPU:", useGPU);
         const WorkerWrapper = Comlink.wrap(new InlineWorker());
         // @ts-ignore
         this.worker = await new WorkerWrapper();
@@ -29,7 +29,8 @@ export class EmbeddingService {
             modelId,
             Comlink.proxy((progress: number) => {
                 this.downloadProgress$.next(progress);
-            })
+            }),
+            useGPU // Pass GPU acceleration setting to worker
         );
         log.info("Model loaded", response);
 

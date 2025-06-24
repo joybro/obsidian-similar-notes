@@ -42,8 +42,22 @@ export class StatusBarView {
         // });
     }
 
+    /**
+     * Set the status message in the status bar
+     * @param status The status to set ("ready" or "error")
+     */
+    setStatus(status: "ready" | "error"): void {
+        if (status === "ready") {
+            this.modelBusyItem.setText("");
+        } else if (status === "error") {
+            this.modelBusyItem.setText("Error loading model");
+            this.modelBusyItem.show();
+        }
+    }
+
     dispose() {
         this.noteCountItem.remove();
         this.modelBusyItem.remove();
+        this.modelDownloadProgressItem.remove();
     }
 }

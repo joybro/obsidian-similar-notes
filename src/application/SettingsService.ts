@@ -6,6 +6,7 @@ export interface SimilarNotesSettings {
     modelId: string; // The model ID to use for embeddings
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
     showSourceChunk: boolean; // Whether to show the original chunk in the results
+    useGPU: boolean; // Whether to use GPU acceleration for model inference
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
@@ -13,6 +14,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     modelId: "sentence-transformers/all-MiniLM-L6-v2",
     includeFrontmatter: false,
     showSourceChunk: false,
+    useGPU: true, // Use GPU acceleration by default
 };
 
 export class SettingsService {

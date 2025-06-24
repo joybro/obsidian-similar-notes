@@ -203,8 +203,13 @@ export default class MainPlugin extends Plugin {
             }
 
             if (firstTime || newModel) {
-                await this.modelService.loadModel(modelId);
-                log.info("Model service initialized successfully");
+                // Get the GPU setting from settings
+                const settings = this.settingsService.get();
+                const useGPU = settings.useGPU;
+                
+                // Pass the useGPU setting to loadModel
+                await this.modelService.loadModel(modelId, useGPU);
+                log.info("Model service initialized successfully with GPU:", useGPU);
 
                 this.noteChunkingService.init();
             }
@@ -255,6 +260,38 @@ export default class MainPlugin extends Plugin {
 
     async changeModel(modelId: string): Promise<void> {
         await this.init(modelId, false, true);
+    }
+
+    /**
+     * Reload the current model with updated GPU settings
+     * This does not trigger reindexing as it only changes how the model runs
+     */
+    async reloadModel(): Promise<void> {
+        // Stop the indexing service to prevent any operations during model reload
+        this.noteIndexingService.stopLoop();
+        
+        // Unload existing model
+        if (this.modelService) {
+            await this.modelService.unloadModel();
+        }
+
+        // Get current settings
+        const settings = this.settingsService.get();
+        const modelId = settings.modelId;
+        const useGPU = settings.useGPU;
+
+        try {
+            // Reload the model with current settings
+            await this.modelService.loadModel(modelId, useGPU);
+            this.statusBarView.setStatus("ready");
+        } catch (error) {
+            log.error("Failed to reload model:", error);
+            this.statusBarView.setStatus("error");
+        } finally {
+            // Restart the indexing service whether the model load succeeded or failed
+            // This ensures the service doesn't remain stopped
+            this.noteIndexingService.startLoop();
+        }
     }
 
     async closeStore() {
