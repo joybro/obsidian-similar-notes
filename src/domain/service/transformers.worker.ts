@@ -146,6 +146,13 @@ class TransformersWorker {
     }
 
     async handleUnload(): Promise<void> {
+        if (this.extractor) {
+            // @ts-ignore
+            if (typeof this.extractor.dispose === "function") {
+                await this.extractor.dispose();
+            }
+        }
+
         this.extractor = null;
     }
 

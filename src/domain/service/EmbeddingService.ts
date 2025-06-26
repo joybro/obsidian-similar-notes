@@ -105,11 +105,18 @@ export class EmbeddingService {
 
     public dispose(): void {
         if (this.worker) {
-            // We don't have this in the test environment
-            if (this.worker[Comlink.releaseProxy]) {
-                this.worker[Comlink.releaseProxy]();
-            }
-            this.worker = null;
+            this.worker
+                .handleUnload()
+                .catch((err) => {
+                    log.error("Error unloading model:", err);
+                })
+                .finally(() => {
+                    if (this.worker && this.worker[Comlink.releaseProxy]) {
+                        this.worker[Comlink.releaseProxy]();
+                    }
+
+                    this.worker = null;
+                });
         }
         this.modelId = null;
         this.vectorSize = null;

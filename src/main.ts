@@ -164,14 +164,25 @@ export default class MainPlugin extends Plugin {
             clearInterval(this.autoSaveInterval);
         }
 
-        // Dispose of model service
-        if (this.modelService) {
-            this.modelService.dispose();
+        // Persist and close database connections
+        await this.closeStore();
+
+        // Explicitly dispose Orama worker
+        if (this.noteChunkRepository) {
+            // Call our new dispose method on the repository
+            log.info("Disposing note chunk repository worker");
+            await this.noteChunkRepository.dispose();
         }
 
         this.noteChangeQueue.cleanup();
 
-        this.closeStore();
+        // Dispose of model service - do this last as it's the most memory intensive
+        if (this.modelService) {
+            log.info("Disposing model service");
+            this.modelService.dispose();
+        }
+
+        log.info("Similar Notes plugin unloaded");
     }
 
     public setLogLevel(level: log.LogLevelDesc): void {
@@ -206,10 +217,13 @@ export default class MainPlugin extends Plugin {
                 // Get the GPU setting from settings
                 const settings = this.settingsService.get();
                 const useGPU = settings.useGPU;
-                
+
                 // Pass the useGPU setting to loadModel
                 await this.modelService.loadModel(modelId, useGPU);
-                log.info("Model service initialized successfully with GPU:", useGPU);
+                log.info(
+                    "Model service initialized successfully with GPU:",
+                    useGPU
+                );
 
                 this.noteChunkingService.init();
             }
@@ -269,7 +283,7 @@ export default class MainPlugin extends Plugin {
     async reloadModel(): Promise<void> {
         // Stop the indexing service to prevent any operations during model reload
         this.noteIndexingService.stopLoop();
-        
+
         // Unload existing model
         if (this.modelService) {
             await this.modelService.unloadModel();

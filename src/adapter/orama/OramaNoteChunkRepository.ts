@@ -89,7 +89,6 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         return await this.worker.count();
     }
 
-
     public setLogLevel(level: log.LogLevelDesc): void {
         log.setLevel(level);
         log.info(
@@ -102,6 +101,27 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
                 .catch((err) =>
                     log.error("Failed to set log level on OramaWorker", err)
                 );
+        }
+    }
+
+    /**
+     * Dispose the repository and clean up resources
+     * Should be called when the plugin is unloaded
+     */
+    public async dispose(): Promise<void> {
+        try {
+            // First persist any pending changes
+            if (this.worker) {
+                // Release the Comlink proxy
+                if (this.worker[Comlink.releaseProxy]) {
+                    this.worker[Comlink.releaseProxy]();
+                }
+
+                // Clear the worker reference
+                this.worker = null;
+            }
+        } catch (error) {
+            log.error("Error during OramaNoteChunkRepository disposal:", error);
         }
     }
 }
