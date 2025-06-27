@@ -55,3 +55,12 @@
 .search-result-file-matches.is-collapsed {
     max-height: 0;
 }
+
+/* For Minimal theme */
+.markdown-source-view.mod-cm6.is-readable-line-width
+    .cm-sizer
+    > .embedded-similar-notes {
+    max-width: var(--max-width);
+    width: var(--line-width);
+    margin-inline: var(--content-margin) !important;
+}
