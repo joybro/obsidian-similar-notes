@@ -130,6 +130,7 @@ class TransformersWorker {
             normalize: true,
         });
         const testEmbedding = tensor.tolist();
+        tensor.dispose();
         this.vectorSize = testEmbedding[0].length;
 
         // Get max tokens from the tokenizer
@@ -168,7 +169,9 @@ class TransformersWorker {
                 normalize: true,
             });
 
-            return tensor.tolist()[0];
+            const result = tensor.tolist()[0];
+            tensor.dispose();
+            return result;
         });
     }
 
@@ -184,7 +187,9 @@ class TransformersWorker {
                 normalize: true,
             });
 
-            return tensor.tolist();
+            const result = tensor.tolist();
+            tensor.dispose();
+            return result;
         });
     }
 
