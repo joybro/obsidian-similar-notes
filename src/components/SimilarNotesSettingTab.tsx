@@ -256,6 +256,8 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         testOutputTextArea.readOnly = true;
         testOutputTextArea.placeholder = "Filtered content will appear here";
 
+        const settingsService = this.settingsService;
+
         // Add event listener to process test input
         testInputTextArea.addEventListener("input", () => {
             // This is just a placeholder for now - real implementation will come later
@@ -264,7 +266,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             let outputText = inputText;
 
             try {
-                const patterns = settings.excludeRegexPatterns;
+                const currentSettings = settingsService.get();
+                const patterns = currentSettings.excludeRegexPatterns;
+
                 for (const pattern of patterns) {
                     const regex = new RegExp(pattern, "gm");
                     outputText = outputText.replace(regex, "");
