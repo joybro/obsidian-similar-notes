@@ -79,7 +79,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("Model").setHeading();
 
         new Setting(containerEl)
-            .setName("Current Model")
+            .setName("Current model")
             .setDesc(settings.modelId);
 
         const recommendedModels = [
@@ -90,7 +90,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         let selectedModel = settings.modelId;
 
         new Setting(containerEl)
-            .setName("Recommended Models")
+            .setName("Recommended models")
             .setDesc("Select from recommended embedding models")
             .addDropdown((dropdown) => {
                 for (const model of recommendedModels) {
@@ -119,7 +119,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         let customModel = "";
 
         new Setting(containerEl)
-            .setName("Custom Model")
+            .setName("Custom model")
             .setDesc("Enter a custom model ID from Hugging Face")
             .addText((text) => {
                 text.onChange(async (value) => {
@@ -145,7 +145,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             });
 
         new Setting(containerEl)
-            .setName("Use GPU Acceleration")
+            .setName("Use GPU acceleration")
             .setDesc("If enabled, WebGPU will be used for model inference. Disable if you experience issues with GPU acceleration.")
             .addToggle((toggle) => {
                 toggle
@@ -177,7 +177,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             });
 
         new Setting(containerEl)
-            .setName("Indexed Notes")
+            .setName("Indexed notes")
             .setDesc(
                 `Number of notes currently in the similarity index: ${this.indexedNoteCount}`
             );
@@ -209,7 +209,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             });
 
         new Setting(containerEl)
-            .setName("Log Level")
+            .setName("Log level")
             .setDesc("Set the logging level for debugging purposes")
             .addDropdown((dropdown) => {
                 dropdown
