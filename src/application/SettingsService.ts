@@ -8,6 +8,7 @@ export interface SimilarNotesSettings {
     showSourceChunk: boolean; // Whether to show the original chunk in the results
     useGPU: boolean; // Whether to use GPU acceleration for model inference
     excludeRegexPatterns: string[]; // Regular expressions to exclude content from indexing
+    regexpTestInputText: string; // Saved test input for RegExp testing
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     showSourceChunk: false,
     useGPU: true, // Use GPU acceleration by default
     excludeRegexPatterns: [], // Default to no exclusion patterns
+    regexpTestInputText: "", // Default to empty test input
 };
 
 export class SettingsService {

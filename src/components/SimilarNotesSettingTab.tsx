@@ -209,7 +209,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 testOutputTextArea.value = `Error processing RegExp: ${e.message}`;
             }
         };
-        
+
         // Add UI for regex pattern settings
         new Setting(containerEl)
             .setName("Exclude content from indexing")
@@ -227,7 +227,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     await this.settingsService.update({
                         excludeRegexPatterns: patterns,
                     });
-                    
+
                     // Update test output when patterns change
                     processTestInput();
                 });
@@ -272,6 +272,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         testInputTextArea.cols = 30;
         testInputTextArea.placeholder =
             "Enter text to test against your regular expressions";
+        testInputTextArea.value = settings.regexpTestInputText || "";
 
         const testOutputTextArea = testOutputContainer.createEl("textarea");
         testOutputTextArea.rows = 8;
@@ -281,8 +282,19 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
 
         const settingsService = this.settingsService;
 
-        // Update test output when input text changes
-        testInputTextArea.addEventListener("input", processTestInput);
+        // Update test output and save input text when it changes
+        testInputTextArea.addEventListener("input", () => {
+            // Save the test input text to settings
+            this.settingsService.update({
+                regexpTestInputText: testInputTextArea.value,
+            });
+
+            // Process the input to update the output
+            processTestInput();
+        });
+
+        // Initialize output when settings tab opens
+        setTimeout(() => processTestInput(), 0);
 
         new Setting(containerEl).setName("Debug").setHeading();
 
