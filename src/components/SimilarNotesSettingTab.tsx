@@ -146,20 +146,35 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName("Use GPU acceleration")
-            .setDesc("If enabled, WebGPU will be used for model inference. Disable if you experience issues with GPU acceleration.")
+            .setDesc(
+                "If enabled, WebGPU will be used for model inference. Disable if you experience issues with GPU acceleration."
+            )
             .addToggle((toggle) => {
-                toggle
-                    .setValue(settings.useGPU)
-                    .onChange(async (value) => {
-                        await this.settingsService.update({
-                            useGPU: value,
-                        });
-                        // Only reload model with new GPU setting without reindexing
-                        this.plugin.reloadModel();
+                toggle.setValue(settings.useGPU).onChange(async (value) => {
+                    await this.settingsService.update({
+                        useGPU: value,
                     });
+                    // Only reload model with new GPU setting without reindexing
+                    this.plugin.reloadModel();
+                });
             });
 
         new Setting(containerEl).setName("Index").setHeading();
+
+        new Setting(containerEl)
+            .setName("Indexed notes")
+            .setDesc(
+                `Number of notes currently in the similarity index: ${this.indexedNoteCount}`
+            );
+
+        new Setting(containerEl)
+            .setName("Reindex notes")
+            .setDesc("Rebuild the similarity index for all notes")
+            .addButton((button) => {
+                button.setButtonText("Reindex").onClick(async () => {
+                    await this.plugin.reindexNotes();
+                });
+            });
 
         new Setting(containerEl)
             .setName("Include frontmatter in indexing and search")
@@ -177,19 +192,88 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             });
 
         new Setting(containerEl)
-            .setName("Indexed notes")
+            .setName("Exclude content from indexing")
             .setDesc(
-                `Number of notes currently in the similarity index: ${this.indexedNoteCount}`
-            );
-
-        new Setting(containerEl)
-            .setName("Reindex notes")
-            .setDesc("Rebuild the similarity index for all notes")
-            .addButton((button) => {
-                button.setButtonText("Reindex").onClick(async () => {
-                    await this.plugin.reindexNotes();
+                "Enter regular expressions to exclude content from indexing (one per line)"
+            )
+            .addTextArea((text) => {
+                text.inputEl.rows = 5;
+                text.inputEl.cols = 40;
+                text.setValue(settings.excludeRegexPatterns.join("\n"));
+                text.onChange(async (value) => {
+                    const patterns = value
+                        .split("\n")
+                        .filter((p) => p.trim().length > 0);
+                    await this.settingsService.update({
+                        excludeRegexPatterns: patterns,
+                    });
                 });
             });
+
+        const regExpTesterContainer = containerEl.createDiv(
+            "similar-notes-regexp-tester"
+        );
+        regExpTesterContainer.addClass("setting-item");
+
+        const regExpTesterHeader =
+            regExpTesterContainer.createDiv("setting-item-info");
+        const regExpTesterDescription = regExpTesterHeader.createDiv(
+            "setting-item-description"
+        );
+        regExpTesterDescription.setText(
+            "Test your regular expressions against sample text"
+        );
+
+        const regExpTesterContent = regExpTesterContainer.createDiv(
+            "setting-item-control similar-notes-regexp-tester-content"
+        );
+
+        const testInputContainer = regExpTesterContent.createDiv(
+            "similar-notes-test-input-container"
+        );
+        const testOutputContainer = regExpTesterContent.createDiv(
+            "similar-notes-test-output-container"
+        );
+
+        const testInputLabel = testInputContainer.createDiv(
+            "similar-notes-test-label"
+        );
+        testInputLabel.setText("Input text:");
+        const testOutputLabel = testOutputContainer.createDiv(
+            "similar-notes-test-label"
+        );
+        testOutputLabel.setText("Result (content that will be indexed):");
+
+        const testInputTextArea = testInputContainer.createEl("textarea");
+        testInputTextArea.rows = 8;
+        testInputTextArea.cols = 30;
+        testInputTextArea.placeholder =
+            "Enter text to test against your regular expressions";
+
+        const testOutputTextArea = testOutputContainer.createEl("textarea");
+        testOutputTextArea.rows = 8;
+        testOutputTextArea.cols = 30;
+        testOutputTextArea.readOnly = true;
+        testOutputTextArea.placeholder = "Filtered content will appear here";
+
+        // Add event listener to process test input
+        testInputTextArea.addEventListener("input", () => {
+            // This is just a placeholder for now - real implementation will come later
+            // It should use the same logic as the actual indexing process
+            const inputText = testInputTextArea.value;
+            let outputText = inputText;
+
+            try {
+                const patterns = settings.excludeRegexPatterns;
+                for (const pattern of patterns) {
+                    const regex = new RegExp(pattern, "gm");
+                    outputText = outputText.replace(regex, "");
+                }
+                testOutputTextArea.value = outputText;
+            } catch (e) {
+                testOutputTextArea.value = `Error processing RegExp: ${e.message}`;
+            }
+        });
 
         new Setting(containerEl).setName("Debug").setHeading();
 

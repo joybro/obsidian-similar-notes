@@ -7,6 +7,7 @@ export interface SimilarNotesSettings {
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
     showSourceChunk: boolean; // Whether to show the original chunk in the results
     useGPU: boolean; // Whether to use GPU acceleration for model inference
+    excludeRegexPatterns: string[]; // Regular expressions to exclude content from indexing
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     includeFrontmatter: false,
     showSourceChunk: false,
     useGPU: true, // Use GPU acceleration by default
+    excludeRegexPatterns: [], // Default to no exclusion patterns
 };
 
 export class SettingsService {
