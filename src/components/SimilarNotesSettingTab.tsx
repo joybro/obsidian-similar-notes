@@ -191,6 +191,26 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     });
             });
 
+        // Function to process test input - called whenever regex patterns or input text changes
+        const processTestInput = () => {
+            const inputText = testInputTextArea?.value || "";
+            let outputText = inputText;
+
+            try {
+                const currentSettings = settingsService.get();
+                const patterns = currentSettings.excludeRegexPatterns;
+
+                for (const pattern of patterns) {
+                    const regex = new RegExp(pattern, "gm");
+                    outputText = outputText.replace(regex, "");
+                }
+                testOutputTextArea.value = outputText;
+            } catch (e) {
+                testOutputTextArea.value = `Error processing RegExp: ${e.message}`;
+            }
+        };
+        
+        // Add UI for regex pattern settings
         new Setting(containerEl)
             .setName("Exclude content from indexing")
             .setDesc(
@@ -207,6 +227,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     await this.settingsService.update({
                         excludeRegexPatterns: patterns,
                     });
+                    
+                    // Update test output when patterns change
+                    processTestInput();
                 });
             });
 
@@ -258,26 +281,8 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
 
         const settingsService = this.settingsService;
 
-        // Add event listener to process test input
-        testInputTextArea.addEventListener("input", () => {
-            // This is just a placeholder for now - real implementation will come later
-            // It should use the same logic as the actual indexing process
-            const inputText = testInputTextArea.value;
-            let outputText = inputText;
-
-            try {
-                const currentSettings = settingsService.get();
-                const patterns = currentSettings.excludeRegexPatterns;
-
-                for (const pattern of patterns) {
-                    const regex = new RegExp(pattern, "gm");
-                    outputText = outputText.replace(regex, "");
-                }
-                testOutputTextArea.value = outputText;
-            } catch (e) {
-                testOutputTextArea.value = `Error processing RegExp: ${e.message}`;
-            }
-        });
+        // Update test output when input text changes
+        testInputTextArea.addEventListener("input", processTestInput);
 
         new Setting(containerEl).setName("Debug").setHeading();
 
