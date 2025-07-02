@@ -214,7 +214,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName("Exclude content from indexing")
             .setDesc(
-                "Enter regular expressions to exclude content from indexing (one per line)"
+                "Enter regular expressions to exclude content from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes."
             )
             .addTextArea((text) => {
                 text.inputEl.rows = 5;
