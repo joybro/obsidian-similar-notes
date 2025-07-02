@@ -77,7 +77,28 @@ export class NoteIndexingService {
             return;
         }
 
-        const splitted = await this.noteChunkingService.split(note);
+        // Apply RegExp exclusion patterns before chunking
+        const settings = this.settingsService.get();
+        const patterns = settings.excludeRegexPatterns || [];
+        
+        // Create a copy of the note with filtered content
+        const filteredNote = { ...note };
+        
+        // Apply each regex pattern to exclude matching content
+        if (patterns.length > 0) {
+            let filteredContent = note.content;
+            for (const pattern of patterns) {
+                try {
+                    const regex = new RegExp(pattern, "gm");
+                    filteredContent = filteredContent.replace(regex, "");
+                } catch (e) {
+                    log.warn(`Invalid RegExp pattern: ${pattern}`, e);
+                }
+            }
+            filteredNote.content = filteredContent;
+        }
+        
+        const splitted = await this.noteChunkingService.split(filteredNote);
         if (splitted.length === 0) {
             return;
         }
