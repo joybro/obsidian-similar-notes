@@ -197,7 +197,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             let outputText = inputText;
 
             try {
-                const currentSettings = settingsService.get();
+                const currentSettings = this.settingsService.get();
                 const patterns = currentSettings.excludeRegexPatterns;
 
                 for (const pattern of patterns) {
@@ -220,26 +220,74 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 text.inputEl.rows = 5;
                 text.inputEl.cols = 40;
                 text.setValue(settings.excludeRegexPatterns.join("\n"));
+                // Store error status of each line
+                const errorMessages: Map<number, string> = new Map();
+                
+                // Style for highlighting invalid patterns
+                const errorLineClass = "similar-notes-regexp-error";
+                
+                // Apply error styles if needed
+                const applyErrorStyles = () => {
+                    const textArea = text.inputEl;
+                    const lines = textArea.value.split("\n");
+                    
+                    // Reset all previous error styles
+                    textArea.removeClass(errorLineClass);
+                    textArea.title = "";
+                    
+                    // If there are errors, apply error styles
+                    if (errorMessages.size > 0) {
+                        textArea.addClass(errorLineClass);
+                        
+                        // Create tooltip with error messages
+                        const tooltipMessages = Array.from(errorMessages.entries())
+                            .map(([line, message]) => `Line ${line + 1}: ${message}`)
+                            .join("\n");
+                        textArea.title = tooltipMessages;
+                    }
+                };
+                
                 text.onChange(async (value) => {
-                    const patterns = value
-                        .split("\n")
-                        .filter((p) => p.trim().length > 0);
-                    await this.settingsService.update({
-                        excludeRegexPatterns: patterns,
+                    // Clear previous errors
+                    errorMessages.clear();
+                    
+                    // Process and validate each line
+                    const lines = value.split("\n");
+                    const validPatterns: string[] = [];
+                    
+                    // Check each pattern for validity
+                    lines.forEach((pattern, index) => {
+                        // Skip empty lines
+                        if (pattern.trim().length === 0) return;
+                        
+                        // Validate the pattern
+                        try {
+                            new RegExp(pattern);
+                            validPatterns.push(pattern);
+                        } catch (e) {
+                            // Store error message for this line
+                            errorMessages.set(index, e.message);
+                        }
                     });
-
+                    
+                    // Apply error styles
+                    applyErrorStyles();
+                    
+                    // Save only valid patterns
+                    await this.settingsService.update({
+                        excludeRegexPatterns: validPatterns,
+                    });
+                    
                     // Update test output when patterns change
                     processTestInput();
                 });
             });
-
-        const regExpTesterContainer = containerEl.createDiv(
-            "similar-notes-regexp-tester"
-        );
+        
+        // Add RegExp tester UI
+        const regExpTesterContainer = containerEl.createDiv("similar-notes-regexp-tester");
         regExpTesterContainer.addClass("setting-item");
-
-        const regExpTesterHeader =
-            regExpTesterContainer.createDiv("setting-item-info");
+        
+        const regExpTesterHeader = regExpTesterContainer.createDiv("setting-item-info");
         const regExpTesterDescription = regExpTesterHeader.createDiv(
             "setting-item-description"
         );
@@ -279,8 +327,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         testOutputTextArea.cols = 30;
         testOutputTextArea.readOnly = true;
         testOutputTextArea.placeholder = "Filtered content will appear here";
-
-        const settingsService = this.settingsService;
 
         // Update test output and save input text when it changes
         testInputTextArea.addEventListener("input", () => {

@@ -78,6 +78,12 @@
     margin-top: 0.5rem;
 }
 
+/* Error highlighting for invalid RegExp patterns */
+.similar-notes-regexp-error {
+    border: 2px solid var(--color-red) !important;
+    background-color: rgba(255, 0, 0, 0.05);
+}
+
 @media (max-width: 768px) {
     .similar-notes-regexp-tester-content {
         flex-direction: column;
