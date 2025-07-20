@@ -1,7 +1,7 @@
 import type { SettingsService } from "@/application/SettingsService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import log from "loglevel";
-import { PluginSettingTab, Setting } from "obsidian";
+import { Notice, PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
 import { LoadModelModal } from "./LoadModelModal";
 
@@ -78,86 +78,148 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
 
         new Setting(containerEl).setName("Model").setHeading();
 
+        // Model Provider Selection
         new Setting(containerEl)
-            .setName("Current model")
-            .setDesc(settings.modelId);
-
-        const recommendedModels = [
-            "sentence-transformers/all-MiniLM-L6-v2",
-            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-        ];
-
-        let selectedModel = settings.modelId;
-
-        new Setting(containerEl)
-            .setName("Recommended models")
-            .setDesc("Select from recommended embedding models")
+            .setName("Model Provider")
+            .setDesc("Choose between built-in models or Ollama")
             .addDropdown((dropdown) => {
-                for (const model of recommendedModels) {
-                    dropdown.addOption(model, model);
-                }
-                dropdown.setValue(settings.modelId);
-                dropdown.onChange(async (value) => {
-                    selectedModel = value;
-                });
-            })
-            .addButton((button) => {
-                button.setButtonText("Load").onClick(async () => {
-                    new LoadModelModal(
-                        this.app,
-                        async () => {
-                            await this.settingsService.update({
-                                modelId: selectedModel,
-                            });
-                            this.plugin.changeModel(selectedModel);
-                        },
-                        () => {}
-                    ).open();
-                });
-            });
-
-        let customModel = "";
-
-        new Setting(containerEl)
-            .setName("Custom model")
-            .setDesc("Enter a custom model ID from Hugging Face")
-            .addText((text) => {
-                text.onChange(async (value) => {
-                    customModel = value;
-                });
-            })
-            .addButton((button) => {
-                button.setButtonText("Load").onClick(async () => {
-                    if (customModel.length === 0) {
-                        return;
-                    }
-                    new LoadModelModal(
-                        this.app,
-                        async () => {
-                            await this.settingsService.update({
-                                modelId: customModel,
-                            });
-                            this.plugin.changeModel(customModel);
-                        },
-                        () => {}
-                    ).open();
-                });
-            });
-
-        new Setting(containerEl)
-            .setName("Use GPU acceleration")
-            .setDesc(
-                "If enabled, WebGPU will be used for model inference. Disable if you experience issues with GPU acceleration."
-            )
-            .addToggle((toggle) => {
-                toggle.setValue(settings.useGPU).onChange(async (value) => {
-                    await this.settingsService.update({
-                        useGPU: value,
+                dropdown
+                    .addOption("builtin", "Built-in Models")
+                    .addOption("ollama", "Ollama")
+                    .setValue(settings.modelProvider || "builtin")
+                    .onChange(async (value: "builtin" | "ollama") => {
+                        await this.settingsService.update({
+                            modelProvider: value,
+                        });
+                        // Redraw settings to show/hide provider-specific options
+                        this.display();
                     });
-                    // Only reload model with new GPU setting without reindexing
-                    this.plugin.reloadModel();
-                });
             });
+
+        // Provider-specific settings
+        if (settings.modelProvider === "builtin") {
+            // Built-in model settings
+            new Setting(containerEl)
+                .setName("Current model")
+                .setDesc(settings.modelId);
+
+            const recommendedModels = [
+                "sentence-transformers/all-MiniLM-L6-v2",
+                "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            ];
+
+            let selectedModel = settings.modelId;
+
+            new Setting(containerEl)
+                .setName("Recommended models")
+                .setDesc("Select from recommended embedding models")
+                .addDropdown((dropdown) => {
+                    for (const model of recommendedModels) {
+                        dropdown.addOption(model, model);
+                    }
+                    dropdown.setValue(settings.modelId);
+                    dropdown.onChange(async (value) => {
+                        selectedModel = value;
+                    });
+                })
+                .addButton((button) => {
+                    button.setButtonText("Load").onClick(async () => {
+                        new LoadModelModal(
+                            this.app,
+                            async () => {
+                                await this.settingsService.update({
+                                    modelId: selectedModel,
+                                });
+                                this.plugin.changeModel(selectedModel);
+                            },
+                            () => {}
+                        ).open();
+                    });
+                });
+
+            let customModel = "";
+
+            new Setting(containerEl)
+                .setName("Custom model")
+                .setDesc("Enter a custom model ID from Hugging Face")
+                .addText((text) => {
+                    text.onChange(async (value) => {
+                        customModel = value;
+                    });
+                })
+                .addButton((button) => {
+                    button.setButtonText("Load").onClick(async () => {
+                        if (customModel.length === 0) {
+                            return;
+                        }
+                        new LoadModelModal(
+                            this.app,
+                            async () => {
+                                await this.settingsService.update({
+                                    modelId: customModel,
+                                });
+                                this.plugin.changeModel(customModel);
+                            },
+                            () => {}
+                        ).open();
+                    });
+                });
+
+            new Setting(containerEl)
+                .setName("Use GPU acceleration")
+                .setDesc(
+                    "If enabled, WebGPU will be used for model inference. Disable if you experience issues with GPU acceleration."
+                )
+                .addToggle((toggle) => {
+                    toggle.setValue(settings.useGPU).onChange(async (value) => {
+                        await this.settingsService.update({
+                            useGPU: value,
+                        });
+                        // Only reload model with new GPU setting without reindexing
+                        this.plugin.reloadModel();
+                    });
+                });
+        } else if (settings.modelProvider === "ollama") {
+            // Ollama settings
+            new Setting(containerEl)
+                .setName("Ollama Server URL")
+                .setDesc("URL of your Ollama server (default: http://localhost:11434)")
+                .addText((text) => {
+                    text.setPlaceholder("http://localhost:11434")
+                        .setValue(settings.ollamaUrl || "http://localhost:11434")
+                        .onChange(async (value) => {
+                            await this.settingsService.update({
+                                ollamaUrl: value,
+                            });
+                        });
+                });
+
+            new Setting(containerEl)
+                .setName("Ollama Model")
+                .setDesc("Name of the Ollama model to use for embeddings (e.g., nomic-embed-text, mxbai-embed-large)")
+                .addText((text) => {
+                    text.setPlaceholder("nomic-embed-text")
+                        .setValue(settings.ollamaModel || "")
+                        .onChange(async (value) => {
+                            await this.settingsService.update({
+                                ollamaModel: value,
+                            });
+                        });
+                })
+                .addButton((button) => {
+                    button.setButtonText("Test Connection").onClick(async () => {
+                        // TODO: Implement connection test
+                        // For now, just show a notice
+                        const url = settings.ollamaUrl || "http://localhost:11434";
+                        const model = settings.ollamaModel;
+                        if (!model) {
+                            new Notice("Please enter a model name first");
+                            return;
+                        }
+                        new Notice(`Testing connection to ${url} with model ${model}...`);
+                    });
+                });
+        }
 
         new Setting(containerEl).setName("Index").setHeading();
 

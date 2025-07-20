@@ -3,7 +3,10 @@ import { type Observable, Subject } from "rxjs";
 
 export interface SimilarNotesSettings {
     autoSaveInterval: number; // in minutes
+    modelProvider: "builtin" | "ollama"; // Model provider type
     modelId: string; // The model ID to use for embeddings
+    ollamaUrl?: string; // Ollama server URL
+    ollamaModel?: string; // Ollama model name
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
     showSourceChunk: boolean; // Whether to show the original chunk in the results
     useGPU: boolean; // Whether to use GPU acceleration for model inference
@@ -13,6 +16,7 @@ export interface SimilarNotesSettings {
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
     autoSaveInterval: 10,
+    modelProvider: "builtin", // Default to built-in models
     modelId: "sentence-transformers/all-MiniLM-L6-v2",
     includeFrontmatter: false,
     showSourceChunk: false,
