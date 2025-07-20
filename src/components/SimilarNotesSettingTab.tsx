@@ -1,5 +1,6 @@
 import type { SettingsService } from "@/application/SettingsService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
+import { OllamaClient } from "@/adapter/ollama";
 import log from "loglevel";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
@@ -181,42 +182,114 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 });
         } else if (settings.modelProvider === "ollama") {
             // Ollama settings
+            const ollamaUrl = settings.ollamaUrl || "http://localhost:11434";
+            const ollamaClient = new OllamaClient(ollamaUrl);
+            
+            // State for Ollama models
+            let ollamaModels: string[] = [];
+            let modelLoadError: string | null = null;
+            
+            // Function to fetch Ollama models
+            const fetchOllamaModels = async () => {
+                modelLoadError = null;
+                
+                try {
+                    ollamaModels = await ollamaClient.getModelNames();
+                } catch (error) {
+                    modelLoadError = error instanceof Error ? error.message : "Failed to fetch models";
+                    ollamaModels = [];
+                }
+            };
+            
             new Setting(containerEl)
                 .setName("Ollama Server URL")
                 .setDesc("URL of your Ollama server (default: http://localhost:11434)")
                 .addText((text) => {
                     text.setPlaceholder("http://localhost:11434")
-                        .setValue(settings.ollamaUrl || "http://localhost:11434")
+                        .setValue(ollamaUrl)
                         .onChange(async (value) => {
                             await this.settingsService.update({
                                 ollamaUrl: value,
                             });
+                            // Update client URL and refresh the page
+                            ollamaClient.setBaseUrl(value);
+                            this.display();
                         });
                 });
 
-            new Setting(containerEl)
+            // Create the model dropdown setting
+            const modelSetting = new Setting(containerEl)
                 .setName("Ollama Model")
-                .setDesc("Name of the Ollama model to use for embeddings (e.g., nomic-embed-text, mxbai-embed-large)")
-                .addText((text) => {
-                    text.setPlaceholder("nomic-embed-text")
-                        .setValue(settings.ollamaModel || "")
-                        .onChange(async (value) => {
-                            await this.settingsService.update({
-                                ollamaModel: value,
-                            });
-                        });
-                })
+                .setDesc("Select an Ollama model for embeddings");
+                
+            let dropdownComponent: any;
+            modelSetting.addDropdown((dropdown) => {
+                dropdownComponent = dropdown;
+                dropdown.addOption("", "Loading models...");
+                dropdown.setValue(settings.ollamaModel || "");
+                dropdown.onChange(async (value) => {
+                    await this.settingsService.update({
+                        ollamaModel: value,
+                    });
+                });
+            });
+            
+            // Add refresh button
+            modelSetting.addButton((button) => {
+                button.setButtonText("Refresh")
+                    .setTooltip("Refresh model list")
+                    .onClick(async () => {
+                        await fetchOllamaModels();
+                        this.display(); // Redraw to update dropdown
+                    });
+            });
+            
+            // Fetch models on load
+            fetchOllamaModels().then(() => {
+                // Update dropdown with fetched models
+                dropdownComponent.selectEl.empty();
+                
+                if (modelLoadError) {
+                    dropdownComponent.addOption("", `Error: ${modelLoadError}`);
+                } else if (ollamaModels.length === 0) {
+                    dropdownComponent.addOption("", "No models found");
+                } else {
+                    dropdownComponent.addOption("", "Select a model");
+                    ollamaModels.forEach(model => {
+                        dropdownComponent.addOption(model, model);
+                    });
+                    
+                    // Set current value if it exists in the list
+                    if (settings.ollamaModel && ollamaModels.includes(settings.ollamaModel)) {
+                        dropdownComponent.setValue(settings.ollamaModel);
+                    }
+                }
+            });
+            
+            // Test connection button
+            new Setting(containerEl)
+                .setName("Test Connection")
+                .setDesc("Test the connection to Ollama server and selected model")
                 .addButton((button) => {
-                    button.setButtonText("Test Connection").onClick(async () => {
-                        // TODO: Implement connection test
-                        // For now, just show a notice
-                        const url = settings.ollamaUrl || "http://localhost:11434";
+                    button.setButtonText("Test").onClick(async () => {
                         const model = settings.ollamaModel;
                         if (!model) {
-                            new Notice("Please enter a model name first");
+                            new Notice("Please select a model first");
                             return;
                         }
-                        new Notice(`Testing connection to ${url} with model ${model}...`);
+                        
+                        new Notice(`Testing connection to ${ollamaUrl} with model ${model}...`);
+                        
+                        try {
+                            const success = await ollamaClient.testModel(model);
+                            if (success) {
+                                new Notice("Connection successful! Model is ready for embeddings.");
+                            } else {
+                                new Notice(`Connection failed: Model test failed`);
+                            }
+                        } catch (error) {
+                            new Notice(`Connection failed: ${error}`);
+                        }
                     });
                 });
         }
