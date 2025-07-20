@@ -10,6 +10,12 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     private indexedNoteCount: number = 0;
     private subscription: { unsubscribe: () => void } | null = null;
     private mTimeStore?: IndexedNoteMTimeStore;
+    
+    // Temporary state for model changes (not saved until Apply is clicked)
+    private tempModelProvider?: "builtin" | "ollama";
+    private tempModelId?: string;
+    private tempOllamaUrl?: string;
+    private tempOllamaModel?: string;
 
     constructor(
         private plugin: MainPlugin,
@@ -63,6 +69,12 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         const settings = this.settingsService.get();
         const { containerEl } = this;
         containerEl.empty();
+        
+        // Initialize temporary state from current settings
+        this.tempModelProvider = this.tempModelProvider ?? settings.modelProvider;
+        this.tempModelId = this.tempModelId ?? settings.modelId;
+        this.tempOllamaUrl = this.tempOllamaUrl ?? settings.ollamaUrl;
+        this.tempOllamaModel = this.tempOllamaModel ?? settings.ollamaModel;
 
         new Setting(containerEl)
             .setName("Auto-save interval")
@@ -79,37 +91,41 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
 
         new Setting(containerEl).setName("Model").setHeading();
 
+        // Current model display
+        const currentModelDesc = settings.modelProvider === "builtin" 
+            ? `Built-in: ${settings.modelId}`
+            : settings.modelProvider === "ollama" 
+                ? `Ollama: ${settings.ollamaModel || 'Not configured'}`
+                : "Not configured";
+        
+        new Setting(containerEl)
+            .setName("Current model")
+            .setDesc(currentModelDesc);
+
         // Model Provider Selection
         new Setting(containerEl)
-            .setName("Model Provider")
+            .setName("Model provider")
             .setDesc("Choose between built-in models or Ollama")
             .addDropdown((dropdown) => {
                 dropdown
                     .addOption("builtin", "Built-in Models")
                     .addOption("ollama", "Ollama")
-                    .setValue(settings.modelProvider || "builtin")
-                    .onChange(async (value: "builtin" | "ollama") => {
-                        await this.settingsService.update({
-                            modelProvider: value,
-                        });
+                    .setValue(this.tempModelProvider || "builtin")
+                    .onChange((value: "builtin" | "ollama") => {
+                        this.tempModelProvider = value;
                         // Redraw settings to show/hide provider-specific options
                         this.display();
                     });
             });
 
         // Provider-specific settings
-        if (settings.modelProvider === "builtin") {
+        if (this.tempModelProvider === "builtin") {
             // Built-in model settings
-            new Setting(containerEl)
-                .setName("Current model")
-                .setDesc(settings.modelId);
 
             const recommendedModels = [
                 "sentence-transformers/all-MiniLM-L6-v2",
                 "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
             ];
-
-            let selectedModel = settings.modelId;
 
             new Setting(containerEl)
                 .setName("Recommended models")
@@ -118,52 +134,20 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     for (const model of recommendedModels) {
                         dropdown.addOption(model, model);
                     }
-                    dropdown.setValue(settings.modelId);
-                    dropdown.onChange(async (value) => {
-                        selectedModel = value;
-                    });
-                })
-                .addButton((button) => {
-                    button.setButtonText("Load").onClick(async () => {
-                        new LoadModelModal(
-                            this.app,
-                            async () => {
-                                await this.settingsService.update({
-                                    modelId: selectedModel,
-                                });
-                                this.plugin.changeModel(selectedModel);
-                            },
-                            () => {}
-                        ).open();
+                    dropdown.setValue(this.tempModelId || settings.modelId);
+                    dropdown.onChange((value) => {
+                        this.tempModelId = value;
                     });
                 });
-
-            let customModel = "";
 
             new Setting(containerEl)
                 .setName("Custom model")
                 .setDesc("Enter a custom model ID from Hugging Face")
                 .addText((text) => {
-                    text.onChange(async (value) => {
-                        customModel = value;
-                    });
-                })
-                .addButton((button) => {
-                    button.setButtonText("Load").onClick(async () => {
-                        if (customModel.length === 0) {
-                            return;
-                        }
-                        new LoadModelModal(
-                            this.app,
-                            async () => {
-                                await this.settingsService.update({
-                                    modelId: customModel,
-                                });
-                                this.plugin.changeModel(customModel);
-                            },
-                            () => {}
-                        ).open();
-                    });
+                    text.setValue(this.tempModelId || "")
+                        .onChange((value) => {
+                            this.tempModelId = value;
+                        });
                 });
 
             new Setting(containerEl)
@@ -180,9 +164,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         this.plugin.reloadModel();
                     });
                 });
-        } else if (settings.modelProvider === "ollama") {
+        } else if (this.tempModelProvider === "ollama") {
             // Ollama settings
-            const ollamaUrl = settings.ollamaUrl || "http://localhost:11434";
+            const ollamaUrl = this.tempOllamaUrl || settings.ollamaUrl || "http://localhost:11434";
             const ollamaClient = new OllamaClient(ollamaUrl);
             
             // State for Ollama models
@@ -202,15 +186,13 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             };
             
             new Setting(containerEl)
-                .setName("Ollama Server URL")
+                .setName("Ollama server URL")
                 .setDesc("URL of your Ollama server (default: http://localhost:11434)")
                 .addText((text) => {
                     text.setPlaceholder("http://localhost:11434")
                         .setValue(ollamaUrl)
-                        .onChange(async (value) => {
-                            await this.settingsService.update({
-                                ollamaUrl: value,
-                            });
+                        .onChange((value) => {
+                            this.tempOllamaUrl = value;
                             // Update client URL and refresh the page
                             ollamaClient.setBaseUrl(value);
                             this.display();
@@ -219,18 +201,16 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
 
             // Create the model dropdown setting
             const modelSetting = new Setting(containerEl)
-                .setName("Ollama Model")
+                .setName("Ollama model")
                 .setDesc("Select an Ollama model for embeddings");
                 
             let dropdownComponent: any;
             modelSetting.addDropdown((dropdown) => {
                 dropdownComponent = dropdown;
                 dropdown.addOption("", "Loading models...");
-                dropdown.setValue(settings.ollamaModel || "");
-                dropdown.onChange(async (value) => {
-                    await this.settingsService.update({
-                        ollamaModel: value,
-                    });
+                dropdown.setValue(this.tempOllamaModel || "");
+                dropdown.onChange((value) => {
+                    this.tempOllamaModel = value;
                 });
             });
             
@@ -260,19 +240,19 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     });
                     
                     // Set current value if it exists in the list
-                    if (settings.ollamaModel && ollamaModels.includes(settings.ollamaModel)) {
-                        dropdownComponent.setValue(settings.ollamaModel);
+                    if (this.tempOllamaModel && ollamaModels.includes(this.tempOllamaModel)) {
+                        dropdownComponent.setValue(this.tempOllamaModel);
                     }
                 }
             });
             
             // Test connection button
             new Setting(containerEl)
-                .setName("Test Connection")
+                .setName("Test connection")
                 .setDesc("Test the connection to Ollama server and selected model")
                 .addButton((button) => {
                     button.setButtonText("Test").onClick(async () => {
-                        const model = settings.ollamaModel;
+                        const model = this.tempOllamaModel;
                         if (!model) {
                             new Notice("Please select a model first");
                             return;
@@ -293,6 +273,30 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     });
                 });
         }
+
+        // Model Apply Button
+        const hasChanges = this.hasModelChanges(settings);
+        const buttonText = this.tempModelProvider === "builtin" ? "Load & Apply" : "Apply Changes";
+        const buttonDesc = hasChanges 
+            ? "Apply the selected model configuration. This will rebuild the similarity index."
+            : "No changes to apply. Modify settings above to enable this button.";
+            
+        new Setting(containerEl)
+            .setName("Apply model changes")
+            .setDesc(buttonDesc)
+            .addButton((button) => {
+                button.setButtonText(buttonText)
+                    .setDisabled(!hasChanges)
+                    .onClick(async () => {
+                        if (hasChanges) {
+                            await this.applyModelChanges(settings);
+                        }
+                    });
+                
+                if (hasChanges) {
+                    button.setCta();
+                }
+            });
 
         new Setting(containerEl).setName("Index").setHeading();
 
@@ -512,5 +516,60 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         );
                     });
             });
+    }
+
+    private hasModelChanges(settings: any): boolean {
+        return (
+            this.tempModelProvider !== settings.modelProvider ||
+            (this.tempModelProvider === "builtin" && this.tempModelId && this.tempModelId !== settings.modelId) ||
+            (this.tempModelProvider === "ollama" && 
+                (this.tempOllamaUrl !== settings.ollamaUrl || this.tempOllamaModel !== settings.ollamaModel))
+        );
+    }
+
+    private async applyModelChanges(settings: any): Promise<void> {
+        if (this.tempModelProvider === "builtin") {
+            // Built-in model - use LoadModelModal
+            const modelId = this.tempModelId || settings.modelId;
+            new LoadModelModal(
+                this.app,
+                async () => {
+                    await this.settingsService.update({
+                        modelProvider: this.tempModelProvider,
+                        modelId: modelId,
+                    });
+                    this.plugin.changeModel(modelId);
+                    // Clear temporary state after successful apply
+                    this.clearTempState();
+                    this.display();
+                },
+                () => {} // Cancel callback
+            ).open();
+        } else if (this.tempModelProvider === "ollama") {
+            // Ollama model - show confirmation modal
+            new LoadModelModal(
+                this.app,
+                async () => {
+                    await this.settingsService.update({
+                        modelProvider: this.tempModelProvider,
+                        ollamaUrl: this.tempOllamaUrl,
+                        ollamaModel: this.tempOllamaModel,
+                    });
+                    // TODO: Implement Ollama model switching in plugin
+                    new Notice("Ollama model configuration saved. Ollama integration is not yet implemented.");
+                    // Clear temporary state after successful apply
+                    this.clearTempState();
+                    this.display();
+                },
+                () => {} // Cancel callback
+            ).open();
+        }
+    }
+
+    private clearTempState(): void {
+        this.tempModelProvider = undefined;
+        this.tempModelId = undefined;
+        this.tempOllamaUrl = undefined;
+        this.tempOllamaModel = undefined;
     }
 }
