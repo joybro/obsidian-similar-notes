@@ -16,6 +16,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     private tempModelId?: string;
     private tempOllamaUrl?: string;
     private tempOllamaModel?: string;
+    
+    // Apply button reference for direct updates
+    private applyButton?: any;
 
     constructor(
         private plugin: MainPlugin,
@@ -137,6 +140,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     dropdown.setValue(this.tempModelId || settings.modelId);
                     dropdown.onChange((value) => {
                         this.tempModelId = value;
+                        this.display(); // Redraw to update Apply button state
                     });
                 });
 
@@ -147,6 +151,8 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     text.setValue(this.tempModelId || "")
                         .onChange((value) => {
                             this.tempModelId = value;
+                            // Don't redraw for text input to avoid losing focus
+                            this.updateApplyButtonState(settings);
                         });
                 });
 
@@ -211,6 +217,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 dropdown.setValue(this.tempOllamaModel || "");
                 dropdown.onChange((value) => {
                     this.tempOllamaModel = value;
+                    this.display(); // Redraw to update Apply button state
                 });
             });
             
@@ -285,6 +292,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             .setName("Apply model changes")
             .setDesc(buttonDesc)
             .addButton((button) => {
+                this.applyButton = button; // Store reference for updates
                 button.setButtonText(buttonText)
                     .setDisabled(!hasChanges)
                     .onClick(async () => {
@@ -531,8 +539,11 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         if (this.tempModelProvider === "builtin") {
             // Built-in model - use LoadModelModal
             const modelId = this.tempModelId || settings.modelId;
+            const builtinMessage = "The model will be downloaded from Hugging Face (this might take a while) and all your notes will be reindexed. Do you want to continue?";
+            
             new LoadModelModal(
                 this.app,
+                builtinMessage,
                 async () => {
                     await this.settingsService.update({
                         modelProvider: this.tempModelProvider,
@@ -547,8 +558,11 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             ).open();
         } else if (this.tempModelProvider === "ollama") {
             // Ollama model - show confirmation modal
+            const ollamaMessage = "Your embedding model will be changed and all notes will be reindexed. Do you want to continue?";
+            
             new LoadModelModal(
                 this.app,
+                ollamaMessage,
                 async () => {
                     await this.settingsService.update({
                         modelProvider: this.tempModelProvider,
@@ -571,5 +585,21 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         this.tempModelId = undefined;
         this.tempOllamaUrl = undefined;
         this.tempOllamaModel = undefined;
+    }
+
+    private updateApplyButtonState(settings: any): void {
+        if (!this.applyButton) return;
+        
+        const hasChanges = this.hasModelChanges(settings);
+        const buttonText = this.tempModelProvider === "builtin" ? "Load & Apply" : "Apply Changes";
+        
+        this.applyButton.setButtonText(buttonText).setDisabled(!hasChanges);
+        
+        // Update CTA styling
+        if (hasChanges) {
+            this.applyButton.setCta();
+        } else {
+            this.applyButton.removeCta();
+        }
     }
 }

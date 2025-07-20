@@ -1,11 +1,9 @@
 import { type App, Modal, Setting } from "obsidian";
 
 export class LoadModelModal extends Modal {
-    constructor(app: App, onSubmit: () => void, onCancel: () => void) {
+    constructor(app: App, message: string, onSubmit: () => void, onCancel: () => void) {
         super(app);
-        this.setContent(
-            "Heads up! The model will be downloaded from Hugging Face (this might take a while) and all your notes will be reindexed. Check the status bar to see the progress."
-        );
+        this.setContent(message);
 
         new Setting(this.contentEl)
             .addButton((btn) =>
