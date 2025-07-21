@@ -212,14 +212,16 @@ export default class MainPlugin extends Plugin {
             if (firstTime || newModel) {
                 // Get settings and switch provider
                 const settings = this.settingsService.get();
-                
+
                 // Switch to appropriate provider based on settings
                 await this.modelService.switchProvider(settings);
                 log.info(
                     "Model service initialized successfully with provider:",
                     settings.modelProvider,
                     "and model:",
-                    settings.modelProvider === "builtin" ? settings.modelId : settings.ollamaModel
+                    settings.modelProvider === "builtin"
+                        ? settings.modelId
+                        : settings.ollamaModel
                 );
 
                 this.noteChunkingService.init();

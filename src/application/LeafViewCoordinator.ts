@@ -26,9 +26,6 @@ export class LeafViewCoordinator {
         }
 
         this.noteBottomViewMap.set(leaf.view, similarNotesView);
-        if (leaf.view.file) {
-            this.similarNoteCoordinator.emitNoteBottomViewModel(leaf.view.file);
-        }
     }
 
     async onLayoutChange(): Promise<void> {
