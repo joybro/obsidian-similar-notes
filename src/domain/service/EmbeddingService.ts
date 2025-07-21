@@ -1,138 +1,156 @@
-import * as Comlink from "comlink";
 import log from "loglevel";
-import { type Observable, Subject } from "rxjs";
-import type { TransformersWorker } from "./transformers.worker";
-// @ts-ignore
-import InlineWorker from "./transformers.worker";
+import { type Observable, Subject, of } from "rxjs";
+import type { SimilarNotesSettings } from "@/application/SettingsService";
+import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
+import { TransformersEmbeddingProvider, type TransformersConfig } from "./TransformersEmbeddingProvider";
+import { OllamaEmbeddingProvider, type OllamaConfig } from "./OllamaEmbeddingProvider";
 
 export class EmbeddingService {
-    private worker: Comlink.Remote<TransformersWorker> | null = null;
-    private modelId: string | null = null;
-    private vectorSize: number | null = null;
-    private maxTokens: number | null = null;
-    private modelBusy$ = new Subject<boolean>();
-    private downloadProgress$ = new Subject<number>();
+    private provider: EmbeddingProvider | null = null;
+    private currentProviderType: "builtin" | "ollama" | null = null;
+    
+    // Default observables for when no provider is initialized
+    private defaultModelBusy$ = new Subject<boolean>();
+    private defaultDownloadProgress$ = new Subject<number>();
 
-    async loadModel(modelId: string, useGPU: boolean = true): Promise<void> {
-        log.info("Loading model", modelId, "with GPU:", useGPU);
-        const WorkerWrapper = Comlink.wrap(new InlineWorker());
-        // @ts-ignore
-        this.worker = await new WorkerWrapper();
-        log.info("Worker initialized", this.worker);
-        if (!this.worker) {
-            throw new Error("Worker not initialized");
+    /**
+     * Switch to a different embedding provider based on settings
+     */
+    async switchProvider(settings: SimilarNotesSettings): Promise<void> {
+        const newProviderType = settings.modelProvider;
+        
+        // If same provider type and model, no need to switch
+        if (this.currentProviderType === newProviderType && this.provider?.isModelLoaded()) {
+            const currentModelId = this.provider.getCurrentModelId();
+            const targetModelId = newProviderType === "builtin" ? settings.modelId : settings.ollamaModel;
+            
+            if (currentModelId === targetModelId) {
+                log.info("Same provider and model already loaded, skipping switch");
+                return;
+            }
         }
 
-        await this.worker.setLogLevel(log.getLevel());
+        // Dispose current provider
+        if (this.provider) {
+            log.info("Disposing current embedding provider:", this.currentProviderType);
+            this.provider.dispose();
+            this.provider = null;
+        }
 
-        const response = await this.worker.handleLoad(
-            modelId,
-            Comlink.proxy((progress: number) => {
-                this.downloadProgress$.next(progress);
-            }),
-            useGPU // Pass GPU acceleration setting to worker
-        );
-        log.info("Model loaded", response);
+        // Create new provider
+        if (newProviderType === "builtin") {
+            log.info("Switching to Transformers embedding provider");
+            this.provider = new TransformersEmbeddingProvider();
+            await this.loadModel(settings.modelId, { useGPU: settings.useGPU });
+        } else if (newProviderType === "ollama") {
+            log.info("Switching to Ollama embedding provider");
+            const ollamaConfig: OllamaConfig = {
+                url: settings.ollamaUrl || "http://localhost:11434",
+                model: settings.ollamaModel || "",
+            };
+            this.provider = new OllamaEmbeddingProvider(ollamaConfig);
+            await this.loadModel(settings.ollamaModel || "", ollamaConfig);
+        } else {
+            throw new Error(`Unknown provider type: ${newProviderType}`);
+        }
 
-        this.modelId = modelId;
-        this.vectorSize = response.vectorSize;
-        this.maxTokens = response.maxTokens;
+        this.currentProviderType = newProviderType;
+        log.info("Successfully switched to provider:", newProviderType);
+    }
+
+    /**
+     * Load model with the current provider
+     */
+    async loadModel(modelId: string, config?: TransformersConfig | OllamaConfig): Promise<ModelInfo> {
+        if (!this.provider) {
+            throw new Error("No embedding provider initialized");
+        }
+
+        return await this.provider.loadModel(modelId, config);
     }
 
     async unloadModel(): Promise<void> {
-        if (!this.worker) {
+        if (!this.provider) {
             return;
         }
-
-        await this.worker.handleUnload();
-
-        this.modelId = null;
-        this.vectorSize = null;
-        this.maxTokens = null;
+        await this.provider.unloadModel();
     }
 
     getModelBusy$(): Observable<boolean> {
-        return this.modelBusy$.asObservable();
+        if (!this.provider) {
+            // Return default observable when no provider is initialized
+            return this.defaultModelBusy$.asObservable();
+        }
+        return this.provider.getModelBusy$();
     }
 
     getDownloadProgress$(): Observable<number> {
-        return this.downloadProgress$.asObservable();
+        if (!this.provider) {
+            // Return default observable when no provider is initialized
+            return this.defaultDownloadProgress$.asObservable();
+        }
+        return this.provider.getDownloadProgress$();
     }
 
     async embedText(text: string): Promise<number[]> {
-        if (!this.worker || !this.modelId) {
-            throw new Error("Model not loaded");
+        if (!this.provider) {
+            throw new Error("No embedding provider initialized");
         }
-
-        this.modelBusy$.next(true);
-        const result = await this.worker.handleEmbed(text);
-        this.modelBusy$.next(false);
-        return result;
+        return await this.provider.embedText(text);
     }
 
     async embedTexts(texts: string[]): Promise<number[][]> {
-        if (!this.worker || !this.modelId) {
-            throw new Error("Model not loaded");
+        if (!this.provider) {
+            throw new Error("No embedding provider initialized");
         }
-
-        this.modelBusy$.next(true);
-        const result = await this.worker.handleEmbedBatch(texts);
-        this.modelBusy$.next(false);
-        return result;
+        return await this.provider.embedTexts(texts);
     }
 
     async countTokens(text: string): Promise<number> {
-        if (!this.worker || !this.modelId) {
-            throw new Error("Model not loaded");
+        if (!this.provider) {
+            throw new Error("No embedding provider initialized");
         }
-
-        return await this.worker.handleCountToken(text);
+        return await this.provider.countTokens(text);
     }
 
     public getVectorSize(): number {
-        if (!this.vectorSize) {
-            throw new Error("Model not loaded");
+        if (!this.provider) {
+            throw new Error("No embedding provider initialized");
         }
-        return this.vectorSize;
+        return this.provider.getVectorSize();
     }
 
     public getMaxTokens(): number {
-        if (!this.maxTokens) {
-            throw new Error("Model not loaded");
+        if (!this.provider) {
+            throw new Error("No embedding provider initialized");
         }
-        return this.maxTokens;
+        return this.provider.getMaxTokens();
+    }
+
+    public isModelLoaded(): boolean {
+        return this.provider?.isModelLoaded() ?? false;
+    }
+
+    public getCurrentModelId(): string | null {
+        return this.provider?.getCurrentModelId() ?? null;
+    }
+
+    public getCurrentProviderType(): "builtin" | "ollama" | null {
+        return this.currentProviderType;
     }
 
     public dispose(): void {
-        if (this.worker) {
-            this.worker
-                .handleUnload()
-                .catch((err) => {
-                    log.error("Error unloading model:", err);
-                })
-                .finally(() => {
-                    if (this.worker && this.worker[Comlink.releaseProxy]) {
-                        this.worker[Comlink.releaseProxy]();
-                    }
-
-                    this.worker = null;
-                });
+        if (this.provider) {
+            this.provider.dispose();
+            this.provider = null;
         }
-        this.modelId = null;
-        this.vectorSize = null;
-        this.maxTokens = null;
+        this.currentProviderType = null;
     }
 
     public setLogLevel(level: log.LogLevelDesc): void {
-        if (this.worker) {
-            this.worker
-                .setLogLevel(level)
-                .catch((err) =>
-                    log.error(
-                        "Failed to set log level on TransformersWorker",
-                        err
-                    )
-                );
+        // Only TransformersEmbeddingProvider supports log level setting
+        if (this.provider instanceof TransformersEmbeddingProvider) {
+            this.provider.setLogLevel(level);
         }
     }
 }

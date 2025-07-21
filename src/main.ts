@@ -209,20 +209,17 @@ export default class MainPlugin extends Plugin {
         this.noteIndexingService.stopLoop();
 
         try {
-            if (newModel) {
-                await this.modelService.unloadModel();
-            }
-
             if (firstTime || newModel) {
-                // Get the GPU setting from settings
+                // Get settings and switch provider
                 const settings = this.settingsService.get();
-                const useGPU = settings.useGPU;
-
-                // Pass the useGPU setting to loadModel
-                await this.modelService.loadModel(modelId, useGPU);
+                
+                // Switch to appropriate provider based on settings
+                await this.modelService.switchProvider(settings);
                 log.info(
-                    "Model service initialized successfully with GPU:",
-                    useGPU
+                    "Model service initialized successfully with provider:",
+                    settings.modelProvider,
+                    "and model:",
+                    settings.modelProvider === "builtin" ? settings.modelId : settings.ollamaModel
                 );
 
                 this.noteChunkingService.init();
@@ -273,6 +270,8 @@ export default class MainPlugin extends Plugin {
     }
 
     async changeModel(modelId: string): Promise<void> {
+        // modelId parameter is kept for backward compatibility but not used
+        // The actual model info is taken from settings
         await this.init(modelId, false, true);
     }
 
@@ -284,19 +283,12 @@ export default class MainPlugin extends Plugin {
         // Stop the indexing service to prevent any operations during model reload
         this.noteIndexingService.stopLoop();
 
-        // Unload existing model
-        if (this.modelService) {
-            await this.modelService.unloadModel();
-        }
-
         // Get current settings
         const settings = this.settingsService.get();
-        const modelId = settings.modelId;
-        const useGPU = settings.useGPU;
 
         try {
             // Reload the model with current settings
-            await this.modelService.loadModel(modelId, useGPU);
+            await this.modelService.switchProvider(settings);
             this.statusBarView.setStatus("ready");
         } catch (error) {
             log.error("Failed to reload model:", error);

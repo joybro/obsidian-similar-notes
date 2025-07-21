@@ -569,8 +569,8 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         ollamaUrl: this.tempOllamaUrl,
                         ollamaModel: this.tempOllamaModel,
                     });
-                    // TODO: Implement Ollama model switching in plugin
-                    new Notice("Ollama model configuration saved. Ollama integration is not yet implemented.");
+                    // Trigger model change with new settings
+                    this.plugin.changeModel(this.tempOllamaModel || "");
                     // Clear temporary state after successful apply
                     this.clearTempState();
                     this.display();
