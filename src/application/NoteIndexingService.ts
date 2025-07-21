@@ -5,6 +5,7 @@ import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { NoteChangeQueue } from "@/services/noteChangeQueue";
 import log from "loglevel";
+import type { App } from "obsidian";
 import { type Observable, BehaviorSubject } from "rxjs";
 import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 
@@ -19,10 +20,9 @@ export class NoteIndexingService {
         private noteChunkingService: NoteChunkingService,
         private embeddingService: EmbeddingService,
         private similarNoteCoordinator: SimilarNoteCoordinator,
-        private settingsService: SettingsService
+        private settingsService: SettingsService,
+        private app: App
     ) {}
-    
-
 
     startLoop() {
         const fileChangeLoop = async () => {
@@ -61,8 +61,6 @@ export class NoteIndexingService {
     getNoteChangeCount$(): Observable<number> {
         return this.noteChangeCount$.asObservable();
     }
-    
-
 
     private async processDeletedNote(path: string) {
         await this.noteChunkRepository.removeByPath(path);
@@ -80,10 +78,10 @@ export class NoteIndexingService {
         // Apply RegExp exclusion patterns before chunking
         const settings = this.settingsService.get();
         const patterns = settings.excludeRegexPatterns || [];
-        
+
         // Create a copy of the note with filtered content
         const filteredNote = { ...note };
-        
+
         // Apply each regex pattern to exclude matching content
         if (patterns.length > 0) {
             let filteredContent = note.content;
@@ -97,7 +95,7 @@ export class NoteIndexingService {
             }
             filteredNote.content = filteredContent;
         }
-        
+
         const splitted = await this.noteChunkingService.split(filteredNote);
         if (splitted.length === 0) {
             return;
@@ -113,15 +111,22 @@ export class NoteIndexingService {
 
         log.info("chunks", noteChunks);
 
-        const wasRemoved = await this.noteChunkRepository.removeByPath(note.path);
+        const wasRemoved = await this.noteChunkRepository.removeByPath(
+            note.path
+        );
         await this.noteChunkRepository.putMulti(noteChunks);
-        
+
         log.info(
             "count of chunks in embedding store",
             await this.noteChunkRepository.count()
         );
 
-        // TODO: this should be refactored with an event driven approach
-        this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(note.path);
+        // Only calculate similar notes if this is the currently active file
+        const activeFile = this.app.workspace.getActiveFile();
+        if (activeFile && activeFile.path === note.path) {
+            this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(
+                note.path
+            );
+        }
     }
 }

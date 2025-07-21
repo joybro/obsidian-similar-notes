@@ -138,7 +138,8 @@ export default class MainPlugin extends Plugin {
             this.noteChunkingService,
             this.modelService,
             this.similarNoteCoordinator,
-            this.settingsService
+            this.settingsService,
+            this.app
         );
 
         // noteIndexingService is now initialized
