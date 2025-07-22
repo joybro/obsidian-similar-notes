@@ -1,5 +1,5 @@
-import { Notice } from "obsidian";
 import type { Plugin } from "obsidian";
+import { Notice } from "obsidian";
 import type { Observable } from "rxjs";
 
 export class StatusBarView {
@@ -33,11 +33,16 @@ export class StatusBarView {
             if (count > 10) {
                 this.noteCountItem.setText(`${count} to index`);
                 this.noteCountItem.show();
-                
+
                 // Show notice when crossing 100-note thresholds
-                const currentThreshold = Math.floor(count / 100) * 100;
-                if (this.lastNotifiedThreshold !== null && currentThreshold < this.lastNotifiedThreshold) {
-                    new Notice(`Similar Notes: ${count} notes remaining to index`);
+                const currentThreshold = Math.floor((count - 1) / 100) * 100 + 100;
+                if (
+                    this.lastNotifiedThreshold !== null &&
+                    currentThreshold < this.lastNotifiedThreshold
+                ) {
+                    new Notice(
+                        `Similar Notes: ${count} notes remaining to index`
+                    );
                 }
                 this.lastNotifiedThreshold = currentThreshold;
             } else {
