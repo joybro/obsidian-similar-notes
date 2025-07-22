@@ -3,6 +3,7 @@ import log from "loglevel";
 import { type Observable, Subject } from "rxjs";
 import type { TransformersWorker } from "./transformers.worker";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
+import { WorkerManager } from "@/infrastructure/WorkerManager";
 // @ts-ignore
 import InlineWorker from "./transformers.worker";
 
@@ -11,12 +12,16 @@ export interface TransformersConfig {
 }
 
 export class TransformersEmbeddingProvider implements EmbeddingProvider {
-    private worker: Comlink.Remote<TransformersWorker> | null = null;
+    private workerManager: WorkerManager<TransformersWorker>;
     private modelId: string | null = null;
     private vectorSize: number | null = null;
     private maxTokens: number | null = null;
     private modelBusy$ = new Subject<boolean>();
     private downloadProgress$ = new Subject<number>();
+
+    constructor() {
+        this.workerManager = new WorkerManager<TransformersWorker>("TransformersWorker");
+    }
 
     async loadModel(modelId: string, config?: TransformersConfig): Promise<ModelInfo> {
         const useGPU = config?.useGPU ?? true;
@@ -25,18 +30,9 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
         // Clean up existing worker if any
         await this.unloadModel();
         
-        const WorkerWrapper = Comlink.wrap(new InlineWorker());
-        // @ts-ignore
-        this.worker = await new WorkerWrapper();
-        log.info("TransformersWorker initialized", this.worker);
-        
-        if (!this.worker) {
-            throw new Error("TransformersWorker not initialized");
-        }
+        const worker = await this.workerManager.initialize(InlineWorker);
 
-        await this.worker.setLogLevel(log.getLevel());
-
-        const response = await this.worker.handleLoad(
+        const response = await worker.handleLoad(
             modelId,
             Comlink.proxy((progress: number) => {
                 this.downloadProgress$.next(progress);
@@ -56,12 +52,13 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     }
 
     async unloadModel(): Promise<void> {
-        if (!this.worker) {
+        if (!this.workerManager.isInitialized()) {
             return;
         }
 
         try {
-            await this.worker.handleUnload();
+            const worker = this.workerManager.getWorker();
+            await worker.handleUnload();
         } catch (error) {
             log.error("Error unloading Transformers model:", error);
         }
@@ -80,13 +77,15 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     }
 
     async embedText(text: string): Promise<number[]> {
-        if (!this.worker || !this.modelId) {
+        this.workerManager.ensureInitialized();
+        if (!this.modelId) {
             throw new Error("Transformers model not loaded");
         }
 
         this.modelBusy$.next(true);
         try {
-            const result = await this.worker.handleEmbed(text);
+            const worker = this.workerManager.getWorker();
+            const result = await worker.handleEmbed(text);
             return result;
         } finally {
             this.modelBusy$.next(false);
@@ -94,13 +93,15 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     }
 
     async embedTexts(texts: string[]): Promise<number[][]> {
-        if (!this.worker || !this.modelId) {
+        this.workerManager.ensureInitialized();
+        if (!this.modelId) {
             throw new Error("Transformers model not loaded");
         }
 
         this.modelBusy$.next(true);
         try {
-            const result = await this.worker.handleEmbedBatch(texts);
+            const worker = this.workerManager.getWorker();
+            const result = await worker.handleEmbedBatch(texts);
             return result;
         } finally {
             this.modelBusy$.next(false);
@@ -108,11 +109,13 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     }
 
     async countTokens(text: string): Promise<number> {
-        if (!this.worker || !this.modelId) {
+        this.workerManager.ensureInitialized();
+        if (!this.modelId) {
             throw new Error("Transformers model not loaded");
         }
 
-        return await this.worker.handleCountToken(text);
+        const worker = this.workerManager.getWorker();
+        return await worker.handleCountToken(text);
     }
 
     getVectorSize(): number {
@@ -130,7 +133,7 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     }
 
     isModelLoaded(): boolean {
-        return this.worker !== null && this.modelId !== null;
+        return this.workerManager.isInitialized() && this.modelId !== null;
     }
 
     getCurrentModelId(): string | null {
@@ -138,18 +141,15 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     }
 
     dispose(): void {
-        if (this.worker) {
-            this.worker
+        if (this.workerManager.isInitialized()) {
+            const worker = this.workerManager.getWorker();
+            worker
                 .handleUnload()
-                .catch((err) => {
+                .catch((err: unknown) => {
                     log.error("Error unloading Transformers model:", err);
                 })
                 .finally(() => {
-                    if (this.worker && this.worker[Comlink.releaseProxy]) {
-                        this.worker[Comlink.releaseProxy]();
-                    }
-
-                    this.worker = null;
+                    this.workerManager.dispose();
                 });
         }
         this.modelId = null;
@@ -158,15 +158,6 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     }
 
     setLogLevel(level: log.LogLevelDesc): void {
-        if (this.worker) {
-            this.worker
-                .setLogLevel(level)
-                .catch((err) =>
-                    log.error(
-                        "Failed to set log level on TransformersWorker",
-                        err
-                    )
-                );
-        }
+        this.workerManager.updateLogLevel(level);
     }
 }
