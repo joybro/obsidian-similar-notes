@@ -6,10 +6,11 @@ Similar Notes is an Obsidian plugin that uses language models to find and recomm
 
 ## Features
 
--   **Zero External Dependencies**: No need for ChatGPT, Claude, or other external LLM services
--   **Built-in Language Model**: Downloads and runs models directly from Hugging Face
+-   **Flexible Model Options**: Choose between built-in models or connect to Ollama for custom models
+-   **Built-in Language Models**: Downloads and runs models directly from Hugging Face
+-   **Ollama Integration**: Supports any embedding model available through Ollama
 -   **Self-contained**: Includes its own vector database for efficient similarity search
--   **No Local Runner Required**: Unlike solutions that need Ollama or other local services
+-   **Zero External API Dependencies**: No need for ChatGPT, Claude, or other cloud LLM services
 
 ## How It Works
 
@@ -29,13 +30,28 @@ Once initialization is complete, the plugin will start suggesting similar notes 
 
 ## Model Options
 
-The plugin uses language models to calculate semantic similarity between notes:
+The plugin supports two types of model providers:
+
+### Built-in Models (Default)
+
+The plugin can download and run models directly from Hugging Face:
 
 -   **Default Model**: `all-MiniLM-L6-v2` - Optimized for English content
 -   **Multilingual Model**: `paraphrase-multilingual-MiniLM-L12-v2` - Recommended for non-English users
 -   **Custom Models**: You can specify any compatible Sentence Transformer model from Hugging Face
 
-> **Note**: Changing models will trigger re-indexing of all notes, which may take time depending on your vault size.
+### Ollama Integration
+
+If you have Ollama installed locally, you can use any embedding model available through Ollama:
+
+1. Install and run [Ollama](https://ollama.com/)
+2. Pull an embedding model (e.g., `ollama pull nomic-embed-text`)
+3. In plugin settings:
+   - Set Model Provider to "Ollama"
+   - Configure the Ollama URL (default: `http://localhost:11434`)
+   - Select your model from the dropdown
+
+> **Note**: Changing models or providers will trigger re-indexing of all notes, which may take time depending on your vault size.
 
 ## Technical Details
 
