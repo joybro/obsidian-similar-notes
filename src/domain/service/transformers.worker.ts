@@ -106,6 +106,7 @@ class TransformersWorker {
         progress_callback: (progress: number) => void,
         useGPU: boolean = true
     ): Promise<{ vectorSize: number; maxTokens: number }> {
+        log.info(`Loading model: ${modelId}, useGPU: ${useGPU}`);
         const transformers = await importTransformers();
         this.extractor = await transformers.pipeline(
             "feature-extraction",

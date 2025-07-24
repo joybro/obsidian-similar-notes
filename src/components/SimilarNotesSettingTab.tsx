@@ -1,6 +1,6 @@
+import { OllamaClient } from "@/adapter/ollama";
 import type { SettingsService } from "@/application/SettingsService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
-import { OllamaClient } from "@/adapter/ollama";
 import log from "loglevel";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
@@ -10,13 +10,14 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     private indexedNoteCount: number = 0;
     private subscription: { unsubscribe: () => void } | null = null;
     private mTimeStore?: IndexedNoteMTimeStore;
-    
+
     // Temporary state for model changes (not saved until Apply is clicked)
     private tempModelProvider?: "builtin" | "ollama";
     private tempModelId?: string;
     private tempOllamaUrl?: string;
     private tempOllamaModel?: string;
-    
+    private tempUseGPU?: boolean;
+
     // Apply button reference for direct updates
     private applyButton?: any;
 
@@ -72,12 +73,14 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         const settings = this.settingsService.get();
         const { containerEl } = this;
         containerEl.empty();
-        
+
         // Initialize temporary state from current settings
-        this.tempModelProvider = this.tempModelProvider ?? settings.modelProvider;
+        this.tempModelProvider =
+            this.tempModelProvider ?? settings.modelProvider;
         this.tempModelId = this.tempModelId ?? settings.modelId;
         this.tempOllamaUrl = this.tempOllamaUrl ?? settings.ollamaUrl;
         this.tempOllamaModel = this.tempOllamaModel ?? settings.ollamaModel;
+        this.tempUseGPU = this.tempUseGPU ?? settings.useGPU;
 
         new Setting(containerEl)
             .setName("Auto-save interval")
@@ -95,12 +98,14 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("Model").setHeading();
 
         // Current model display
-        const currentModelDesc = settings.modelProvider === "builtin" 
-            ? `Built-in: ${settings.modelId}`
-            : settings.modelProvider === "ollama" 
-                ? `Ollama: ${settings.ollamaModel || 'Not configured'}`
+        const gpuStatus = settings.modelProvider === "builtin" && settings.useGPU ? " (GPU)" : "";
+        const currentModelDesc =
+            settings.modelProvider === "builtin"
+                ? `Built-in: ${settings.modelId}${gpuStatus}`
+                : settings.modelProvider === "ollama"
+                ? `Ollama: ${settings.ollamaModel || "Not configured"}`
                 : "Not configured";
-        
+
         new Setting(containerEl)
             .setName("Current model")
             .setDesc(currentModelDesc);
@@ -148,12 +153,11 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 .setName("Custom model")
                 .setDesc("Enter a custom model ID from Hugging Face")
                 .addText((text) => {
-                    text.setValue(this.tempModelId || "")
-                        .onChange((value) => {
-                            this.tempModelId = value;
-                            // Don't redraw for text input to avoid losing focus
-                            this.updateApplyButtonState(settings);
-                        });
+                    text.setValue(this.tempModelId || "").onChange((value) => {
+                        this.tempModelId = value;
+                        // Don't redraw for text input to avoid losing focus
+                        this.updateApplyButtonState(settings);
+                    });
                 });
 
             new Setting(containerEl)
@@ -162,38 +166,48 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     "If enabled, WebGPU will be used for model inference. Disable if you experience issues with GPU acceleration."
                 )
                 .addToggle((toggle) => {
-                    toggle.setValue(settings.useGPU).onChange(async (value) => {
-                        await this.settingsService.update({
-                            useGPU: value,
+                    toggle
+                        .setValue(this.tempUseGPU ?? settings.useGPU)
+                        .onChange((value) => {
+                            this.tempUseGPU = value;
+                            // Delay redraw to allow toggle animation to complete
+                            setTimeout(() => {
+                                this.display(); // Redraw to update Apply button state
+                            }, 150);
                         });
-                        // Only reload model with new GPU setting without reindexing
-                        this.plugin.reloadModel();
-                    });
                 });
         } else if (this.tempModelProvider === "ollama") {
             // Ollama settings
-            const ollamaUrl = this.tempOllamaUrl || settings.ollamaUrl || "http://localhost:11434";
+            const ollamaUrl =
+                this.tempOllamaUrl ||
+                settings.ollamaUrl ||
+                "http://localhost:11434";
             const ollamaClient = new OllamaClient(ollamaUrl);
-            
+
             // State for Ollama models
             let ollamaModels: string[] = [];
             let modelLoadError: string | null = null;
-            
+
             // Function to fetch Ollama models
             const fetchOllamaModels = async () => {
                 modelLoadError = null;
-                
+
                 try {
                     ollamaModels = await ollamaClient.getModelNames();
                 } catch (error) {
-                    modelLoadError = error instanceof Error ? error.message : "Failed to fetch models";
+                    modelLoadError =
+                        error instanceof Error
+                            ? error.message
+                            : "Failed to fetch models";
                     ollamaModels = [];
                 }
             };
-            
+
             new Setting(containerEl)
                 .setName("Ollama server URL")
-                .setDesc("URL of your Ollama server (default: http://localhost:11434)")
+                .setDesc(
+                    "URL of your Ollama server (default: http://localhost:11434)"
+                )
                 .addText((text) => {
                     text.setPlaceholder("http://localhost:11434")
                         .setValue(ollamaUrl)
@@ -209,7 +223,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             const modelSetting = new Setting(containerEl)
                 .setName("Ollama model")
                 .setDesc("Select an Ollama model for embeddings");
-                
+
             let dropdownComponent: any;
             modelSetting.addDropdown((dropdown) => {
                 dropdownComponent = dropdown;
@@ -220,43 +234,49 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     this.display(); // Redraw to update Apply button state
                 });
             });
-            
+
             // Add refresh button
             modelSetting.addButton((button) => {
-                button.setButtonText("Refresh")
+                button
+                    .setButtonText("Refresh")
                     .setTooltip("Refresh model list")
                     .onClick(async () => {
                         await fetchOllamaModels();
                         this.display(); // Redraw to update dropdown
                     });
             });
-            
+
             // Fetch models on load
             fetchOllamaModels().then(() => {
                 // Update dropdown with fetched models
                 dropdownComponent.selectEl.empty();
-                
+
                 if (modelLoadError) {
                     dropdownComponent.addOption("", `Error: ${modelLoadError}`);
                 } else if (ollamaModels.length === 0) {
                     dropdownComponent.addOption("", "No models found");
                 } else {
                     dropdownComponent.addOption("", "Select a model");
-                    ollamaModels.forEach(model => {
+                    ollamaModels.forEach((model) => {
                         dropdownComponent.addOption(model, model);
                     });
-                    
+
                     // Set current value if it exists in the list
-                    if (this.tempOllamaModel && ollamaModels.includes(this.tempOllamaModel)) {
+                    if (
+                        this.tempOllamaModel &&
+                        ollamaModels.includes(this.tempOllamaModel)
+                    ) {
                         dropdownComponent.setValue(this.tempOllamaModel);
                     }
                 }
             });
-            
+
             // Test connection button
             new Setting(containerEl)
                 .setName("Test connection")
-                .setDesc("Test the connection to Ollama server and selected model")
+                .setDesc(
+                    "Test the connection to Ollama server and selected model"
+                )
                 .addButton((button) => {
                     button.setButtonText("Test").onClick(async () => {
                         const model = this.tempOllamaModel;
@@ -264,15 +284,21 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             new Notice("Please select a model first");
                             return;
                         }
-                        
-                        new Notice(`Testing connection to ${ollamaUrl} with model ${model}...`);
-                        
+
+                        new Notice(
+                            `Testing connection to ${ollamaUrl} with model ${model}...`
+                        );
+
                         try {
                             const success = await ollamaClient.testModel(model);
                             if (success) {
-                                new Notice("Connection successful! Model is ready for embeddings.");
+                                new Notice(
+                                    "Connection successful! Model is ready for embeddings."
+                                );
                             } else {
-                                new Notice(`Connection failed: Model test failed`);
+                                new Notice(
+                                    `Connection failed: Model test failed`
+                                );
                             }
                         } catch (error) {
                             new Notice(`Connection failed: ${error}`);
@@ -283,24 +309,28 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
 
         // Model Apply Button
         const hasChanges = this.hasModelChanges(settings);
-        const buttonText = this.tempModelProvider === "builtin" ? "Load & Apply" : "Apply Changes";
-        const buttonDesc = hasChanges 
+        const buttonText =
+            this.tempModelProvider === "builtin"
+                ? "Load & Apply"
+                : "Apply Changes";
+        const buttonDesc = hasChanges
             ? "Apply the selected model configuration. This will rebuild the similarity index."
             : "No changes to apply. Modify settings above to enable this button.";
-            
+
         new Setting(containerEl)
             .setName("Apply model changes")
             .setDesc(buttonDesc)
             .addButton((button) => {
                 this.applyButton = button; // Store reference for updates
-                button.setButtonText(buttonText)
+                button
+                    .setButtonText(buttonText)
                     .setDisabled(!hasChanges)
                     .onClick(async () => {
                         if (hasChanges) {
                             await this.applyModelChanges(settings);
                         }
                     });
-                
+
                 if (hasChanges) {
                     button.setCta();
                 }
@@ -369,44 +399,49 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 text.setValue(settings.excludeRegexPatterns.join("\n"));
                 // Store error status of each line
                 const errorMessages: Map<number, string> = new Map();
-                
+
                 // Style for highlighting invalid patterns
                 const errorLineClass = "similar-notes-regexp-error";
-                
+
                 // Apply error styles if needed
                 const applyErrorStyles = () => {
                     const textArea = text.inputEl;
                     const lines = textArea.value.split("\n");
-                    
+
                     // Reset all previous error styles
                     textArea.removeClass(errorLineClass);
                     textArea.title = "";
-                    
+
                     // If there are errors, apply error styles
                     if (errorMessages.size > 0) {
                         textArea.addClass(errorLineClass);
-                        
+
                         // Create tooltip with error messages
-                        const tooltipMessages = Array.from(errorMessages.entries())
-                            .map(([line, message]) => `Line ${line + 1}: ${message}`)
+                        const tooltipMessages = Array.from(
+                            errorMessages.entries()
+                        )
+                            .map(
+                                ([line, message]) =>
+                                    `Line ${line + 1}: ${message}`
+                            )
                             .join("\n");
                         textArea.title = tooltipMessages;
                     }
                 };
-                
+
                 text.onChange(async (value) => {
                     // Clear previous errors
                     errorMessages.clear();
-                    
+
                     // Process and validate each line
                     const lines = value.split("\n");
                     const validPatterns: string[] = [];
-                    
+
                     // Check each pattern for validity
                     lines.forEach((pattern, index) => {
                         // Skip empty lines
                         if (pattern.trim().length === 0) return;
-                        
+
                         // Validate the pattern
                         try {
                             new RegExp(pattern);
@@ -416,25 +451,28 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             errorMessages.set(index, e.message);
                         }
                     });
-                    
+
                     // Apply error styles
                     applyErrorStyles();
-                    
+
                     // Save only valid patterns
                     await this.settingsService.update({
                         excludeRegexPatterns: validPatterns,
                     });
-                    
+
                     // Update test output when patterns change
                     processTestInput();
                 });
             });
-        
+
         // Add RegExp tester UI
-        const regExpTesterContainer = containerEl.createDiv("similar-notes-regexp-tester");
+        const regExpTesterContainer = containerEl.createDiv(
+            "similar-notes-regexp-tester"
+        );
         regExpTesterContainer.addClass("setting-item");
-        
-        const regExpTesterHeader = regExpTesterContainer.createDiv("setting-item-info");
+
+        const regExpTesterHeader =
+            regExpTesterContainer.createDiv("setting-item-info");
         const regExpTesterDescription = regExpTesterHeader.createDiv(
             "setting-item-description"
         );
@@ -529,9 +567,14 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     private hasModelChanges(settings: any): boolean {
         return (
             this.tempModelProvider !== settings.modelProvider ||
-            (this.tempModelProvider === "builtin" && this.tempModelId && this.tempModelId !== settings.modelId) ||
-            (this.tempModelProvider === "ollama" && 
-                (this.tempOllamaUrl !== settings.ollamaUrl || this.tempOllamaModel !== settings.ollamaModel))
+            (this.tempModelProvider === "builtin" &&
+                this.tempModelId &&
+                this.tempModelId !== settings.modelId) ||
+            (this.tempModelProvider === "ollama" &&
+                (this.tempOllamaUrl !== settings.ollamaUrl ||
+                    this.tempOllamaModel !== settings.ollamaModel)) ||
+            (this.tempModelProvider === "builtin" &&
+                this.tempUseGPU !== settings.useGPU)
         );
     }
 
@@ -539,8 +582,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         if (this.tempModelProvider === "builtin") {
             // Built-in model - use LoadModelModal
             const modelId = this.tempModelId || settings.modelId;
-            const builtinMessage = "The model will be downloaded from Hugging Face (this might take a while) and all your notes will be reindexed. Do you want to continue?";
-            
+            const builtinMessage =
+                "The model will be downloaded from Hugging Face (this might take a while) and all your notes will be reindexed. Do you want to continue?";
+
             new LoadModelModal(
                 this.app,
                 builtinMessage,
@@ -548,6 +592,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     await this.settingsService.update({
                         modelProvider: this.tempModelProvider,
                         modelId: modelId,
+                        useGPU: this.tempUseGPU ?? settings.useGPU,
                     });
                     this.plugin.changeModel(modelId);
                     // Clear temporary state after successful apply
@@ -558,8 +603,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             ).open();
         } else if (this.tempModelProvider === "ollama") {
             // Ollama model - show confirmation modal
-            const ollamaMessage = "Your embedding model will be changed and all notes will be reindexed. Do you want to continue?";
-            
+            const ollamaMessage =
+                "Your embedding model will be changed and all notes will be reindexed. Do you want to continue?";
+
             new LoadModelModal(
                 this.app,
                 ollamaMessage,
@@ -585,16 +631,20 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         this.tempModelId = undefined;
         this.tempOllamaUrl = undefined;
         this.tempOllamaModel = undefined;
+        this.tempUseGPU = undefined;
     }
 
     private updateApplyButtonState(settings: any): void {
         if (!this.applyButton) return;
-        
+
         const hasChanges = this.hasModelChanges(settings);
-        const buttonText = this.tempModelProvider === "builtin" ? "Load & Apply" : "Apply Changes";
-        
+        const buttonText =
+            this.tempModelProvider === "builtin"
+                ? "Load & Apply"
+                : "Apply Changes";
+
         this.applyButton.setButtonText(buttonText).setDisabled(!hasChanges);
-        
+
         // Update CTA styling
         if (hasChanges) {
             this.applyButton.setCta();

@@ -19,14 +19,19 @@ export class EmbeddingService {
     async switchProvider(settings: SimilarNotesSettings): Promise<void> {
         const newProviderType = settings.modelProvider;
         
-        // If same provider type and model, no need to switch
+        // If same provider type and model, check if GPU settings changed for builtin provider
         if (this.currentProviderType === newProviderType && this.provider?.isModelLoaded()) {
             const currentModelId = this.provider.getCurrentModelId();
             const targetModelId = newProviderType === "builtin" ? settings.modelId : settings.ollamaModel;
             
             if (currentModelId === targetModelId) {
-                log.info("Same provider and model already loaded, skipping switch");
-                return;
+                // For builtin provider, GPU settings change requires reload
+                if (newProviderType === "builtin") {
+                    log.info("Same model but GPU settings may have changed, continuing with provider switch");
+                } else {
+                    log.info("Same provider and model already loaded, skipping switch");
+                    return;
+                }
             }
         }
 
