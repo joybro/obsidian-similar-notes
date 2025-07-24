@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EmbeddingService } from "../EmbeddingService";
+import type { SimilarNotesSettings } from "@/application/SettingsService";
 
 // Mock Comlink.wrap
 vi.mock("comlink", async () => {
@@ -19,7 +20,7 @@ vi.mock("comlink", async () => {
                     };
                 }
                 handleUnload() {
-                    return undefined;
+                    return Promise.resolve();
                 }
                 handleEmbedBatch(texts: string[]) {
                     return Promise.resolve(
@@ -55,21 +56,36 @@ describe("EmbeddingModelService", () => {
 
     describe("loadModel", () => {
         it("should load model successfully", async () => {
-            await service.loadModel("test-model");
+            // Initialize with builtin provider
+            await service.switchProvider({
+                modelProvider: "builtin",
+                modelId: "test-model",
+                useGPU: false,
+                ollamaUrl: "",
+                ollamaModel: ""
+            } as SimilarNotesSettings);
+            
             expect(service.getVectorSize()).toBe(384);
             expect(service.getMaxTokens()).toBe(512);
         });
     });
 
     describe("embedTexts", () => {
-        it("should throw error if model not loaded", async () => {
+        it("should throw error if provider not initialized", async () => {
             await expect(service.embedTexts(["test"])).rejects.toThrow(
-                "Model not loaded"
+                "No embedding provider initialized"
             );
         });
 
         it("should embed texts successfully", async () => {
-            await service.loadModel("test-model");
+            await service.switchProvider({
+                modelProvider: "builtin",
+                modelId: "test-model",
+                useGPU: false,
+                ollamaUrl: "",
+                ollamaModel: ""
+            } as SimilarNotesSettings);
+            
             const embeddings = await service.embedTexts(["test1", "test2"]);
             expect(embeddings).toHaveLength(2);
             expect(embeddings[0]).toHaveLength(384);
@@ -78,23 +94,38 @@ describe("EmbeddingModelService", () => {
     });
 
     describe("countTokens", () => {
-        it("should throw error if model not loaded", async () => {
+        it("should throw error if provider not initialized", async () => {
             await expect(service.countTokens("test")).rejects.toThrow(
-                "Model not loaded"
+                "No embedding provider initialized"
             );
         });
 
         it("should count tokens successfully", async () => {
-            await service.loadModel("test-model");
+            await service.switchProvider({
+                modelProvider: "builtin",
+                modelId: "test-model",
+                useGPU: false,
+                ollamaUrl: "",
+                ollamaModel: ""
+            } as SimilarNotesSettings);
+            
             const tokenCount = await service.countTokens("test text");
             expect(tokenCount).toBe(3); // Math.ceil(9 / 4) = 3
         });
     });
 
     describe("concurrent requests", () => {
+        beforeEach(async () => {
+            await service.switchProvider({
+                modelProvider: "builtin",
+                modelId: "test-model",
+                useGPU: false,
+                ollamaUrl: "",
+                ollamaModel: ""
+            } as SimilarNotesSettings);
+        });
+        
         it("should handle concurrent embedTexts and countTokens requests correctly", async () => {
-            await service.loadModel("test-model");
-
             const [embeddings, tokenCount] = await Promise.all([
                 service.embedTexts(["test1", "test2"]),
                 service.countTokens("test text"),
@@ -107,8 +138,6 @@ describe("EmbeddingModelService", () => {
         });
 
         it("should maintain request order and response matching", async () => {
-            await service.loadModel("test-model");
-
             const results = await Promise.all([
                 service.countTokens("short"),
                 service.countTokens("medium length text"),
@@ -123,22 +152,39 @@ describe("EmbeddingModelService", () => {
 
     describe("unloadModel", () => {
         it("should unload model successfully", async () => {
-            await service.loadModel("test-model");
+            await service.switchProvider({
+                modelProvider: "builtin",
+                modelId: "test-model",
+                useGPU: false,
+                ollamaUrl: "",
+                ollamaModel: ""
+            } as SimilarNotesSettings);
+            
             await service.unloadModel();
+            
+            // After unloading, the provider is still there but model is not loaded
+            // This should throw "Transformers model not loaded"
             await expect(service.embedTexts(["test"])).rejects.toThrow(
-                "Model not loaded"
+                "Transformers model not loaded"
             );
         });
     });
 
     describe("getVectorSize and getMaxTokens", () => {
-        it("should throw error if model not loaded", () => {
-            expect(() => service.getVectorSize()).toThrow("Model not loaded");
-            expect(() => service.getMaxTokens()).toThrow("Model not loaded");
+        it("should throw error if provider not initialized", () => {
+            expect(() => service.getVectorSize()).toThrow("No embedding provider initialized");
+            expect(() => service.getMaxTokens()).toThrow("No embedding provider initialized");
         });
 
         it("should return correct values after model is loaded", async () => {
-            await service.loadModel("test-model");
+            await service.switchProvider({
+                modelProvider: "builtin",
+                modelId: "test-model",
+                useGPU: false,
+                ollamaUrl: "",
+                ollamaModel: ""
+            } as SimilarNotesSettings);
+            
             expect(service.getVectorSize()).toBe(384);
             expect(service.getMaxTokens()).toBe(512);
         });
