@@ -527,7 +527,25 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         // Initialize output when settings tab opens
         setTimeout(() => processTestInput(), 0);
 
-        new Setting(containerEl).setName("Debug").setHeading();
+        new Setting(containerEl).setName("Display").setHeading();
+
+        new Setting(containerEl)
+            .setName("Note display mode")
+            .setDesc(
+                "Choose how note names are displayed in the results"
+            )
+            .addDropdown((dropdown) => {
+                dropdown
+                    .addOption("title", "Title only")
+                    .addOption("path", "Full path")
+                    .addOption("smart", "Smart (path when duplicates exist)")
+                    .setValue(settings.noteDisplayMode)
+                    .onChange(async (value: "title" | "path" | "smart") => {
+                        await this.settingsService.update({
+                            noteDisplayMode: value,
+                        });
+                    });
+            });
 
         new Setting(containerEl)
             .setName("Show source chunk in results")
@@ -543,6 +561,8 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         });
                     });
             });
+
+        new Setting(containerEl).setName("Debug").setHeading();
 
         new Setting(containerEl)
             .setName("Log level")

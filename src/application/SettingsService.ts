@@ -12,6 +12,7 @@ export interface SimilarNotesSettings {
     useGPU: boolean; // Whether to use GPU acceleration for model inference
     excludeRegexPatterns: string[]; // Regular expressions to exclude content from indexing
     regexpTestInputText: string; // Saved test input for RegExp testing
+    noteDisplayMode: "title" | "path" | "smart"; // How to display note names in results
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
@@ -23,6 +24,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     useGPU: true, // Use GPU acceleration by default
     excludeRegexPatterns: [], // Default to no exclusion patterns
     regexpTestInputText: "", // Default to empty test input
+    noteDisplayMode: "title", // Default to showing title only
 };
 
 export class SettingsService {

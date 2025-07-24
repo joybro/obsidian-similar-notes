@@ -19,6 +19,7 @@ export class SimilarNoteCoordinator {
     private noteBottomViewModel$ = new BehaviorSubject<NoteBottomViewModel>({
         currentFile: null,
         similarNoteEntries: [],
+        noteDisplayMode: "title", // Will be properly initialized in constructor
     });
     private cache = new Map<string, SimilarNoteCacheEntry>(); // file path -> entry
 
@@ -28,12 +29,26 @@ export class SimilarNoteCoordinator {
         private readonly similarNoteFinder: SimilarNoteFinder,
         private readonly settingsService: SettingsService
     ) {
+        // Initialize with current settings
+        const currentModel = this.noteBottomViewModel$.value;
+        this.noteBottomViewModel$.next({
+            ...currentModel,
+            noteDisplayMode: this.settingsService.get().noteDisplayMode,
+        });
+
         this.settingsService
             .getNewSettingsObservable()
             .subscribe((newSettings) => {
                 if (newSettings.includeFrontmatter !== undefined) {
                     this.cache.clear();
                 }
+                
+                // Update current model with new settings
+                const currentModel = this.noteBottomViewModel$.value;
+                this.noteBottomViewModel$.next({
+                    ...currentModel,
+                    noteDisplayMode: this.settingsService.get().noteDisplayMode,
+                });
             });
     }
 
@@ -63,6 +78,7 @@ export class SimilarNoteCoordinator {
         this.noteBottomViewModel$.next({
             currentFile: file,
             similarNoteEntries: similarNotes,
+            noteDisplayMode: this.settingsService.get().noteDisplayMode,
         });
     }
 

@@ -45,6 +45,15 @@
     font-size: max(var(--font-ui-small), var(--font-smaller));
 }
 
+/* Note title/path display with truncation */
+.similar-notes-pane .tree-item-inner {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0; /* Allow flexbox to shrink below content size */
+}
+
 /* Animation transition for search result previews */
 .search-result-file-matches {
     max-height: 1000px; /* 충분히 큰 값으로 설정 */

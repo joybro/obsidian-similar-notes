@@ -1,3 +1,4 @@
+import { getNoteDisplayText } from "@/utils/displayUtils";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { Menu } from "obsidian";
 import { useEffect, useState } from "react";
@@ -14,6 +15,7 @@ export interface SimilarNoteEntry {
 export interface NoteBottomViewModel {
     currentFile: TFile | null;
     similarNoteEntries: SimilarNoteEntry[];
+    noteDisplayMode: "title" | "path" | "smart";
 }
 
 interface SimilarNotesHeaderProps {
@@ -90,10 +92,14 @@ const SearchResult = ({
     note,
     onNoteClick,
     onContextMenu,
+    noteDisplayMode,
+    allSimilarNotes,
 }: {
     note: SimilarNoteEntry;
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
+    noteDisplayMode: "title" | "path" | "smart";
+    allSimilarNotes: SimilarNoteEntry[];
 }) => {
     const [isCollapsed, setIsCollapsed] = useState(true);
     // Separate state to control whether the component is rendered in the DOM
@@ -175,7 +181,14 @@ const SearchResult = ({
                         <path d="M3 8L12 17L21 8" />
                     </svg>
                 </div>
-                <div className="tree-item-inner">{note.title}</div>
+                <div className="tree-item-inner" title={note.file.path}>
+                    {getNoteDisplayText(
+                        note.file,
+                        note.title,
+                        { noteDisplayMode },
+                        allSimilarNotes.map((entry) => entry.file)
+                    )}
+                </div>
                 <div className="tree-item-flair-outer">
                     <div className="tree-item-flair">
                         {note.similarity.toFixed(2)}
@@ -197,10 +210,12 @@ const SearchResultsContainer = ({
     similarNotes,
     onNoteClick,
     onContextMenu,
+    noteDisplayMode,
 }: {
     similarNotes: SimilarNoteEntry[];
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
+    noteDisplayMode: "title" | "path" | "smart";
 }) => {
     if (similarNotes.length === 0) {
         return (
@@ -215,12 +230,14 @@ const SearchResultsContainer = ({
     return (
         <div className="search-result-container">
             <div className="search-results-children">
-                {similarNotes.map((note, i) => (
+                {similarNotes.map((note) => (
                     <SearchResult
                         key={note.file.path}
                         note={note}
                         onNoteClick={onNoteClick}
                         onContextMenu={onContextMenu}
+                        noteDisplayMode={noteDisplayMode}
+                        allSimilarNotes={similarNotes}
                     />
                 ))}
             </div>
@@ -237,6 +254,9 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
 }) => {
     const [collapsed, setCollapsed] = useState(false);
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
+    const [noteDisplayMode, setNoteDisplayMode] = useState<
+        "title" | "path" | "smart"
+    >("title");
 
     const handleNewViewModel = (model: NoteBottomViewModel) => {
         if (leaf.file !== model.currentFile) {
@@ -244,6 +264,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
         }
 
         setSimilarNotes(model.similarNoteEntries);
+        setNoteDisplayMode(model.noteDisplayMode);
     };
 
     // biome-ignore lint/correctness/useExhaustiveDependencies(handleNewViewModel):
@@ -301,6 +322,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                         similarNotes={similarNotes}
                         onNoteClick={handleNoteClick}
                         onContextMenu={handleContextMenu}
+                        noteDisplayMode={noteDisplayMode}
                     />
                 )}
             </div>
