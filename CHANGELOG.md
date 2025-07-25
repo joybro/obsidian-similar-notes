@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2025-07-25
+
+### Added
+
+-   **Similar Notes Sidebar**: New sidebar view accessible via ribbon icon
+    -   Displays similar notes in Obsidian's right sidebar
+    -   Automatically tracks the currently active file
+    -   Same UI and functionality as bottom view but in a dedicated panel
+    -   Toggleable independently from bottom view display
+-   **Bottom View Toggle**: New setting to show/hide similar notes at the bottom of notes
+    -   Located in Display section: "Show similar notes at the bottom of notes"
+    -   Enabled by default for backward compatibility
+    -   When disabled, similar notes are hidden from note bottoms but sidebar remains available
+
+### Changed
+
+-   **Architecture Improvements**: Major refactoring for better maintainability
+    -   Introduced ViewManager abstraction for managing view lifecycles
+    -   Improved dependency injection following SOLID principles
+    -   Enhanced error handling with graceful degradation
+    -   Better separation of concerns between components
+
+### Fixed
+
+-   **Error Handling**: Improved stability when views fail to create (e.g., missing backlinks container)
+
+### Other
+
+-   n/a
+
 ## [0.6.0] - 2025-07-24
 
 ### Added
