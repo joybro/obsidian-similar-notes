@@ -1,4 +1,5 @@
 import { NoteBottomView } from "@/components/NoteBottomView";
+import log from "loglevel";
 import type { App, WorkspaceLeaf } from "obsidian";
 import { MarkdownView } from "obsidian";
 import type { SettingsService } from "./SettingsService";
@@ -32,14 +33,20 @@ export class LeafViewCoordinator {
 
         if (this.noteBottomViewMap.has(leaf.view)) return;
 
-        const similarNotesView = await this.createAndAttachNoteBottomView(
-            leaf.view
-        );
-        if (!similarNotesView) {
-            throw new Error("Failed to create similar notes view");
-        }
+        try {
+            const similarNotesView = await this.createAndAttachNoteBottomView(
+                leaf.view
+            );
 
-        this.noteBottomViewMap.set(leaf.view, similarNotesView);
+            if (similarNotesView) {
+                this.noteBottomViewMap.set(leaf.view, similarNotesView);
+            }
+            // If view creation returns null, it's a valid case (e.g., no backlinks container)
+            // so we don't throw an error
+        } catch (error) {
+            log.error("Failed to create similar notes view:", error);
+            // Don't throw - allow the plugin to continue functioning
+        }
     }
 
     async onLayoutChange(): Promise<void> {
@@ -63,53 +70,66 @@ export class LeafViewCoordinator {
     private async createAndAttachNoteBottomView(
         view: MarkdownView
     ): Promise<NoteBottomView | null> {
-        // Find embedded backlinks container
-        const embeddedBacklinksContainer = view.containerEl.querySelector(
-            ".embedded-backlinks"
-        );
+        try {
+            // Validate prerequisites
+            if (!view.file) {
+                // No file open in this view - this is normal
+                return null;
+            }
 
-        if (
-            !embeddedBacklinksContainer ||
-            !embeddedBacklinksContainer?.parentElement
-        ) {
+            // Find embedded backlinks container
+            const embeddedBacklinksContainer = view.containerEl.querySelector(
+                ".embedded-backlinks"
+            );
+
+            if (
+                !embeddedBacklinksContainer ||
+                !embeddedBacklinksContainer?.parentElement
+            ) {
+                // Some views might not have backlinks container - this is expected
+                return null;
+            }
+
+            const noteBottomView = new NoteBottomView(
+                this.app.workspace,
+                this.app.vault.getName(),
+                view,
+                embeddedBacklinksContainer.parentElement,
+                this.similarNoteCoordinator.getNoteBottomViewModelObservable()
+            );
+
+            // Move similar notes container before embedded backlinks container
+            const noteBottomViewContainerEl = noteBottomView.getContainerEl();
+            embeddedBacklinksContainer.parentElement.insertBefore(
+                noteBottomViewContainerEl,
+                embeddedBacklinksContainer
+            );
+
+            return noteBottomView;
+        } catch (error) {
+            log.error("Error creating NoteBottomView:", error);
+            // Return null instead of throwing to allow graceful degradation
             return null;
         }
-
-        if (!view.file) {
-            return null;
-        }
-
-        const noteBottomView = new NoteBottomView(
-            this.app.workspace,
-            this.app.vault.getName(),
-            view,
-            embeddedBacklinksContainer.parentElement,
-            this.similarNoteCoordinator.getNoteBottomViewModelObservable()
-        );
-
-        // Move similar notes container before embedded backlinks container
-        const noteBottomViewContainerEl = noteBottomView.getContainerEl();
-        embeddedBacklinksContainer.parentElement.insertBefore(
-            noteBottomViewContainerEl,
-            embeddedBacklinksContainer
-        );
-
-        return noteBottomView;
     }
 
     private handleShowAtBottomChange(showAtBottom: boolean): void {
         if (showAtBottom) {
             // Re-create views for all open markdown leaves
             const activeLeaves = this.app.workspace.getLeavesOfType("markdown");
-            activeLeaves.forEach((leaf) => {
+            activeLeaves.forEach(async (leaf) => {
                 if (leaf.view instanceof MarkdownView) {
-                    this.onActiveLeafChange(leaf);
+                    await this.onActiveLeafChange(leaf);
                 }
             });
         } else {
             // Remove all bottom views
-            for (const [view, bottomView] of this.noteBottomViewMap) {
-                bottomView.unload();
+            for (const [, bottomView] of this.noteBottomViewMap) {
+                try {
+                    bottomView.unload();
+                } catch (error) {
+                    log.error("Error unloading bottom view:", error);
+                }
             }
             this.noteBottomViewMap.clear();
         }
