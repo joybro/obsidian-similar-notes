@@ -6,6 +6,10 @@ import { NoteIndexingService } from "./application/NoteIndexingService";
 import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
+import {
+    SimilarNotesSidebarView,
+    VIEW_TYPE_SIMILAR_NOTES_SIDEBAR,
+} from "./components/SimilarNotesSidebarView";
 import { StatusBarView } from "./components/StatusBarView";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "./domain/repository/NoteRepository";
@@ -151,11 +155,49 @@ export default class MainPlugin extends Plugin {
             this.modelService.getDownloadProgress$()
         );
 
+        // Register sidebar view
+        this.registerView(
+            VIEW_TYPE_SIMILAR_NOTES_SIDEBAR,
+            (leaf) =>
+                new SimilarNotesSidebarView(
+                    leaf,
+                    this.similarNoteCoordinator.getNoteBottomViewModelObservable()
+                )
+        );
+
+        // Add ribbon icon
+        this.addRibbonIcon("files", "Open Similar Notes sidebar", () => {
+            this.activateSimilarNotesView();
+        });
+
         // Complete initialization
         await this.init(this.settingsService.get().modelId, true, false);
     }
 
+    async activateSimilarNotesView() {
+        const existing = this.app.workspace.getLeavesOfType(
+            VIEW_TYPE_SIMILAR_NOTES_SIDEBAR
+        );
+
+        if (existing.length > 0) {
+            // If sidebar is already open, focus it
+            this.app.workspace.revealLeaf(existing[0]);
+        } else {
+            // Open in right sidebar
+            const leaf = this.app.workspace.getRightLeaf(false);
+            if (leaf) {
+                await leaf.setViewState({
+                    type: VIEW_TYPE_SIMILAR_NOTES_SIDEBAR,
+                    active: true,
+                });
+            }
+        }
+    }
+
     async onunload() {
+        // Clean up sidebar views
+        this.app.workspace.detachLeavesOfType(VIEW_TYPE_SIMILAR_NOTES_SIDEBAR);
+
         this.statusBarView.dispose();
         this.noteIndexingService.stopLoop();
         this.leafViewCoordinator.onUnload();
