@@ -1,12 +1,12 @@
+import { VIEW_TYPE_SIMILAR_NOTES_SIDEBAR } from "@/constants/viewTypes";
+import { createActiveFileMockView } from "@/utils/viewUtils";
 import type { WorkspaceLeaf } from "obsidian";
-import { ItemView, MarkdownView } from "obsidian";
+import { ItemView } from "obsidian";
 import { createRoot, Root } from "react-dom/client";
 import type { Observable } from "rxjs";
 import NoteBottomViewReact, {
     type NoteBottomViewModel,
 } from "./NoteBottomViewReact";
-
-export const VIEW_TYPE_SIMILAR_NOTES_SIDEBAR = "similar-notes-sidebar";
 
 export class SimilarNotesSidebarView extends ItemView {
     private root: Root | null = null;
@@ -38,14 +38,7 @@ export class SimilarNotesSidebarView extends ItemView {
         container.addClass("similar-notes-sidebar-container");
 
         // Create a mock leaf that represents the current active file
-        const mockLeaf = {
-            get file() {
-                const activeView =
-                    this.app.workspace.getActiveViewOfType(MarkdownView);
-                return activeView?.file || null;
-            },
-            app: this.app,
-        } as MarkdownView;
+        const mockLeaf = createActiveFileMockView(this.app);
 
         // Create React root and render component
         this.root = createRoot(container);

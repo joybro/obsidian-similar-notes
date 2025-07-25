@@ -6,10 +6,8 @@ import { NoteIndexingService } from "./application/NoteIndexingService";
 import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
-import {
-    SimilarNotesSidebarView,
-    VIEW_TYPE_SIMILAR_NOTES_SIDEBAR,
-} from "./components/SimilarNotesSidebarView";
+import { SimilarNotesSidebarView } from "./components/SimilarNotesSidebarView";
+import { VIEW_TYPE_SIMILAR_NOTES_SIDEBAR } from "./constants/viewTypes";
 import { StatusBarView } from "./components/StatusBarView";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "./domain/repository/NoteRepository";
