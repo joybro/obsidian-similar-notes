@@ -530,6 +530,19 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("Display").setHeading();
 
         new Setting(containerEl)
+            .setName("Show similar notes at the bottom of notes")
+            .setDesc(
+                "Display similar notes section at the bottom of each note"
+            )
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(settings.showAtBottom)
+                    .onChange((value) => {
+                        this.settingsService.update({ showAtBottom: value });
+                    });
+            });
+
+        new Setting(containerEl)
             .setName("Note display mode")
             .setDesc(
                 "Choose how note names are displayed in the results"

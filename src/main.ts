@@ -125,7 +125,8 @@ export default class MainPlugin extends Plugin {
 
         this.leafViewCoordinator = new LeafViewCoordinator(
             this.app,
-            this.similarNoteCoordinator
+            this.similarNoteCoordinator,
+            this.settingsService
         );
 
         // Initialize file change queue

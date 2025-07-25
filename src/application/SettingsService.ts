@@ -13,6 +13,7 @@ export interface SimilarNotesSettings {
     excludeRegexPatterns: string[]; // Regular expressions to exclude content from indexing
     regexpTestInputText: string; // Saved test input for RegExp testing
     noteDisplayMode: "title" | "path" | "smart"; // How to display note names in results
+    showAtBottom: boolean; // Whether to show similar notes at the bottom of notes
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
@@ -25,6 +26,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     excludeRegexPatterns: [], // Default to no exclusion patterns
     regexpTestInputText: "", // Default to empty test input
     noteDisplayMode: "title", // Default to showing title only
+    showAtBottom: true, // Show similar notes at the bottom by default
 };
 
 export class SettingsService {

@@ -58,6 +58,7 @@ describe("SimilarNotesViewReact", () => {
         excludeRegexPatterns: [],
         regexpTestInputText: "",
         noteDisplayMode: "title",
+        showAtBottom: true,
     };
 
     beforeEach(() => {

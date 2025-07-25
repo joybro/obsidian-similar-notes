@@ -1,6 +1,7 @@
 import { NoteBottomView } from "@/components/NoteBottomView";
 import type { App, WorkspaceLeaf } from "obsidian";
 import { MarkdownView } from "obsidian";
+import type { SettingsService } from "./SettingsService";
 import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 
 export class LeafViewCoordinator {
@@ -8,11 +9,24 @@ export class LeafViewCoordinator {
 
     constructor(
         private app: App,
-        private similarNoteCoordinator: SimilarNoteCoordinator
-    ) {}
+        private similarNoteCoordinator: SimilarNoteCoordinator,
+        private settingsService: SettingsService
+    ) {
+        // Listen for showAtBottom setting changes
+        this.settingsService.getNewSettingsObservable().subscribe((changes) => {
+            if (changes.showAtBottom !== undefined) {
+                this.handleShowAtBottomChange(changes.showAtBottom);
+            }
+        });
+    }
 
     async onActiveLeafChange(leaf: WorkspaceLeaf | null): Promise<void> {
         if (!leaf || !(leaf.view instanceof MarkdownView)) {
+            return;
+        }
+
+        // Only create view if showAtBottom is enabled
+        if (!this.settingsService.get().showAtBottom) {
             return;
         }
 
@@ -81,5 +95,23 @@ export class LeafViewCoordinator {
         );
 
         return noteBottomView;
+    }
+
+    private handleShowAtBottomChange(showAtBottom: boolean): void {
+        if (showAtBottom) {
+            // Re-create views for all open markdown leaves
+            const activeLeaves = this.app.workspace.getLeavesOfType("markdown");
+            activeLeaves.forEach((leaf) => {
+                if (leaf.view instanceof MarkdownView) {
+                    this.onActiveLeafChange(leaf);
+                }
+            });
+        } else {
+            // Remove all bottom views
+            for (const [view, bottomView] of this.noteBottomViewMap) {
+                bottomView.unload();
+            }
+            this.noteBottomViewMap.clear();
+        }
     }
 }
