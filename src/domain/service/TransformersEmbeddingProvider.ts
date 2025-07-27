@@ -1,9 +1,10 @@
+import { WorkerManager } from "@/infrastructure/WorkerManager";
 import * as Comlink from "comlink";
 import log from "loglevel";
+import { Notice } from "obsidian";
 import { type Observable, Subject } from "rxjs";
-import type { TransformersWorker } from "./transformers.worker";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
-import { WorkerManager } from "@/infrastructure/WorkerManager";
+import type { TransformersWorker } from "./transformers.worker";
 // @ts-ignore
 import InlineWorker from "./transformers.worker";
 
@@ -18,37 +19,84 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     private maxTokens: number | null = null;
     private modelBusy$ = new Subject<boolean>();
     private downloadProgress$ = new Subject<number>();
+    private modelError$ = new Subject<string | null>();
 
     constructor() {
-        this.workerManager = new WorkerManager<TransformersWorker>("TransformersWorker");
+        this.workerManager = new WorkerManager<TransformersWorker>(
+            "TransformersWorker"
+        );
     }
 
-    async loadModel(modelId: string, config?: TransformersConfig): Promise<ModelInfo> {
+    async loadModel(
+        modelId: string,
+        config?: TransformersConfig
+    ): Promise<ModelInfo> {
         const useGPU = config?.useGPU ?? true;
         log.info("Loading Transformers model", modelId, "with GPU:", useGPU);
-        
+
+        // Clear any previous error state
+        this.modelError$.next(null);
+
         // Clean up existing worker if any
         await this.unloadModel();
-        
-        const worker = await this.workerManager.initialize(InlineWorker);
 
-        const response = await worker.handleLoad(
-            modelId,
-            Comlink.proxy((progress: number) => {
-                this.downloadProgress$.next(progress);
-            }),
-            useGPU
-        );
-        log.info("Transformers model loaded", response);
+        try {
+            const worker = await this.workerManager.initialize(InlineWorker);
 
-        this.modelId = modelId;
-        this.vectorSize = response.vectorSize;
-        this.maxTokens = response.maxTokens;
+            const response = await worker.handleLoad(
+                modelId,
+                Comlink.proxy((progress: number) => {
+                    this.downloadProgress$.next(progress);
+                }),
+                useGPU
+            );
+            log.info("Transformers model loaded", response);
 
-        return {
-            vectorSize: response.vectorSize,
-            maxTokens: response.maxTokens,
-        };
+            this.modelId = modelId;
+            this.vectorSize = response.vectorSize;
+            this.maxTokens = response.maxTokens;
+
+            return {
+                vectorSize: response.vectorSize,
+                maxTokens: response.maxTokens,
+            };
+        } catch (error) {
+            const errorMessage =
+                error instanceof Error
+                    ? error.message
+                    : "Unknown error occurred";
+            log.error("Failed to load Transformers model:", errorMessage);
+
+            // Extract simplified error message for user display
+            let userFriendlyMessage = errorMessage;
+            if (
+                errorMessage.includes("webgpu") ||
+                errorMessage.includes("WebGPU")
+            ) {
+                userFriendlyMessage =
+                    "GPU acceleration failed - try disabling GPU in settings";
+            } else if (errorMessage.includes("Failed to get GPU adapter")) {
+                userFriendlyMessage =
+                    "GPU not available - disable GPU acceleration in settings";
+            } else if (
+                errorMessage.includes("network") ||
+                errorMessage.includes("fetch")
+            ) {
+                userFriendlyMessage =
+                    "Network error - check your internet connection";
+            } else if (errorMessage.length > 100) {
+                // Truncate very long error messages
+                userFriendlyMessage = errorMessage.substring(0, 100) + "...";
+            }
+
+            // Show notice to user
+            new Notice(`Failed to load model: ${userFriendlyMessage}`, 8000);
+
+            // Emit error state
+            this.modelError$.next(userFriendlyMessage);
+
+            throw error;
+        }
     }
 
     async unloadModel(): Promise<void> {
@@ -74,6 +122,10 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
 
     getDownloadProgress$(): Observable<number> {
         return this.downloadProgress$.asObservable();
+    }
+
+    getModelError$(): Observable<string | null> {
+        return this.modelError$.asObservable();
     }
 
     async embedText(text: string): Promise<number[]> {

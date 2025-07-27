@@ -18,10 +18,12 @@ export class EmbeddingService {
     // Proxy subjects that relay provider's observables
     private modelBusy$ = new Subject<boolean>();
     private downloadProgress$ = new Subject<number>();
+    private modelError$ = new Subject<string | null>();
 
     // Subscriptions to provider's observables
     private modelBusySubscription?: Subscription;
     private downloadProgressSubscription?: Subscription;
+    private modelErrorSubscription?: Subscription;
 
     /**
      * Switch to a different embedding provider based on settings
@@ -65,6 +67,7 @@ export class EmbeddingService {
             // Unsubscribe from current provider's observables
             this.modelBusySubscription?.unsubscribe();
             this.downloadProgressSubscription?.unsubscribe();
+            this.modelErrorSubscription?.unsubscribe();
 
             this.provider.dispose();
             this.provider = null;
@@ -110,6 +113,18 @@ export class EmbeddingService {
             .subscribe((progress) => {
                 this.downloadProgress$.next(progress);
             });
+
+        // Subscribe to model error observable (if provider supports it)
+        if (
+            "getModelError$" in this.provider &&
+            typeof this.provider.getModelError$ === "function"
+        ) {
+            this.modelErrorSubscription = (this.provider as any)
+                .getModelError$()
+                .subscribe((error: string | null) => {
+                    this.modelError$.next(error);
+                });
+        }
     }
 
     /**
@@ -139,6 +154,10 @@ export class EmbeddingService {
 
     getDownloadProgress$(): Observable<number> {
         return this.downloadProgress$.asObservable();
+    }
+
+    getModelError$(): Observable<string | null> {
+        return this.modelError$.asObservable();
     }
 
     async embedText(text: string): Promise<number[]> {
@@ -192,6 +211,7 @@ export class EmbeddingService {
         // Clean up subscriptions
         this.modelBusySubscription?.unsubscribe();
         this.downloadProgressSubscription?.unsubscribe();
+        this.modelErrorSubscription?.unsubscribe();
 
         if (this.provider) {
             this.provider.dispose();

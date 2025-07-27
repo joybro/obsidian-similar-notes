@@ -12,7 +12,8 @@ export class StatusBarView {
         private plugin: Plugin,
         private noteChangeCount$: Observable<number>,
         private modelBusy$: Observable<boolean>,
-        private downloadProgress$: Observable<number>
+        private downloadProgress$: Observable<number>,
+        private modelError$?: Observable<string | null>
     ) {
         this.modelBusyItem = this.plugin.addStatusBarItem();
         this.modelDownloadProgressItem = this.plugin.addStatusBarItem();
@@ -35,7 +36,8 @@ export class StatusBarView {
                 this.noteCountItem.show();
 
                 // Show notice when crossing 100-note thresholds
-                const currentThreshold = Math.floor((count - 1) / 100) * 100 + 100;
+                const currentThreshold =
+                    Math.floor((count - 1) / 100) * 100 + 100;
                 if (
                     this.lastNotifiedThreshold !== null &&
                     currentThreshold < this.lastNotifiedThreshold
@@ -50,6 +52,17 @@ export class StatusBarView {
                 this.lastNotifiedThreshold = null;
             }
         });
+
+        // Subscribe to model error changes
+        if (this.modelError$) {
+            this.modelError$.subscribe((error) => {
+                if (error) {
+                    this.setStatus("error");
+                } else {
+                    this.setStatus("ready");
+                }
+            });
+        }
 
         // It turned out to be too short time to be useful
         // this.modelBusy$.subscribe((busy) => {

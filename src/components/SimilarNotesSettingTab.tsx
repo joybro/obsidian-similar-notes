@@ -13,7 +13,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     private mTimeStore?: IndexedNoteMTimeStore;
     private modelService?: EmbeddingService;
     private downloadProgressSubscription?: { unsubscribe: () => void };
+    private modelErrorSubscription?: { unsubscribe: () => void };
     private currentDownloadProgress: number = 100;
+    private currentModelError: string | null = null;
 
     // Temporary state for model changes (not saved until Apply is clicked)
     private tempModelProvider?: "builtin" | "ollama";
@@ -70,9 +72,12 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
      * This allows the EmbeddingService to be initialized after the tab is created.
      */
     setModelService(modelService: EmbeddingService): void {
-        // Clean up existing subscription if any
+        // Clean up existing subscriptions if any
         if (this.downloadProgressSubscription) {
             this.downloadProgressSubscription.unsubscribe();
+        }
+        if (this.modelErrorSubscription) {
+            this.modelErrorSubscription.unsubscribe();
         }
 
         this.modelService = modelService;
@@ -84,7 +89,22 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 const previousProgress = this.currentDownloadProgress;
                 this.currentDownloadProgress = progress;
                 // Redraw the settings tab if it's active and progress changed
-                if (this.containerEl.isShown() && previousProgress !== progress) {
+                if (
+                    this.containerEl.isShown() &&
+                    previousProgress !== progress
+                ) {
+                    this.display();
+                }
+            });
+
+        // Subscribe to model error changes
+        this.modelErrorSubscription = this.modelService
+            .getModelError$()
+            .subscribe((error) => {
+                const previousError = this.currentModelError;
+                this.currentModelError = error;
+                // Redraw the settings tab if it's active and error changed
+                if (this.containerEl.isShown() && previousError !== error) {
                     this.display();
                 }
             });
@@ -99,6 +119,10 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         if (this.downloadProgressSubscription) {
             this.downloadProgressSubscription.unsubscribe();
             this.downloadProgressSubscription = undefined;
+        }
+        if (this.modelErrorSubscription) {
+            this.modelErrorSubscription.unsubscribe();
+            this.modelErrorSubscription = undefined;
         }
     }
 
@@ -150,6 +174,11 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             currentModelDesc += ` - Downloading: ${Math.floor(
                 this.currentDownloadProgress
             )}%`;
+        }
+
+        // Add error status if there's an error
+        if (this.currentModelError) {
+            currentModelDesc += ` - Failed: ${this.currentModelError}`;
         }
 
         new Setting(containerEl)
