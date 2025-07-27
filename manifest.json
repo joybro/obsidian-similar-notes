@@ -6,5 +6,5 @@
     "description": "Recommends semantically similar notes to the currently viewed note.",
     "author": "Young Lee",
     "authorUrl": "https://github.com/joybro",
-    "isDesktopOnly": true
+    "isDesktopOnly": false
 }
