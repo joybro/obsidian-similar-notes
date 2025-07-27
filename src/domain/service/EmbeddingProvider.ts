@@ -52,6 +52,11 @@ export interface EmbeddingProvider {
     getDownloadProgress$(): Observable<number>;
 
     /**
+     * Get observable for model error state
+     */
+    getModelError$(): Observable<string | null>;
+
+    /**
      * Check if model is currently loaded
      */
     isModelLoaded(): boolean;

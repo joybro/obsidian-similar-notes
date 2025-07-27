@@ -1,4 +1,5 @@
 import log from "loglevel";
+import { Notice } from "obsidian";
 import { type Observable, Subject } from "rxjs";
 import { OllamaClient } from "@/adapter/ollama";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
@@ -15,6 +16,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     private maxTokens: number | null = null;
     private modelBusy$ = new Subject<boolean>();
     private downloadProgress$ = new Subject<number>();
+    private modelError$ = new Subject<string | null>();
 
     constructor(private config: OllamaConfig) {
         this.ollamaClient = new OllamaClient(config.url);
@@ -23,6 +25,9 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     async loadModel(modelId: string, config?: OllamaConfig): Promise<ModelInfo> {
         const finalConfig = config || this.config;
         log.info("Loading Ollama model", modelId, "from", finalConfig.url);
+
+        // Clear any previous error state
+        this.modelError$.next(null);
 
         // Update client URL if changed
         if (finalConfig.url !== this.config.url) {
@@ -64,7 +69,26 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
                 maxTokens: this.maxTokens,
             };
         } catch (error) {
-            log.error("Failed to load Ollama model:", error);
+            const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+            log.error("Failed to load Ollama model:", errorMessage);
+            
+            // Extract simplified error message for user display
+            let userFriendlyMessage = errorMessage;
+            if (errorMessage.includes("Cannot connect")) {
+                userFriendlyMessage = "Cannot connect to Ollama server - check if Ollama is running";
+            } else if (errorMessage.includes("not available")) {
+                userFriendlyMessage = "Model not found - check if model is installed in Ollama";
+            } else if (errorMessage.length > 100) {
+                // Truncate very long error messages
+                userFriendlyMessage = errorMessage.substring(0, 100) + "...";
+            }
+            
+            // Show notice to user
+            new Notice(`Failed to load Ollama model: ${userFriendlyMessage}`, 8000);
+            
+            // Emit error state
+            this.modelError$.next(userFriendlyMessage);
+            
             throw error;
         }
     }
@@ -84,6 +108,10 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     getDownloadProgress$(): Observable<number> {
         // Ollama models are already downloaded, so always return 100%
         return this.downloadProgress$.asObservable();
+    }
+
+    getModelError$(): Observable<string | null> {
+        return this.modelError$.asObservable();
     }
 
     async embedText(text: string): Promise<number[]> {

@@ -114,17 +114,12 @@ export class EmbeddingService {
                 this.downloadProgress$.next(progress);
             });
 
-        // Subscribe to model error observable (if provider supports it)
-        if (
-            "getModelError$" in this.provider &&
-            typeof this.provider.getModelError$ === "function"
-        ) {
-            this.modelErrorSubscription = (this.provider as any)
-                .getModelError$()
-                .subscribe((error: string | null) => {
-                    this.modelError$.next(error);
-                });
-        }
+        // Subscribe to model error observable
+        this.modelErrorSubscription = this.provider
+            .getModelError$()
+            .subscribe((error: string | null) => {
+                this.modelError$.next(error);
+            });
     }
 
     /**
