@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2025-07-27
+
+### Added
+
+-   **Command Palette Integration**: Three new commands accessible via command palette (Cmd/Ctrl+P)
+    -   **Show Similar Notes**: Opens the similar notes sidebar
+    -   **Toggle in-document view**: Toggles the display of similar notes at the bottom of documents
+    -   **Reindex all notes**: Forces a complete rebuild of the note index
+
+### Changed
+
+-   n/a
+
+### Fixed
+
+-   n/a
+
+### Other
+
+-   n/a
+
 ## [0.7.0] - 2025-07-25
 
 ### Added
