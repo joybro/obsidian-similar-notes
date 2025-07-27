@@ -1,5 +1,6 @@
 import { OllamaClient } from "@/adapter/ollama";
 import type { SettingsService } from "@/application/SettingsService";
+import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import log from "loglevel";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
@@ -10,6 +11,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     private indexedNoteCount: number = 0;
     private subscription: { unsubscribe: () => void } | null = null;
     private mTimeStore?: IndexedNoteMTimeStore;
+    private modelService?: EmbeddingService;
+    private downloadProgressSubscription?: { unsubscribe: () => void };
+    private currentDownloadProgress: number = 100;
 
     // Temporary state for model changes (not saved until Apply is clicked)
     private tempModelProvider?: "builtin" | "ollama";
@@ -61,11 +65,40 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             });
     }
 
+    /**
+     * Set the EmbeddingService and update subscriptions.
+     * This allows the EmbeddingService to be initialized after the tab is created.
+     */
+    setModelService(modelService: EmbeddingService): void {
+        // Clean up existing subscription if any
+        if (this.downloadProgressSubscription) {
+            this.downloadProgressSubscription.unsubscribe();
+        }
+
+        this.modelService = modelService;
+
+        // Subscribe to download progress changes
+        this.downloadProgressSubscription = this.modelService
+            .getDownloadProgress$()
+            .subscribe((progress) => {
+                const previousProgress = this.currentDownloadProgress;
+                this.currentDownloadProgress = progress;
+                // Redraw the settings tab if it's active and progress changed
+                if (this.containerEl.isShown() && previousProgress !== progress) {
+                    this.display();
+                }
+            });
+    }
+
     onClose() {
         // Clean up subscription when the settings tab is closed
         if (this.subscription) {
             this.subscription.unsubscribe();
             this.subscription = null;
+        }
+        if (this.downloadProgressSubscription) {
+            this.downloadProgressSubscription.unsubscribe();
+            this.downloadProgressSubscription = undefined;
         }
     }
 
@@ -98,13 +131,26 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("Model").setHeading();
 
         // Current model display
-        const gpuStatus = settings.modelProvider === "builtin" && settings.useGPU ? " (GPU)" : "";
-        const currentModelDesc =
+        const gpuStatus =
+            settings.modelProvider === "builtin" && settings.useGPU
+                ? " (GPU)"
+                : "";
+        let currentModelDesc =
             settings.modelProvider === "builtin"
                 ? `Built-in: ${settings.modelId}${gpuStatus}`
                 : settings.modelProvider === "ollama"
                 ? `Ollama: ${settings.ollamaModel || "Not configured"}`
                 : "Not configured";
+
+        // Add download progress if downloading
+        if (
+            this.currentDownloadProgress < 100 &&
+            settings.modelProvider === "builtin"
+        ) {
+            currentModelDesc += ` - Downloading: ${Math.floor(
+                this.currentDownloadProgress
+            )}%`;
+        }
 
         new Setting(containerEl)
             .setName("Current model")
@@ -531,22 +577,16 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName("Show similar notes at the bottom of notes")
-            .setDesc(
-                "Display similar notes section at the bottom of each note"
-            )
+            .setDesc("Display similar notes section at the bottom of each note")
             .addToggle((toggle) => {
-                toggle
-                    .setValue(settings.showAtBottom)
-                    .onChange((value) => {
-                        this.settingsService.update({ showAtBottom: value });
-                    });
+                toggle.setValue(settings.showAtBottom).onChange((value) => {
+                    this.settingsService.update({ showAtBottom: value });
+                });
             });
 
         new Setting(containerEl)
             .setName("Note display mode")
-            .setDesc(
-                "Choose how note names are displayed in the results"
-            )
+            .setDesc("Choose how note names are displayed in the results")
             .addDropdown((dropdown) => {
                 dropdown
                     .addOption("title", "Title only")

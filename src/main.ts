@@ -103,6 +103,9 @@ export default class MainPlugin extends Plugin {
         this.modelService = new EmbeddingService();
         this.noteChunkRepository = new OramaNoteChunkRepository(this.app.vault);
 
+        // Set the model service in the settings tab
+        this.settingTab.setModelService(this.modelService);
+
         // Restore persisted data
         await this.indexedNotesMTimeStore.restore();
 

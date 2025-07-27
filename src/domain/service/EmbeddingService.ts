@@ -1,35 +1,55 @@
-import log from "loglevel";
-import { type Observable, Subject, of } from "rxjs";
 import type { SimilarNotesSettings } from "@/application/SettingsService";
+import log from "loglevel";
+import { Subject, type Observable, type Subscription } from "rxjs";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
-import { TransformersEmbeddingProvider, type TransformersConfig } from "./TransformersEmbeddingProvider";
-import { OllamaEmbeddingProvider, type OllamaConfig } from "./OllamaEmbeddingProvider";
+import {
+    OllamaEmbeddingProvider,
+    type OllamaConfig,
+} from "./OllamaEmbeddingProvider";
+import {
+    TransformersEmbeddingProvider,
+    type TransformersConfig,
+} from "./TransformersEmbeddingProvider";
 
 export class EmbeddingService {
     private provider: EmbeddingProvider | null = null;
     private currentProviderType: "builtin" | "ollama" | null = null;
-    
-    // Default observables for when no provider is initialized
-    private defaultModelBusy$ = new Subject<boolean>();
-    private defaultDownloadProgress$ = new Subject<number>();
+
+    // Proxy subjects that relay provider's observables
+    private modelBusy$ = new Subject<boolean>();
+    private downloadProgress$ = new Subject<number>();
+
+    // Subscriptions to provider's observables
+    private modelBusySubscription?: Subscription;
+    private downloadProgressSubscription?: Subscription;
 
     /**
      * Switch to a different embedding provider based on settings
      */
     async switchProvider(settings: SimilarNotesSettings): Promise<void> {
         const newProviderType = settings.modelProvider;
-        
+
         // If same provider type and model, check if GPU settings changed for builtin provider
-        if (this.currentProviderType === newProviderType && this.provider?.isModelLoaded()) {
+        if (
+            this.currentProviderType === newProviderType &&
+            this.provider?.isModelLoaded()
+        ) {
             const currentModelId = this.provider.getCurrentModelId();
-            const targetModelId = newProviderType === "builtin" ? settings.modelId : settings.ollamaModel;
-            
+            const targetModelId =
+                newProviderType === "builtin"
+                    ? settings.modelId
+                    : settings.ollamaModel;
+
             if (currentModelId === targetModelId) {
                 // For builtin provider, GPU settings change requires reload
                 if (newProviderType === "builtin") {
-                    log.info("Same model but GPU settings may have changed, continuing with provider switch");
+                    log.info(
+                        "Same model but GPU settings may have changed, continuing with provider switch"
+                    );
                 } else {
-                    log.info("Same provider and model already loaded, skipping switch");
+                    log.info(
+                        "Same provider and model already loaded, skipping switch"
+                    );
                     return;
                 }
             }
@@ -37,7 +57,15 @@ export class EmbeddingService {
 
         // Dispose current provider
         if (this.provider) {
-            log.info("Disposing current embedding provider:", this.currentProviderType);
+            log.info(
+                "Disposing current embedding provider:",
+                this.currentProviderType
+            );
+
+            // Unsubscribe from current provider's observables
+            this.modelBusySubscription?.unsubscribe();
+            this.downloadProgressSubscription?.unsubscribe();
+
             this.provider.dispose();
             this.provider = null;
         }
@@ -46,6 +74,7 @@ export class EmbeddingService {
         if (newProviderType === "builtin") {
             log.info("Switching to Transformers embedding provider");
             this.provider = new TransformersEmbeddingProvider();
+            this.setupProviderSubscriptions();
             await this.loadModel(settings.modelId, { useGPU: settings.useGPU });
         } else if (newProviderType === "ollama") {
             log.info("Switching to Ollama embedding provider");
@@ -54,6 +83,7 @@ export class EmbeddingService {
                 model: settings.ollamaModel || "",
             };
             this.provider = new OllamaEmbeddingProvider(ollamaConfig);
+            this.setupProviderSubscriptions();
             await this.loadModel(settings.ollamaModel || "", ollamaConfig);
         } else {
             throw new Error(`Unknown provider type: ${newProviderType}`);
@@ -64,9 +94,31 @@ export class EmbeddingService {
     }
 
     /**
+     * Setup subscriptions to relay provider's observables
+     */
+    private setupProviderSubscriptions(): void {
+        if (!this.provider) return;
+
+        // Subscribe to model busy observable
+        this.modelBusySubscription = this.provider
+            .getModelBusy$()
+            .subscribe((busy) => this.modelBusy$.next(busy));
+
+        // Subscribe to download progress observable
+        this.downloadProgressSubscription = this.provider
+            .getDownloadProgress$()
+            .subscribe((progress) => {
+                this.downloadProgress$.next(progress);
+            });
+    }
+
+    /**
      * Load model with the current provider
      */
-    async loadModel(modelId: string, config?: TransformersConfig | OllamaConfig): Promise<ModelInfo> {
+    async loadModel(
+        modelId: string,
+        config?: TransformersConfig | OllamaConfig
+    ): Promise<ModelInfo> {
         if (!this.provider) {
             throw new Error("No embedding provider initialized");
         }
@@ -82,19 +134,11 @@ export class EmbeddingService {
     }
 
     getModelBusy$(): Observable<boolean> {
-        if (!this.provider) {
-            // Return default observable when no provider is initialized
-            return this.defaultModelBusy$.asObservable();
-        }
-        return this.provider.getModelBusy$();
+        return this.modelBusy$.asObservable();
     }
 
     getDownloadProgress$(): Observable<number> {
-        if (!this.provider) {
-            // Return default observable when no provider is initialized
-            return this.defaultDownloadProgress$.asObservable();
-        }
-        return this.provider.getDownloadProgress$();
+        return this.downloadProgress$.asObservable();
     }
 
     async embedText(text: string): Promise<number[]> {
@@ -145,6 +189,10 @@ export class EmbeddingService {
     }
 
     public dispose(): void {
+        // Clean up subscriptions
+        this.modelBusySubscription?.unsubscribe();
+        this.downloadProgressSubscription?.unsubscribe();
+
         if (this.provider) {
             this.provider.dispose();
             this.provider = null;
