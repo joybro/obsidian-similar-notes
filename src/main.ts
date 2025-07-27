@@ -5,10 +5,12 @@ import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
 import { NoteIndexingService } from "./application/NoteIndexingService";
 import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
+import type { Command } from "./commands";
+import { ShowSimilarNotesCommand, ToggleInDocumentViewCommand, ReindexAllNotesCommand } from "./commands";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesSidebarView } from "./components/SimilarNotesSidebarView";
-import { VIEW_TYPE_SIMILAR_NOTES_SIDEBAR } from "./constants/viewTypes";
 import { StatusBarView } from "./components/StatusBarView";
+import { VIEW_TYPE_SIMILAR_NOTES_SIDEBAR } from "./constants/viewTypes";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
@@ -37,6 +39,7 @@ export default class MainPlugin extends Plugin {
     private indexedNotesMTimeStore: IndexedNoteMTimeStore;
     private statusBarView: StatusBarView;
     private settingTab: SimilarNotesSettingTab;
+    private commands: Command[] = [];
 
     async onload() {
         log.setDefaultLevel(log.levels.ERROR);
@@ -165,12 +168,29 @@ export default class MainPlugin extends Plugin {
         );
 
         // Add ribbon icon
-        this.addRibbonIcon("files", "Open Similar Notes sidebar", () => {
+        this.addRibbonIcon("files", "Open Similar Notes", () => {
             this.activateSimilarNotesView();
         });
 
+        // Register commands
+        this.registerCommands();
+
         // Complete initialization
         await this.init(this.settingsService.get().modelId, true, false);
+    }
+
+    private registerCommands() {
+        // Initialize commands
+        this.commands = [
+            new ShowSimilarNotesCommand(this),
+            new ToggleInDocumentViewCommand(this.settingsService),
+            new ReindexAllNotesCommand(this),
+        ];
+
+        // Register each command
+        this.commands.forEach((command) => {
+            command.register(this);
+        });
     }
 
     async activateSimilarNotesView() {
