@@ -1,66 +1,48 @@
 # Similar Notes for Obsidian
 
-Similar Notes is an Obsidian plugin that uses language models to find and recommend semantically similar notes. As shown below, the plugin analyzes your content in real-time and displays the most relevant related notes at the bottom of your current note. This makes it easy to discover connections between your ideas and reference related content while writing.
+Find semantically similar notes using AI, directly on your device. Works on both desktop and mobile without external servers.
 
 ![Demo](images/demo.gif)
 
 ## Features
 
--   **Flexible Model Options**: Choose between built-in models or connect to Ollama for custom models
--   **Built-in Language Models**: Downloads and runs models directly from Hugging Face
--   **Ollama Integration**: Supports any embedding model available through Ollama
--   **Self-contained**: Includes its own vector database for efficient similarity search
--   **Zero External API Dependencies**: No need for ChatGPT, Claude, or other cloud LLM services
+-   **Mobile & Desktop**: Works on iOS, Android, and all desktop platforms
+-   **100% Private**: All processing happens locally on your device
+-   **Built-in Models**: Uses Hugging Face models, no setup required
+-   **Ollama Support**: Connect to custom models via Ollama (desktop only)
+-   **No API Keys**: No ChatGPT, Claude, or cloud services needed
 
 ## How It Works
 
-Similar Notes uses embeddings-based semantic similarity to find connections between your notes that might not be obvious from keywords alone. The plugin understands the meaning behind your content, not just matching specific terms.
-
-As you work on a note, the plugin displays the **5 most semantically similar notes** from your vault at the bottom of your current note. This makes it easy to discover connections and reference related content while writing. Importantly, the plugin intelligently excludes notes that are already linked from your current document, ensuring you only see new potential connections.
+The plugin understands the meaning behind your content, not just keywords. As you write, it shows the 5 most similar notes at the bottom of your current note, excluding already-linked notes.
 
 ## Getting Started
 
-After installing the plugin:
+1. Install the plugin
+2. The default model will download automatically (one-time, ~30MB)
+3. Your notes will be indexed in the background
+4. Similar notes will appear at the bottom of your current note
 
-1. **Model Download**: On first run, the plugin will download the default language model. This may take some time depending on your internet connection.
-2. **Initial Indexing**: The plugin will automatically begin indexing your existing notes. This process runs in the background.
-3. **Progress Monitoring**: Both the model download and indexing progress can be monitored in the status bar in the bottom right corner of the Obsidian window.
-
-Once initialization is complete, the plugin will start suggesting similar notes as you work.
+Progress appears in the status bar.
 
 ## Model Options
 
-The plugin supports two types of model providers:
+### Built-in Models (Mobile & Desktop)
+-   **Default**: `all-MiniLM-L6-v2` (English)
+-   **Multilingual**: `paraphrase-multilingual-MiniLM-L12-v2`
+-   **Custom**: Any Sentence Transformer model from Hugging Face
 
-### Built-in Models (Default)
+### Ollama (Desktop Only)
+Connect to any Ollama embedding model on `localhost:11434`
 
-The plugin can download and run models directly from Hugging Face:
-
--   **Default Model**: `all-MiniLM-L6-v2` - Optimized for English content
--   **Multilingual Model**: `paraphrase-multilingual-MiniLM-L12-v2` - Recommended for non-English users
--   **Custom Models**: You can specify any compatible Sentence Transformer model from Hugging Face
-
-### Ollama Integration
-
-If you have Ollama installed locally, you can use any embedding model available through Ollama:
-
-1. Install and run [Ollama](https://ollama.com/)
-2. Pull an embedding model (e.g., `ollama pull nomic-embed-text`)
-3. In plugin settings:
-   - Set Model Provider to "Ollama"
-   - Configure the Ollama URL (default: `http://localhost:11434`)
-   - Select your model from the dropdown
-
-> **Note**: Changing models or providers will trigger re-indexing of all notes, which may take time depending on your vault size.
+> Changing models triggers re-indexing.
 
 ## Technical Details
 
-Similar Notes leverages several powerful technologies to provide a seamless experience:
-
--   **Transformers.js**: Uses Hugging Face's transformers.js library, running directly within Obsidian without external dependencies
--   **WebGPU Acceleration**: Utilizes WebGPU for hardware-accelerated model inference when available
--   **Orama Vector Database**: Implements Orama as an efficient vector database for similarity search
--   **Web Workers**: All model operations and vector database queries run in separate Web Workers, ensuring the plugin doesn't impact Obsidian's responsiveness or performance
+-   **Transformers.js**: Runs Hugging Face models directly in Obsidian
+-   **WebGPU**: GPU acceleration on desktop, automatic CPU fallback
+-   **Orama**: Built-in vector database for fast search
+-   **Web Workers**: All processing runs in background threads
 
 ## License
 

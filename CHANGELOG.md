@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2025-07-28
+
+-   **Mobile Support**: Plugin now fully works on Obsidian mobile apps (iOS/Android)
+    -   All features function identically to desktop version
+-   **Model Download Progress**: Real-time download progress indicator
+    -   Shows percentage in status bar during model downloads
+    -   Updates current model display in settings with download progress
+-   **Enhanced Error Handling**: Improved error messages and recovery
+    -   Model loading failures now display clear error reasons in settings
+    -   User-friendly error messages for common issues (GPU, network, etc.)
+-   **GPU Fallback**: Automatic CPU fallback when GPU acceleration fails
+    -   Seamlessly retries with CPU mode on GPU errors
+    -   Prompts to disable GPU setting after successful CPU fallback
+    -   No manual intervention required for GPU-incompatible devices
+
 ## [0.7.1] - 2025-07-27
 
 ### Added

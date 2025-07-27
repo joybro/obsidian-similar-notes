@@ -1,9 +1,9 @@
 {
     "id": "similar-notes",
     "name": "Similar Notes",
-    "version": "0.7.1",
+    "version": "0.8.0",
     "minAppVersion": "1.8.9",
-    "description": "Recommends semantically similar notes to the currently viewed note.",
+    "description": "Find semantically similar notes using local AI. Works on desktop and mobile without external servers.",
     "author": "Young Lee",
     "authorUrl": "https://github.com/joybro",
     "isDesktopOnly": false
