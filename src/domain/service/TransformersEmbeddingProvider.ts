@@ -1,7 +1,10 @@
+import type { SettingsService } from "@/application/SettingsService";
+import { GPUSettingModal } from "@/components/GPUSettingModal";
 import { WorkerManager } from "@/infrastructure/WorkerManager";
-import { handleEmbeddingLoadError } from "@/utils/errorHandling";
+import { handleEmbeddingLoadError, isGPUError } from "@/utils/errorHandling";
 import * as Comlink from "comlink";
 import log from "loglevel";
+import { Notice } from "obsidian";
 import { type Observable, Subject } from "rxjs";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 import type { TransformersWorker } from "./transformers.worker";
@@ -21,7 +24,7 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     private downloadProgress$ = new Subject<number>();
     private modelError$ = new Subject<string | null>();
 
-    constructor() {
+    constructor(private settingsService?: SettingsService) {
         this.workerManager = new WorkerManager<TransformersWorker>(
             "TransformersWorker"
         );
@@ -41,33 +44,71 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
         await this.unloadModel();
 
         try {
-            const worker = await this.workerManager.initialize(InlineWorker);
-
-            const response = await worker.handleLoad(
-                modelId,
-                Comlink.proxy((progress: number) => {
-                    this.downloadProgress$.next(progress);
-                }),
-                useGPU
-            );
-            log.info("Transformers model loaded", response);
-
-            this.modelId = modelId;
-            this.vectorSize = response.vectorSize;
-            this.maxTokens = response.maxTokens;
-
-            return {
-                vectorSize: response.vectorSize,
-                maxTokens: response.maxTokens,
-            };
+            return await this.tryLoadModel(modelId, useGPU);
         } catch (error) {
-            log.error("Failed to load Transformers model:", error);
-            
-            handleEmbeddingLoadError(error, {
-                providerName: "Transformers",
-                errorSubject: this.modelError$
-            });
+            // If GPU failed and we can retry with CPU
+            if (useGPU && isGPUError(error) && this.settingsService) {
+                log.info("GPU failed, retrying with CPU...");
+                new Notice("GPU failed, retrying with CPU...", 3000);
+                
+                try {
+                    const result = await this.tryLoadModel(modelId, false);
+                    
+                    // Show modal to ask user about disabling GPU setting
+                    this.showGPUSettingModal();
+                    
+                    return result;
+                } catch (cpuError) {
+                    log.error("CPU fallback also failed:", cpuError);
+                    handleEmbeddingLoadError(cpuError, {
+                        providerName: "Transformers",
+                        errorSubject: this.modelError$
+                    });
+                }
+            } else {
+                log.error("Failed to load Transformers model:", error);
+                handleEmbeddingLoadError(error, {
+                    providerName: "Transformers",
+                    errorSubject: this.modelError$
+                });
+            }
         }
+    }
+
+    private async tryLoadModel(modelId: string, useGPU: boolean): Promise<ModelInfo> {
+        const worker = await this.workerManager.initialize(InlineWorker);
+
+        const response = await worker.handleLoad(
+            modelId,
+            Comlink.proxy((progress: number) => {
+                this.downloadProgress$.next(progress);
+            }),
+            useGPU
+        );
+        log.info("Transformers model loaded", response);
+
+        this.modelId = modelId;
+        this.vectorSize = response.vectorSize;
+        this.maxTokens = response.maxTokens;
+
+        return {
+            vectorSize: response.vectorSize,
+            maxTokens: response.maxTokens,
+        };
+    }
+
+    private showGPUSettingModal(): void {
+        if (!this.settingsService) return;
+
+        // We need the app instance for the modal, but we don't have direct access
+        // Let's use a different approach - we'll add this to the global window temporarily
+        const modal = new GPUSettingModal(
+            (window as any).app, // Access global app instance
+            async () => {
+                await this.settingsService!.update({ useGPU: false });
+            }
+        );
+        modal.open();
     }
 
     async unloadModel(): Promise<void> {

@@ -1,4 +1,4 @@
-import type { SimilarNotesSettings } from "@/application/SettingsService";
+import type { SimilarNotesSettings, SettingsService } from "@/application/SettingsService";
 import log from "loglevel";
 import { Subject, type Observable, type Subscription } from "rxjs";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
@@ -14,6 +14,8 @@ import {
 export class EmbeddingService {
     private provider: EmbeddingProvider | null = null;
     private currentProviderType: "builtin" | "ollama" | null = null;
+
+    constructor(private settingsService?: SettingsService) {}
 
     // Proxy subjects that relay provider's observables
     private modelBusy$ = new Subject<boolean>();
@@ -76,7 +78,7 @@ export class EmbeddingService {
         // Create new provider
         if (newProviderType === "builtin") {
             log.info("Switching to Transformers embedding provider");
-            this.provider = new TransformersEmbeddingProvider();
+            this.provider = new TransformersEmbeddingProvider(this.settingsService);
             this.setupProviderSubscriptions();
             await this.loadModel(settings.modelId, { useGPU: settings.useGPU });
         } else if (newProviderType === "ollama") {

@@ -100,7 +100,7 @@ export default class MainPlugin extends Plugin {
         this.settingTab.setMTimeStore(this.indexedNotesMTimeStore);
 
         // Create services in proper dependency order
-        this.modelService = new EmbeddingService();
+        this.modelService = new EmbeddingService(this.settingsService);
         this.noteChunkRepository = new OramaNoteChunkRepository(this.app.vault);
 
         // Set the model service in the settings tab

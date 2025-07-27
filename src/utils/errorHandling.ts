@@ -76,6 +76,18 @@ export function extractUserFriendlyMessage(
 }
 
 /**
+ * Check if an error is GPU-related and can be retried with CPU
+ */
+export function isGPUError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    
+    const errorMessage = error.message.toLowerCase();
+    return GPU_ERROR_PATTERNS.some(pattern => 
+        pattern.patterns.some(p => errorMessage.includes(p.toLowerCase()))
+    );
+}
+
+/**
  * Handle embedding provider loading errors in a consistent way
  */
 export function handleEmbeddingLoadError(
