@@ -339,6 +339,8 @@ export default class MainPlugin extends Plugin {
     async changeModel(modelId: string): Promise<void> {
         // modelId parameter is kept for backward compatibility but not used
         // The actual model info is taken from settings
+        // Clear the mTime store to ensure all notes are reindexed
+        this.indexedNotesMTimeStore.clear();
         await this.init(modelId, false, true);
     }
 
