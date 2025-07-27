@@ -1,7 +1,7 @@
 import log from "loglevel";
-import { Notice } from "obsidian";
 import { type Observable, Subject } from "rxjs";
 import { OllamaClient } from "@/adapter/ollama";
+import { handleEmbeddingLoadError } from "@/utils/errorHandling";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 
 export interface OllamaConfig {
@@ -69,27 +69,12 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
                 maxTokens: this.maxTokens,
             };
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-            log.error("Failed to load Ollama model:", errorMessage);
+            log.error("Failed to load Ollama model:", error);
             
-            // Extract simplified error message for user display
-            let userFriendlyMessage = errorMessage;
-            if (errorMessage.includes("Cannot connect")) {
-                userFriendlyMessage = "Cannot connect to Ollama server - check if Ollama is running";
-            } else if (errorMessage.includes("not available")) {
-                userFriendlyMessage = "Model not found - check if model is installed in Ollama";
-            } else if (errorMessage.length > 100) {
-                // Truncate very long error messages
-                userFriendlyMessage = errorMessage.substring(0, 100) + "...";
-            }
-            
-            // Show notice to user
-            new Notice(`Failed to load Ollama model: ${userFriendlyMessage}`, 8000);
-            
-            // Emit error state
-            this.modelError$.next(userFriendlyMessage);
-            
-            throw error;
+            handleEmbeddingLoadError(error, {
+                providerName: "Ollama",
+                errorSubject: this.modelError$
+            });
         }
     }
 

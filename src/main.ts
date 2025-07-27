@@ -156,7 +156,6 @@ export default class MainPlugin extends Plugin {
         this.statusBarView = new StatusBarView(
             this,
             this.noteIndexingService.getNoteChangeCount$(),
-            this.modelService.getModelBusy$(),
             this.modelService.getDownloadProgress$(),
             this.modelService.getModelError$()
         );

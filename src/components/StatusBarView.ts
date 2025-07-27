@@ -11,7 +11,6 @@ export class StatusBarView {
     constructor(
         private plugin: Plugin,
         private noteChangeCount$: Observable<number>,
-        private modelBusy$: Observable<boolean>,
         private downloadProgress$: Observable<number>,
         private modelError$?: Observable<string | null>
     ) {

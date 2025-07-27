@@ -1,7 +1,7 @@
 import { WorkerManager } from "@/infrastructure/WorkerManager";
+import { handleEmbeddingLoadError } from "@/utils/errorHandling";
 import * as Comlink from "comlink";
 import log from "loglevel";
-import { Notice } from "obsidian";
 import { type Observable, Subject } from "rxjs";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 import type { TransformersWorker } from "./transformers.worker";
@@ -61,41 +61,12 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
                 maxTokens: response.maxTokens,
             };
         } catch (error) {
-            const errorMessage =
-                error instanceof Error
-                    ? error.message
-                    : "Unknown error occurred";
-            log.error("Failed to load Transformers model:", errorMessage);
-
-            // Extract simplified error message for user display
-            let userFriendlyMessage = errorMessage;
-            if (
-                errorMessage.includes("webgpu") ||
-                errorMessage.includes("WebGPU")
-            ) {
-                userFriendlyMessage =
-                    "GPU acceleration failed - try disabling GPU in settings";
-            } else if (errorMessage.includes("Failed to get GPU adapter")) {
-                userFriendlyMessage =
-                    "GPU not available - disable GPU acceleration in settings";
-            } else if (
-                errorMessage.includes("network") ||
-                errorMessage.includes("fetch")
-            ) {
-                userFriendlyMessage =
-                    "Network error - check your internet connection";
-            } else if (errorMessage.length > 100) {
-                // Truncate very long error messages
-                userFriendlyMessage = errorMessage.substring(0, 100) + "...";
-            }
-
-            // Show notice to user
-            new Notice(`Failed to load model: ${userFriendlyMessage}`, 8000);
-
-            // Emit error state
-            this.modelError$.next(userFriendlyMessage);
-
-            throw error;
+            log.error("Failed to load Transformers model:", error);
+            
+            handleEmbeddingLoadError(error, {
+                providerName: "Transformers",
+                errorSubject: this.modelError$
+            });
         }
     }
 
