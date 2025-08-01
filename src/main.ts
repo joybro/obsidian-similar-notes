@@ -63,6 +63,32 @@ export default class MainPlugin extends Plugin {
         this.app.workspace.onLayoutReady(() => this.initializeServices());
     }
 
+    private async getPluginDataDir(): Promise<string> {
+        const pluginDataDir = `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+        
+        // Ensure the plugin directory exists
+        if (!(await this.app.vault.adapter.exists(pluginDataDir))) {
+            await this.app.vault.adapter.mkdir(pluginDataDir);
+        }
+        
+        return pluginDataDir;
+    }
+
+    private async migrateDataFiles(oldPath: string, newPath: string): Promise<void> {
+        try {
+            if (await this.app.vault.adapter.exists(oldPath) && 
+                !(await this.app.vault.adapter.exists(newPath))) {
+                log.info(`Migrating file from ${oldPath} to ${newPath}`);
+                const data = await this.app.vault.adapter.read(oldPath);
+                await this.app.vault.adapter.write(newPath, data);
+                await this.app.vault.adapter.remove(oldPath);
+                log.info(`Successfully migrated file to plugin folder`);
+            }
+        } catch (error) {
+            log.error(`Failed to migrate file from ${oldPath} to ${newPath}:`, error);
+        }
+    }
+
     private registerEvents() {
         // Register events that need to be available early
         this.registerEvent(
@@ -86,8 +112,15 @@ export default class MainPlugin extends Plugin {
     }
 
     private async initializeServices() {
-        const fileMtimePath =
-            this.app.vault.configDir + "/" + fileMtimeFileName;
+        // Get plugin data directory and ensure it exists
+        const pluginDataDir = await this.getPluginDataDir();
+        
+        // Set up file paths in plugin folder
+        const fileMtimePath = `${pluginDataDir}/${fileMtimeFileName}`;
+        
+        // Migrate existing files from old location to new location
+        const oldFileMtimePath = `${this.app.vault.configDir}/${fileMtimeFileName}`;
+        await this.migrateDataFiles(oldFileMtimePath, fileMtimePath);
 
         // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
@@ -297,7 +330,12 @@ export default class MainPlugin extends Plugin {
         }
 
         const vectorSize = this.modelService.getVectorSize();
-        const dbPath = this.app.vault.configDir + "/" + dbFileName;
+        const pluginDataDir = await this.getPluginDataDir();
+        const dbPath = `${pluginDataDir}/${dbFileName}`;
+        
+        // Migrate existing database from old location to new location
+        const oldDbPath = `${this.app.vault.configDir}/${dbFileName}`;
+        await this.migrateDataFiles(oldDbPath, dbPath);
 
         if (firstTime) {
             await this.noteChunkRepository.init(vectorSize, dbPath, true);
