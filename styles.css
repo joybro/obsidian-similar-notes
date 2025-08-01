@@ -128,3 +128,58 @@
 .similar-notes-test-output-container textarea {
     background-color: var(--background-secondary);
 }
+
+/* Folder exclusion tester styles */
+.similar-notes-folder-tester {
+    margin-top: 0.5rem;
+}
+
+.similar-notes-folder-tester-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.similar-notes-test-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.similar-notes-test-label {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+}
+
+.similar-notes-test-input {
+    flex: 1;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background-color: var(--background-primary);
+    font-size: var(--font-ui-small);
+}
+
+.similar-notes-test-result {
+    font-size: var(--font-ui-small);
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    min-width: 8rem;
+    text-align: center;
+}
+
+.similar-notes-test-match {
+    color: var(--text-success);
+    background-color: var(--background-success);
+}
+
+.similar-notes-test-no-match {
+    color: var(--text-muted);
+}
+
+.similar-notes-test-error {
+    color: var(--text-error);
+    background-color: var(--background-error);
+}

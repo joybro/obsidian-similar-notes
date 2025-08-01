@@ -2,6 +2,7 @@ import { OllamaClient } from "@/adapter/ollama";
 import type { SettingsService } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
+import { matchesGlobPattern, isValidGlobPattern } from "@/utils/folderExclusion";
 import log from "loglevel";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
@@ -442,6 +443,142 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         });
                     });
             });
+
+        // Function to validate glob patterns and test paths
+        const validateAndTestGlobPatterns = () => {
+            const testPath = folderTestInput?.value || "";
+            let isMatch = false;
+            let errorMessage = "";
+
+            try {
+                const currentSettings = this.settingsService.get();
+                const patterns = currentSettings.excludeFolderPatterns;
+
+                // Check if the test path matches any pattern
+                // Import the same matching logic used in the actual filtering
+                for (const pattern of patterns) {
+                    if (matchesGlobPattern(testPath, pattern)) {
+                        isMatch = true;
+                        break;
+                    }
+                }
+
+                // Update test result display
+                if (testPath) {
+                    folderTestResult.textContent = isMatch
+                        ? "✅ Excluded"
+                        : "❌ Not excluded";
+                    folderTestResult.className = isMatch
+                        ? "similar-notes-test-match"
+                        : "similar-notes-test-no-match";
+                } else {
+                    folderTestResult.textContent = "";
+                }
+            } catch (e) {
+                errorMessage = e.message;
+                folderTestResult.textContent = `Error: ${errorMessage}`;
+                folderTestResult.className = "similar-notes-test-error";
+            }
+        };
+
+        let folderTestInput: HTMLInputElement;
+        let folderTestResult: HTMLSpanElement;
+
+        // Add UI for folder exclusion patterns
+        new Setting(containerEl)
+            .setName("Exclude folders from indexing")
+            .setDesc(
+                "Enter glob patterns to exclude folders/files from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes."
+            )
+            .addTextArea((text) => {
+                text.inputEl.rows = 5;
+                text.inputEl.cols = 40;
+                text.setValue(settings.excludeFolderPatterns.join("\n"));
+                text.setPlaceholder("Templates/\nArchive/\n*.tmp\n**/drafts/*");
+
+                // Store error status
+                let hasError = false;
+
+                // Style for highlighting invalid patterns
+                const errorClass = "similar-notes-regexp-error";
+
+                text.onChange(async (value) => {
+                    // Reset error state
+                    hasError = false;
+                    text.inputEl.removeClass(errorClass);
+
+                    // Process each line as a pattern
+                    const patterns = value
+                        .split("\n")
+                        .map((line) => line.trim())
+                        .filter((line) => line.length > 0);
+
+                    // Validate patterns
+                    const validPatterns: string[] = [];
+                    for (const pattern of patterns) {
+                        if (isValidGlobPattern(pattern)) {
+                            validPatterns.push(pattern);
+                        } else {
+                            hasError = true;
+                        }
+                    }
+
+                    // Apply error styling if needed
+                    if (hasError) {
+                        text.inputEl.addClass(errorClass);
+                    }
+
+                    // Only save valid patterns
+                    await this.settingsService.update({
+                        excludeFolderPatterns: validPatterns,
+                    });
+
+                    // Update test result when patterns change
+                    validateAndTestGlobPatterns();
+                });
+            });
+
+        // Add folder pattern tester UI
+        const folderTesterContainer = containerEl.createDiv(
+            "similar-notes-folder-tester"
+        );
+        folderTesterContainer.addClass("setting-item");
+
+        const folderTesterContent = folderTesterContainer.createDiv(
+            "setting-item-control similar-notes-folder-tester-content"
+        );
+
+        const testContainer = folderTesterContent.createDiv(
+            "similar-notes-test-container"
+        );
+
+        const testLabel = testContainer.createSpan("similar-notes-test-label");
+        testLabel.setText("Test path: ");
+
+        folderTestInput = testContainer.createEl("input", {
+            type: "text",
+            placeholder: "e.g., Templates/Daily.md",
+            cls: "similar-notes-test-input",
+        });
+        folderTestInput.value = settings.excludeFolderTestPath || "";
+
+        folderTestResult = testContainer.createSpan(
+            "similar-notes-test-result"
+        );
+
+        // Update test result and save test path when it changes
+        folderTestInput.addEventListener("input", () => {
+            // Save the test path to settings
+            this.settingsService.update({
+                excludeFolderTestPath: folderTestInput.value,
+            });
+
+            // Validate and test
+            validateAndTestGlobPatterns();
+        });
+
+        // Initialize test result when settings tab opens
+        setTimeout(() => validateAndTestGlobPatterns(), 0);
 
         // Function to process test input - called whenever regex patterns or input text changes
         const processTestInput = () => {
