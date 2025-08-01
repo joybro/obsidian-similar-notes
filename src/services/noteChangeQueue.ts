@@ -1,4 +1,6 @@
+import type { SettingsService } from "@/application/SettingsService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
+import { filterMarkdownFiles } from "@/utils/folderExclusion";
 import log from "loglevel";
 import type { EventRef, TFile, Vault } from "obsidian";
 
@@ -25,7 +27,11 @@ export class NoteChangeQueue {
     /**
      * Creates a new file change queue
      */
-    constructor(private vault: Vault, private mTimeStore: IndexedNoteMTimeStore) {}
+    constructor(
+        private vault: Vault, 
+        private mTimeStore: IndexedNoteMTimeStore,
+        private settingsService: SettingsService
+    ) {}
 
     /**
      * Initializes the file change queue by comparing the vault with the previous state
@@ -33,7 +39,9 @@ export class NoteChangeQueue {
      */
     async initialize(): Promise<void> {
         // Get all markdown files in the vault
-        const files = this.vault.getMarkdownFiles();
+        const allFiles = this.vault.getMarkdownFiles();
+        const settings = this.settingsService.get();
+        const files = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
 
         // Calculate current hashes and detect changes
         const currentMtimes: Record<string, number> = {};
@@ -85,12 +93,17 @@ export class NoteChangeQueue {
         // Register callback for file creation
         const createRef = this.vault.on("create", async (file: TFile) => {
             if (file.extension === "md") {
-                // Add to queue with hash
-                this.queue.push({
-                    path: file.path,
-                    reason: "new" as const,
-                    mtime: file.stat.mtime,
-                });
+                const settings = this.settingsService.get();
+                // Check if file should be excluded
+                const files = filterMarkdownFiles([file], settings.excludeFolderPatterns);
+                if (files.length > 0) {
+                    // Add to queue with hash
+                    this.queue.push({
+                        path: file.path,
+                        reason: "new" as const,
+                        mtime: file.stat.mtime,
+                    });
+                }
             }
         });
         this.eventRefs.push(createRef);
@@ -98,17 +111,22 @@ export class NoteChangeQueue {
         // Register callback for file modification
         const modifyRef = this.vault.on("modify", async (file: TFile) => {
             if (file.extension === "md") {
-                // Remove the file from the queue if it exists
-                this.queue = this.queue.filter(
-                    (change) => change.path !== file.path
-                );
+                const settings = this.settingsService.get();
+                // Check if file should be excluded
+                const files = filterMarkdownFiles([file], settings.excludeFolderPatterns);
+                if (files.length > 0) {
+                    // Remove the file from the queue if it exists
+                    this.queue = this.queue.filter(
+                        (change) => change.path !== file.path
+                    );
 
-                // Add to queue with hash
-                this.queue.push({
-                    path: file.path,
-                    reason: "modified" as const,
-                    mtime: file.stat.mtime,
-                });
+                    // Add to queue with hash
+                    this.queue.push({
+                        path: file.path,
+                        reason: "modified" as const,
+                        mtime: file.stat.mtime,
+                    });
+                }
             }
         });
         this.eventRefs.push(modifyRef);
@@ -156,7 +174,9 @@ export class NoteChangeQueue {
      */
     async enqueueAllNotes(): Promise<void> {
         // Get all markdown files in the vault
-        const files = this.vault.getMarkdownFiles();
+        const allFiles = this.vault.getMarkdownFiles();
+        const settings = this.settingsService.get();
+        const files = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
 
         // Add all files to the queue with their current hashes
         const newQueue: NoteChange[] = [];

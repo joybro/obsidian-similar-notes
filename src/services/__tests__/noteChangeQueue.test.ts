@@ -1,3 +1,4 @@
+import type { SettingsService } from "@/application/SettingsService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import type { TFile, Vault } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -24,6 +25,7 @@ type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on" | "offref">;
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
     let mockMTimeStore: IndexedNoteMTimeStore;
+    let mockSettingsService: SettingsService;
     let fileChangeQueue: NoteChangeQueue;
 
     const testFile1 = createMockTFile("file1.md", 1000);
@@ -52,10 +54,18 @@ describe("FileChangeQueue", () => {
             deleteMTime: vi.fn(),
             getAllPaths: vi.fn().mockReturnValue([]),
         } as unknown as IndexedNoteMTimeStore;
+        
+        mockSettingsService = {
+            get: vi.fn().mockReturnValue({
+                excludeFolderPatterns: [],
+            }),
+        } as unknown as SettingsService;
+        
         // Create a new file change queue
         fileChangeQueue = new NoteChangeQueue(
             mockVault as unknown as Vault,
-            mockMTimeStore
+            mockMTimeStore,
+            mockSettingsService
         );
     });
 
@@ -403,7 +413,8 @@ describe("FileChangeQueue", () => {
             });
             fileChangeQueue = new NoteChangeQueue(
                 mockVault as unknown as Vault,
-                mockMTimeStore
+                mockMTimeStore,
+                mockSettingsService
             );
             await fileChangeQueue.initialize();
             let changes = fileChangeQueue.pollFileChanges(5);
@@ -413,7 +424,8 @@ describe("FileChangeQueue", () => {
             // initialize the queue again (= plugin reload)
             fileChangeQueue = new NoteChangeQueue(
                 mockVault as unknown as Vault,
-                mockMTimeStore
+                mockMTimeStore,
+                mockSettingsService
             );
             await fileChangeQueue.initialize();
             // the queue should have changes from the previous run

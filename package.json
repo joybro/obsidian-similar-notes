@@ -26,6 +26,7 @@
         "@testing-library/user-event": "^14.6.1",
         "@types/jest": "^29.5.14",
         "@types/node": "^20.17.30",
+        "@types/picomatch": "^4.0.2",
         "@types/react": "^18.2.0",
         "@types/react-dom": "^18.2.0",
         "@typescript-eslint/eslint-plugin": "^5.29.0",
@@ -50,6 +51,7 @@
         "esbuild-plugin-polyfill-node": "^0.3.0",
         "loglevel": "^1.9.2",
         "obsidian": "latest",
+        "picomatch": "^4.0.3",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "rxjs": "^7.8.2"
