@@ -378,6 +378,16 @@ export default class MainPlugin extends Plugin {
         await this.init(this.settingsService.get().modelId, false, false);
     }
 
+    // Apply current exclusion patterns to synchronize index with current patterns
+    async applyExclusionPatterns(): Promise<{ removed: number; added: number }> {
+        return await this.noteChangeQueue.applyExclusionPatterns();
+    }
+
+    // Preview how many files would be changed by current patterns
+    previewExclusionApplication(): { removed: number; added: number } {
+        return this.noteChangeQueue.previewExclusionApplication();
+    }
+
     async changeModel(modelId: string): Promise<void> {
         // modelId parameter is kept for backward compatibility but not used
         // The actual model info is taken from settings

@@ -68,12 +68,13 @@ export class NoteChangeQueue {
             }
         }
 
-        // Check for deleted files
-        for (const path of this.mTimeStore.getAllPaths()) {
-            if (!currentMtimes[path]) {
-                newQueue.push({ path, reason: "deleted" });
-            }
+        // Check for deleted files and files excluded by patterns
+        const validFiles: Record<string, boolean> = {};
+        for (const path in currentMtimes) {
+            validFiles[path] = true;
         }
+        const deletedFiles = this.findDeletedAndExcludedFiles(validFiles);
+        newQueue.push(...deletedFiles);
 
         // Update state
         this.queue = newQueue;
@@ -225,5 +226,115 @@ export class NoteChangeQueue {
             // Update the hash store with the processed hash
             this.mTimeStore.setMTime(change.path, change.mtime);
         }
+    }
+
+    /**
+     * Applies current exclusion patterns by synchronizing the index with current patterns.
+     * This handles both newly excluded files (removes them) and newly included files (adds them).
+     * This is more efficient than a full reindex as it only processes the changed files.
+     * 
+     * @returns Promise that resolves to an object with counts of changes
+     */
+    async applyExclusionPatterns(): Promise<{ removed: number; added: number }> {
+        const allFiles = this.vault.getMarkdownFiles();
+        const settings = this.settingsService.get();
+        const filteredFiles = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
+        
+        // Create map of currently valid files (should be indexed)
+        const shouldBeIndexed: Record<string, number> = {};
+        for (const file of filteredFiles) {
+            shouldBeIndexed[file.path] = file.stat.mtime;
+        }
+
+        // Create map of currently indexed files
+        const currentlyIndexed = new Set(this.mTimeStore.getAllPaths());
+
+        const changes: NoteChange[] = [];
+        let removedCount = 0;
+        let addedCount = 0;
+
+        // Find files that should be removed (currently indexed but should not be)
+        for (const indexedPath of currentlyIndexed) {
+            if (!shouldBeIndexed[indexedPath]) {
+                changes.push({ path: indexedPath, reason: "deleted" });
+                removedCount++;
+            }
+        }
+
+        // Find files that should be added (not currently indexed but should be)
+        for (const [filePath, mtime] of Object.entries(shouldBeIndexed)) {
+            if (!currentlyIndexed.has(filePath)) {
+                changes.push({ 
+                    path: filePath, 
+                    reason: "new",
+                    mtime: mtime
+                });
+                addedCount++;
+            }
+        }
+        
+        // Add all changes to queue for processing
+        this.queue.push(...changes);
+        
+        log.info(`Applied exclusion patterns: ${removedCount} files queued for removal, ${addedCount} files queued for addition`);
+        return { removed: removedCount, added: addedCount };
+    }
+
+    /**
+     * Preview how many files would be changed by applying current exclusion patterns
+     * without actually queuing them for processing.
+     * 
+     * @returns Object with counts of files that would be removed and added
+     */
+    previewExclusionApplication(): { removed: number; added: number } {
+        const allFiles = this.vault.getMarkdownFiles();
+        const settings = this.settingsService.get();
+        const filteredFiles = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
+        
+        // Create map of currently valid files (should be indexed)
+        const shouldBeIndexed = new Set<string>();
+        for (const file of filteredFiles) {
+            shouldBeIndexed.add(file.path);
+        }
+
+        // Create map of currently indexed files
+        const currentlyIndexed = new Set(this.mTimeStore.getAllPaths());
+
+        let removedCount = 0;
+        let addedCount = 0;
+
+        // Count files that would be removed
+        for (const indexedPath of currentlyIndexed) {
+            if (!shouldBeIndexed.has(indexedPath)) {
+                removedCount++;
+            }
+        }
+
+        // Count files that would be added
+        for (const validPath of shouldBeIndexed) {
+            if (!currentlyIndexed.has(validPath)) {
+                addedCount++;
+            }
+        }
+
+        return { removed: removedCount, added: addedCount };
+    }
+
+    /**
+     * Helper method to find files that are deleted or excluded by current patterns
+     * 
+     * @param validFiles Map of file paths that should remain in the index
+     * @returns Array of NoteChange objects for files to be removed
+     */
+    private findDeletedAndExcludedFiles(validFiles: Record<string, boolean>): NoteChange[] {
+        const deletedFiles: NoteChange[] = [];
+        
+        for (const path of this.mTimeStore.getAllPaths()) {
+            if (!validFiles[path]) {
+                deletedFiles.push({ path, reason: "deleted" });
+            }
+        }
+        
+        return deletedFiles;
     }
 }
