@@ -183,3 +183,43 @@
     color: var(--text-error);
     background-color: var(--background-error);
 }
+
+/* Excluded files list styles */
+
+.similar-notes-excluded-files-list {
+    height: 120px;
+    min-height: 60px;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background-color: var(--background-secondary);
+    padding: 0.5rem;
+    font-size: var(--font-ui-small);
+    width: 90%;
+    max-width: 600px;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+.similar-notes-excluded-file-item {
+    padding: 0.25rem 0;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: left;
+}
+
+.similar-notes-excluded-file-item:hover {
+    color: var(--text-normal);
+}
+
+.similar-notes-excluded-empty {
+    color: var(--text-faint);
+    font-style: italic;
+    text-align: left;
+    padding: 1rem;
+}

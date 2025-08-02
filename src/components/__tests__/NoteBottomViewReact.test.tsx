@@ -56,7 +56,6 @@ describe("SimilarNotesViewReact", () => {
         showSourceChunk: false,
         useGPU: true,
         excludeFolderPatterns: [],
-        excludeFolderTestPath: "",
         excludeRegexPatterns: [],
         regexpTestInputText: "",
         noteDisplayMode: "title",
