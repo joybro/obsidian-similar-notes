@@ -2,6 +2,7 @@ import { OllamaClient } from "@/adapter/ollama";
 import type { SettingsService } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
+import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import { matchesGlobPattern, isValidGlobPattern, shouldExcludeFile } from "@/utils/folderExclusion";
 import log from "loglevel";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
@@ -10,9 +11,12 @@ import { LoadModelModal } from "./LoadModelModal";
 
 export class SimilarNotesSettingTab extends PluginSettingTab {
     private indexedNoteCount: number = 0;
+    private indexedChunkCount: number = 0;
+    private databaseSize: number = 0;
     private subscription: { unsubscribe: () => void } | null = null;
     private mTimeStore?: IndexedNoteMTimeStore;
     private modelService?: EmbeddingService;
+    private noteChunkRepository?: NoteChunkRepository;
     private downloadProgressSubscription?: { unsubscribe: () => void };
     private modelErrorSubscription?: { unsubscribe: () => void };
     private currentDownloadProgress: number = 100;
@@ -59,13 +63,64 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         // Subscribe to count changes
         this.subscription = this.mTimeStore
             .getIndexedNoteCount$()
-            .subscribe((count) => {
+            .subscribe(async (count) => {
                 this.indexedNoteCount = count;
+                // Update chunk count and database size when note count changes
+                if (this.noteChunkRepository) {
+                    try {
+                        this.indexedChunkCount = await this.noteChunkRepository.count();
+                        await this.updateDatabaseSize();
+                    } catch (error) {
+                        log.error("Failed to update chunk count", error);
+                    }
+                }
                 // Redraw the settings tab if it's active
                 if (this.containerEl.isShown()) {
                     this.display();
                 }
             });
+    }
+
+    /**
+     * Set the NoteChunkRepository to get chunk count and database info.
+     * This allows the NoteChunkRepository to be initialized after the tab is created.
+     */
+    async setNoteChunkRepository(noteChunkRepository: NoteChunkRepository): Promise<void> {
+        this.noteChunkRepository = noteChunkRepository;
+        
+        // Get the initial chunk count
+        if (this.noteChunkRepository) {
+            try {
+                this.indexedChunkCount = await this.noteChunkRepository.count();
+                // Update the database size
+                await this.updateDatabaseSize();
+                // Redraw the settings tab if it's active
+                if (this.containerEl.isShown()) {
+                    this.display();
+                }
+            } catch (error) {
+                log.error("Failed to get chunk count", error);
+            }
+        }
+    }
+
+    /**
+     * Update the database size by checking the file size on disk
+     */
+    private async updateDatabaseSize(): Promise<void> {
+        try {
+            const pluginDataDir = `${this.plugin.app.vault.configDir}/plugins/${this.plugin.manifest.id}`;
+            const dbPath = `${pluginDataDir}/similar-notes.json`;
+            
+            if (await this.plugin.app.vault.adapter.exists(dbPath)) {
+                const stat = await this.plugin.app.vault.adapter.stat(dbPath);
+                if (stat) {
+                    this.databaseSize = stat.size;
+                }
+            }
+        } catch (error) {
+            log.error("Failed to get database size", error);
+        }
     }
 
     /**
@@ -414,10 +469,18 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
 
         new Setting(containerEl).setName("Index").setHeading();
 
+        const formatBytes = (bytes: number): string => {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        };
+
         new Setting(containerEl)
             .setName("Indexed notes")
             .setDesc(
-                `Number of notes currently in the similarity index: ${this.indexedNoteCount}`
+                `Notes: ${this.indexedNoteCount} | Chunks: ${this.indexedChunkCount} | Database size: ${formatBytes(this.databaseSize)}`
             );
 
         new Setting(containerEl)
