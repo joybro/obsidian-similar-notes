@@ -12,8 +12,8 @@ const createMockTFile = (path: string, mtime: number): TFile => ({
     basename: path.split('/').pop()?.split('.')[0] || '',
     stat: { 
         mtime, 
-        ctime: mtime, // 일반적으로 ctime은 mtime과 같거나 그 이전
-        size: 100 // 임의의 파일 크기
+        ctime: mtime, // typically ctime is same or before mtime
+        size: 100 // arbitrary file size
     },
     vault: {} as any,
     parent: {} as any
@@ -104,10 +104,11 @@ describe("FileChangeQueue", () => {
     });
 
     test("should detect modified files", async () => {
-        // Set up previous mtimes
+        // Set up previous mtimes - both files exist in the index
+        mockMTimeStore.getAllPaths = vi.fn(() => ["file1.md", "file2.md"]);
         mockMTimeStore.getMTime = vi.fn((path: string) => {
-            if (path === "file1.md") return 999;
-            if (path === "file2.md") return 1999;
+            if (path === "file1.md") return 999;  // Different from current mtime (1000)
+            if (path === "file2.md") return 1999; // Different from current mtime (2000)
             return -1;
         });
         await fileChangeQueue.initialize();
