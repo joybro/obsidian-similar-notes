@@ -61,9 +61,17 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         log.error("Failed to update chunk count", error);
                     }
                 }
-                // Redraw the settings tab if it's active
+                // Update stats without full redraw if possible
                 if (this.containerEl.isShown()) {
-                    this.display();
+                    if (this.indexSettingsSection) {
+                        this.indexSettingsSection.updateStats({
+                            indexedNoteCount: this.indexedNoteCount,
+                            indexedChunkCount: this.indexedChunkCount,
+                            databaseSize: this.databaseSize
+                        });
+                    } else {
+                        this.display();
+                    }
                 }
             });
     }
@@ -81,9 +89,17 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 this.indexedChunkCount = await this.noteChunkRepository.count();
                 // Update the database size
                 await this.updateDatabaseSize();
-                // Redraw the settings tab if it's active
+                // Update stats without full redraw if possible
                 if (this.containerEl.isShown()) {
-                    this.display();
+                    if (this.indexSettingsSection) {
+                        this.indexSettingsSection.updateStats({
+                            indexedNoteCount: this.indexedNoteCount,
+                            indexedChunkCount: this.indexedChunkCount,
+                            databaseSize: this.databaseSize
+                        });
+                    } else {
+                        this.display();
+                    }
                 }
             } catch (error) {
                 log.error("Failed to get chunk count", error);

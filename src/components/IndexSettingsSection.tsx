@@ -1,10 +1,10 @@
 import type { SettingsService } from "@/application/SettingsService";
-import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
+import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import { isValidGlobPattern, shouldExcludeFile } from "@/utils/folderExclusion";
 import log from "loglevel";
-import { Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
+import { Notice, Setting } from "obsidian";
 import type MainPlugin from "../main";
 import { LoadModelModal } from "./LoadModelModal";
 
@@ -22,24 +22,76 @@ interface IndexSettingsSectionProps {
 
 export class IndexSettingsSection {
     private sectionContainer?: HTMLElement;
+    private statsContainer?: HTMLElement;
+    private indexedStat?: HTMLElement;
+    private excludedStat?: HTMLElement;
+    private dbSizeStat?: HTMLElement;
 
     constructor(private props: IndexSettingsSectionProps) {}
 
     /**
+     * Update just the statistics without rebuilding the entire section
+     */
+    updateStats(stats: {
+        indexedNoteCount: number;
+        indexedChunkCount: number;
+        databaseSize: number;
+    }): void {
+        if (this.indexedStat && this.excludedStat && this.dbSizeStat) {
+            const { app } = this.props;
+            const allFiles = app.vault.getMarkdownFiles();
+            const actuallyExcludedCount = allFiles.length - stats.indexedNoteCount;
+            
+            const formatBytes = (bytes: number): string => {
+                if (bytes === 0) return "0 Bytes";
+                const k = 1024;
+                const sizes = ["Bytes", "KB", "MB", "GB"];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return (
+                    parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+                );
+            };
+
+            this.indexedStat.setText(
+                `• Indexed: ${stats.indexedNoteCount} notes (${stats.indexedChunkCount} chunks)`
+            );
+            this.excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
+            this.dbSizeStat.setText(`• Database size: ${formatBytes(stats.databaseSize)}`);
+        }
+    }
+
+    /**
      * Render the index settings section
      */
-    render(currentStats?: { indexedNoteCount: number; indexedChunkCount: number; databaseSize: number }): void {
+    render(currentStats?: {
+        indexedNoteCount: number;
+        indexedChunkCount: number;
+        databaseSize: number;
+    }): void {
         const { containerEl, settingsService, plugin, app } = this.props;
         // Use current stats if provided, otherwise fall back to props
-        const { indexedNoteCount, indexedChunkCount, databaseSize } = currentStats || this.props;
+        const { indexedNoteCount, indexedChunkCount, databaseSize } =
+            currentStats || this.props;
         const settings = settingsService.get();
 
         // Create or clear the section container
         // Check if sectionContainer exists and is still connected to the DOM
         if (!this.sectionContainer || !this.sectionContainer.parentElement) {
-            this.sectionContainer = containerEl.createDiv("index-settings-section");
+            this.sectionContainer = containerEl.createDiv(
+                "index-settings-section"
+            );
+            // Reset stats container references when section is recreated
+            this.statsContainer = undefined;
+            this.indexedStat = undefined;
+            this.excludedStat = undefined;
+            this.dbSizeStat = undefined;
         } else {
             this.sectionContainer.empty();
+            // Reset stats container references when section is cleared
+            this.statsContainer = undefined;
+            this.indexedStat = undefined;
+            this.excludedStat = undefined;
+            this.dbSizeStat = undefined;
         }
 
         // Add spacing before the Index heading for visual separation
@@ -48,37 +100,45 @@ export class IndexSettingsSection {
         new Setting(this.sectionContainer).setName("Index").setHeading();
 
         const formatBytes = (bytes: number): string => {
-            if (bytes === 0) return '0 Bytes';
+            if (bytes === 0) return "0 Bytes";
             const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const sizes = ["Bytes", "KB", "MB", "GB"];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            return (
+                parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+            );
         };
 
         // Index statistics with excluded files count
-        const indexStatsSetting = new Setting(this.sectionContainer)
-            .setName("Index statistics");
+        const indexStatsSetting = new Setting(this.sectionContainer).setName(
+            "Index statistics"
+        );
 
-        // Function to update index statistics  
+        // Create persistent stats container structure once
+        if (!this.statsContainer) {
+            this.statsContainer = indexStatsSetting.descEl.createDiv(
+                "similar-notes-stats-container"
+            );
+            this.indexedStat = this.statsContainer.createDiv("similar-notes-stat-item");
+            this.excludedStat = this.statsContainer.createDiv("similar-notes-stat-item");
+            this.dbSizeStat = this.statsContainer.createDiv("similar-notes-stat-item");
+        }
+
+        // Function to update index statistics
         const updateVaultStats = () => {
             const allFiles = app.vault.getMarkdownFiles();
-            
+
             // Calculate actually excluded files: total files - indexed files
             const actuallyExcludedCount = allFiles.length - indexedNoteCount;
-            
-            // Clear and rebuild the description with proper structure
-            indexStatsSetting.descEl.empty();
-            
-            const statsContainer = indexStatsSetting.descEl.createDiv("similar-notes-stats-container");
-            
-            const indexedStat = statsContainer.createDiv("similar-notes-stat-item");
-            indexedStat.setText(`• Indexed: ${indexedNoteCount} notes (${indexedChunkCount} chunks)`);
-            
-            const excludedStat = statsContainer.createDiv("similar-notes-stat-item");
-            excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
-            
-            const dbSizeStat = statsContainer.createDiv("similar-notes-stat-item");
-            dbSizeStat.setText(`• Database size: ${formatBytes(databaseSize)}`);
+
+            // Update text content only, preserving DOM structure
+            if (this.indexedStat && this.excludedStat && this.dbSizeStat) {
+                this.indexedStat.setText(
+                    `• Indexed: ${indexedNoteCount} notes (${indexedChunkCount} chunks)`
+                );
+                this.excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
+                this.dbSizeStat.setText(`• Database size: ${formatBytes(databaseSize)}`);
+            }
         };
 
         // Initial update
@@ -158,39 +218,40 @@ export class IndexSettingsSection {
                     await settingsService.update({
                         excludeFolderPatterns: validPatterns,
                     });
-                    
+
                     // Update excluded files list (but not index stats - those reflect current index state)
                     updateExcludedFilesList();
                 });
             });
 
         // Add excluded files preview
-        const excludedFilesSetting = new Setting(this.sectionContainer)
-            .setDesc("");
-        
+        const excludedFilesSetting = new Setting(this.sectionContainer).setDesc(
+            ""
+        );
+
         const excludedFilesDescription = excludedFilesSetting.descEl;
         const excludedFilesList = excludedFilesSetting.controlEl.createDiv(
             "similar-notes-excluded-files-list"
         );
-        
+
         // Function to update excluded files list
         updateExcludedFilesList = () => {
             const allFiles = app.vault.getMarkdownFiles();
             const currentSettings = settingsService.get();
             const patterns = currentSettings.excludeFolderPatterns;
-            
-            const excludedFiles = allFiles.filter(file => 
+
+            const excludedFiles = allFiles.filter((file) =>
                 shouldExcludeFile(file.path, patterns)
             );
-            
+
             excludedFilesDescription.innerHTML = `
                 <div>Excluded files:</div>
                 <div style="font-size: var(--font-ui-smaller); color: var(--text-muted);">${excludedFiles.length} files total</div>
             `;
-            
+
             // Clear and populate list
             excludedFilesList.empty();
-            
+
             if (excludedFiles.length === 0) {
                 const emptyMessage = excludedFilesList.createDiv(
                     "similar-notes-excluded-empty"
@@ -198,32 +259,40 @@ export class IndexSettingsSection {
                 emptyMessage.setText("No files excluded");
             } else {
                 // Show up to 5 files with scroll
-                excludedFiles.slice(0, Math.min(100, excludedFiles.length)).forEach(file => {
-                    const fileItem = excludedFilesList.createDiv(
-                        "similar-notes-excluded-file-item"
-                    );
-                    fileItem.setText(file.path);
-                    fileItem.title = file.path; // Show full path on hover
-                });
+                excludedFiles
+                    .slice(0, Math.min(100, excludedFiles.length))
+                    .forEach((file) => {
+                        const fileItem = excludedFilesList.createDiv(
+                            "similar-notes-excluded-file-item"
+                        );
+                        fileItem.setText(file.path);
+                        fileItem.title = file.path; // Show full path on hover
+                    });
             }
         };
-        
+
         // Update list when settings change
         setTimeout(() => updateExcludedFilesList(), 0);
 
         // Add "Apply exclusion patterns" button
         new Setting(this.sectionContainer)
             .setName("Apply exclusion patterns")
-            .setDesc("Synchronize the index with current exclusion patterns without full reindexing")
+            .setDesc(
+                "Synchronize the index with current exclusion patterns without full reindexing"
+            )
             .addButton((button) => {
                 button
                     .setButtonText("Apply Patterns")
-                    .setTooltip("Apply current exclusion patterns to synchronize the index")
+                    .setTooltip(
+                        "Apply current exclusion patterns to synchronize the index"
+                    )
                     .onClick(async () => {
                         const preview = plugin.previewExclusionApplication();
-                        
+
                         if (preview.removed === 0 && preview.added === 0) {
-                            new Notice("No changes needed - index is already synchronized with current patterns");
+                            new Notice(
+                                "No changes needed - index is already synchronized with current patterns"
+                            );
                             return;
                         }
 
@@ -243,26 +312,38 @@ export class IndexSettingsSection {
                             message,
                             async () => {
                                 try {
-                                    new Notice("Applying exclusion patterns...");
-                                    const result = await plugin.applyExclusionPatterns();
-                                    
-                                    let successMessage = "✓ Exclusion patterns applied";
-                                    if (result.removed > 0 && result.added > 0) {
+                                    new Notice(
+                                        "Applying exclusion patterns..."
+                                    );
+                                    const result =
+                                        await plugin.applyExclusionPatterns();
+
+                                    let successMessage =
+                                        "✓ Exclusion patterns applied";
+                                    if (
+                                        result.removed > 0 &&
+                                        result.added > 0
+                                    ) {
                                         successMessage += ` - ${result.removed} files queued for removal, ${result.added} files queued for indexing`;
                                     } else if (result.removed > 0) {
                                         successMessage += ` - ${result.removed} files queued for removal`;
                                     } else if (result.added > 0) {
                                         successMessage += ` - ${result.added} files queued for indexing`;
                                     }
-                                    
+
                                     new Notice(successMessage);
-                                    
+
                                     // Update excluded files list and index stats (actual index state changed)
                                     updateExcludedFilesList();
                                     updateVaultStats();
                                 } catch (error) {
-                                    log.error("Failed to apply exclusion patterns:", error);
-                                    new Notice(`Failed to apply exclusion patterns: ${error.message}`);
+                                    log.error(
+                                        "Failed to apply exclusion patterns:",
+                                        error
+                                    );
+                                    new Notice(
+                                        `Failed to apply exclusion patterns: ${error.message}`
+                                    );
                                 }
                             },
                             () => {} // Cancel callback
