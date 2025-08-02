@@ -610,6 +610,64 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         // Update list when settings change
         setTimeout(() => updateExcludedFilesList(), 0);
 
+        // Add "Apply exclusion patterns" button
+        new Setting(containerEl)
+            .setName("Apply exclusion patterns")
+            .setDesc("Synchronize the index with current exclusion patterns without full reindexing")
+            .addButton((button) => {
+                button
+                    .setButtonText("Apply Patterns")
+                    .setTooltip("Apply current exclusion patterns to synchronize the index")
+                    .onClick(async () => {
+                        const preview = this.plugin.previewExclusionApplication();
+                        
+                        if (preview.removed === 0 && preview.added === 0) {
+                            new Notice("No changes needed - index is already synchronized with current patterns");
+                            return;
+                        }
+
+                        // Show confirmation modal
+                        let message = "Apply exclusion patterns?\n\n";
+                        if (preview.removed > 0 && preview.added > 0) {
+                            message += `This will remove ${preview.removed} files and add ${preview.added} files to the similarity index.`;
+                        } else if (preview.removed > 0) {
+                            message += `This will remove ${preview.removed} files from the similarity index.`;
+                        } else {
+                            message += `This will add ${preview.added} files to the similarity index.`;
+                        }
+                        message += "\n\nDo you want to continue?";
+
+                        new LoadModelModal(
+                            this.app,
+                            message,
+                            async () => {
+                                try {
+                                    new Notice("Applying exclusion patterns...");
+                                    const result = await this.plugin.applyExclusionPatterns();
+                                    
+                                    let successMessage = "✓ Exclusion patterns applied";
+                                    if (result.removed > 0 && result.added > 0) {
+                                        successMessage += ` - ${result.removed} files queued for removal, ${result.added} files queued for indexing`;
+                                    } else if (result.removed > 0) {
+                                        successMessage += ` - ${result.removed} files queued for removal`;
+                                    } else if (result.added > 0) {
+                                        successMessage += ` - ${result.added} files queued for indexing`;
+                                    }
+                                    
+                                    new Notice(successMessage);
+                                    
+                                    // Update excluded files list
+                                    updateExcludedFilesList();
+                                } catch (error) {
+                                    log.error("Failed to apply exclusion patterns:", error);
+                                    new Notice(`Failed to apply exclusion patterns: ${error.message}`);
+                                }
+                            },
+                            () => {} // Cancel callback
+                        ).open();
+                    });
+            });
+
         // Function to process test input - called whenever regex patterns or input text changes
         const processTestInput = () => {
             const inputText = testInputTextArea?.value || "";
@@ -648,7 +706,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 // Apply error styles if needed
                 const applyErrorStyles = () => {
                     const textArea = text.inputEl;
-                    const lines = textArea.value.split("\n");
 
                     // Reset all previous error styles
                     textArea.removeClass(errorLineClass);
