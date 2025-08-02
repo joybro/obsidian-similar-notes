@@ -166,9 +166,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         }
         this.modelSettingsSection.render();
 
-        // Add spacing between Model and Index sections
-        containerEl.createDiv("setting-item-separator");
-
         // Initialize and render index settings section
         if (!this.indexSettingsSection) {
             this.indexSettingsSection = new IndexSettingsSection({
