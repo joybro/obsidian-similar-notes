@@ -42,6 +42,9 @@ export class IndexSettingsSection {
             this.sectionContainer.empty();
         }
 
+        // Add spacing before the Index heading for visual separation
+        this.sectionContainer.createDiv("setting-item-separator");
+
         new Setting(this.sectionContainer).setName("Index").setHeading();
 
         const formatBytes = (bytes: number): string => {
