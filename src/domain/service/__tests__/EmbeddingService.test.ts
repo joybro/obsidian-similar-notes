@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EmbeddingService } from "../EmbeddingService";
 import type { SimilarNotesSettings } from "@/application/SettingsService";
 
+// Mock Obsidian
+vi.mock("obsidian");
+
 // Mock Comlink.wrap
 vi.mock("comlink", async () => {
     const actual = await vi.importActual("comlink");
