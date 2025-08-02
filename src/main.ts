@@ -363,6 +363,9 @@ export default class MainPlugin extends Plugin {
             await this.noteChunkRepository.init(vectorSize, dbPath, false);
             this.noteChangeQueue.enqueueAllNotes();
         }
+        
+        // Pass NoteChunkRepository to the settings tab after it's initialized
+        await this.settingTab.setNoteChunkRepository(this.noteChunkRepository);
 
         // Start the noteIndexingService loop
         this.noteIndexingService.startLoop();
