@@ -11,7 +11,6 @@ export interface SimilarNotesSettings {
     showSourceChunk: boolean; // Whether to show the original chunk in the results
     useGPU: boolean; // Whether to use GPU acceleration for model inference
     excludeFolderPatterns: string[]; // Glob patterns to exclude folders/files from indexing
-    excludeFolderTestPath: string; // Saved test path for folder exclusion testing
     excludeRegexPatterns: string[]; // Regular expressions to exclude content from indexing
     regexpTestInputText: string; // Saved test input for RegExp testing
     noteDisplayMode: "title" | "path" | "smart"; // How to display note names in results
@@ -26,7 +25,6 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     showSourceChunk: false,
     useGPU: true, // Use GPU acceleration by default
     excludeFolderPatterns: ["Templates/", "Archive/", ".trash/"], // Default exclusion patterns
-    excludeFolderTestPath: "", // Default to empty test path
     excludeRegexPatterns: [], // Default to no exclusion patterns
     regexpTestInputText: "", // Default to empty test input
     noteDisplayMode: "title", // Default to showing title only

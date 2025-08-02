@@ -2,7 +2,7 @@ import { OllamaClient } from "@/adapter/ollama";
 import type { SettingsService } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
-import { matchesGlobPattern, isValidGlobPattern } from "@/utils/folderExclusion";
+import { matchesGlobPattern, isValidGlobPattern, shouldExcludeFile } from "@/utils/folderExclusion";
 import log from "loglevel";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
@@ -444,45 +444,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     });
             });
 
-        // Function to validate glob patterns and test paths
-        const validateAndTestGlobPatterns = () => {
-            const testPath = folderTestInput?.value || "";
-            let isMatch = false;
-            let errorMessage = "";
-
-            try {
-                const currentSettings = this.settingsService.get();
-                const patterns = currentSettings.excludeFolderPatterns;
-
-                // Check if the test path matches any pattern
-                // Import the same matching logic used in the actual filtering
-                for (const pattern of patterns) {
-                    if (matchesGlobPattern(testPath, pattern)) {
-                        isMatch = true;
-                        break;
-                    }
-                }
-
-                // Update test result display
-                if (testPath) {
-                    folderTestResult.textContent = isMatch
-                        ? "✅ Excluded"
-                        : "❌ Not excluded";
-                    folderTestResult.className = isMatch
-                        ? "similar-notes-test-match"
-                        : "similar-notes-test-no-match";
-                } else {
-                    folderTestResult.textContent = "";
-                }
-            } catch (e) {
-                errorMessage = e.message;
-                folderTestResult.textContent = `Error: ${errorMessage}`;
-                folderTestResult.className = "similar-notes-test-error";
-            }
-        };
-
-        let folderTestInput: HTMLInputElement;
-        let folderTestResult: HTMLSpanElement;
+        let updateExcludedFilesList: () => void;
 
         // Add UI for folder exclusion patterns
         new Setting(containerEl)
@@ -532,53 +494,58 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     await this.settingsService.update({
                         excludeFolderPatterns: validPatterns,
                     });
-
-                    // Update test result when patterns change
-                    validateAndTestGlobPatterns();
+                    
+                    // Update excluded files list
+                    updateExcludedFilesList();
                 });
             });
 
-        // Add folder pattern tester UI
-        const folderTesterContainer = containerEl.createDiv(
-            "similar-notes-folder-tester"
+        // Add excluded files preview
+        const excludedFilesSetting = new Setting(containerEl)
+            .setDesc("");
+        
+        const excludedFilesDescription = excludedFilesSetting.descEl;
+        const excludedFilesList = excludedFilesSetting.controlEl.createDiv(
+            "similar-notes-excluded-files-list"
         );
-        folderTesterContainer.addClass("setting-item");
-
-        const folderTesterContent = folderTesterContainer.createDiv(
-            "setting-item-control similar-notes-folder-tester-content"
-        );
-
-        const testContainer = folderTesterContent.createDiv(
-            "similar-notes-test-container"
-        );
-
-        const testLabel = testContainer.createSpan("similar-notes-test-label");
-        testLabel.setText("Test path: ");
-
-        folderTestInput = testContainer.createEl("input", {
-            type: "text",
-            placeholder: "e.g., Templates/Daily.md",
-            cls: "similar-notes-test-input",
-        });
-        folderTestInput.value = settings.excludeFolderTestPath || "";
-
-        folderTestResult = testContainer.createSpan(
-            "similar-notes-test-result"
-        );
-
-        // Update test result and save test path when it changes
-        folderTestInput.addEventListener("input", () => {
-            // Save the test path to settings
-            this.settingsService.update({
-                excludeFolderTestPath: folderTestInput.value,
-            });
-
-            // Validate and test
-            validateAndTestGlobPatterns();
-        });
-
-        // Initialize test result when settings tab opens
-        setTimeout(() => validateAndTestGlobPatterns(), 0);
+        
+        // Function to update excluded files list
+        updateExcludedFilesList = () => {
+            const allFiles = this.app.vault.getMarkdownFiles();
+            const currentSettings = this.settingsService.get();
+            const patterns = currentSettings.excludeFolderPatterns;
+            
+            const excludedFiles = allFiles.filter(file => 
+                shouldExcludeFile(file.path, patterns)
+            );
+            
+            excludedFilesDescription.innerHTML = `
+                <div>Excluded files:</div>
+                <div style="font-size: var(--font-ui-smaller); color: var(--text-muted);">${excludedFiles.length} files total</div>
+            `;
+            
+            // Clear and populate list
+            excludedFilesList.empty();
+            
+            if (excludedFiles.length === 0) {
+                const emptyMessage = excludedFilesList.createDiv(
+                    "similar-notes-excluded-empty"
+                );
+                emptyMessage.setText("No files excluded");
+            } else {
+                // Show up to 5 files with scroll
+                excludedFiles.slice(0, Math.min(100, excludedFiles.length)).forEach(file => {
+                    const fileItem = excludedFilesList.createDiv(
+                        "similar-notes-excluded-file-item"
+                    );
+                    fileItem.setText(file.path);
+                    fileItem.title = file.path; // Show full path on hover
+                });
+            }
+        };
+        
+        // Update list when settings change
+        setTimeout(() => updateExcludedFilesList(), 0);
 
         // Function to process test input - called whenever regex patterns or input text changes
         const processTestInput = () => {
