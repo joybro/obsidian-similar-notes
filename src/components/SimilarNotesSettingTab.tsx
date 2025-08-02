@@ -166,6 +166,8 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         }
         this.modelSettingsSection.render();
 
+        // Add spacing between Model and Index sections
+        containerEl.createDiv("setting-item-separator");
 
         new Setting(containerEl).setName("Index").setHeading();
 
@@ -550,6 +552,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         // Initialize output when settings tab opens
         setTimeout(() => processTestInput(), 0);
 
+        // Add spacing between Index and Display sections
+        containerEl.createDiv("setting-item-separator");
+
         new Setting(containerEl).setName("Display").setHeading();
 
         new Setting(containerEl)
@@ -591,6 +596,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         });
                     });
             });
+
+        // Add spacing between Display and Debug sections
+        containerEl.createDiv("setting-item-separator");
 
         new Setting(containerEl).setName("Debug").setHeading();
 
