@@ -10,6 +10,18 @@ export type NoteChange = {
     mtime?: number;
 };
 
+interface FileInfo {
+    path: string;
+    mtime: number;
+}
+
+interface SyncAnalysis {
+    toAdd: FileInfo[];      // Files that need to be added to the index
+    toRemove: string[];     // Files that need to be removed from the index
+    toUpdate: FileInfo[];   // Files that have changed mtime and need updating
+    counts: { added: number; removed: number; updated: number };
+}
+
 /**
  * Class for managing file changes in an Obsidian vault
  */
@@ -38,47 +50,14 @@ export class NoteChangeQueue {
      * and adding changed files to the queue
      */
     async initialize(): Promise<void> {
-        // Get all markdown files in the vault
-        const allFiles = this.vault.getMarkdownFiles();
-        const settings = this.settingsService.get();
-        const files = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
-
-        // Calculate current hashes and detect changes
-        const currentMtimes: Record<string, number> = {};
-        const newQueue: NoteChange[] = [];
-
-        // Process existing files
-        for (const file of files) {
-            currentMtimes[file.path] = file.stat.mtime;
-            const mtime = await this.mTimeStore.getMTime(file.path);
-
-            // Check if file is new or modified
-            if (!mtime) {
-                newQueue.push({
-                    path: file.path,
-                    reason: "new",
-                    mtime: file.stat.mtime,
-                });
-            } else if (mtime !== file.stat.mtime) {
-                newQueue.push({
-                    path: file.path,
-                    reason: "modified",
-                    mtime: file.stat.mtime,
-                });
-            }
-        }
-
-        // Check for deleted files and files excluded by patterns
-        const validFiles: Record<string, boolean> = {};
-        for (const path in currentMtimes) {
-            validFiles[path] = true;
-        }
-        const deletedFiles = this.findDeletedAndExcludedFiles(validFiles);
-        newQueue.push(...deletedFiles);
-
-        // Update state
-        this.queue = newQueue;
+        // Analyze what files need to be synchronized (including mtime checks)
+        const analysis = this.analyzeSyncNeeds(true);
+        
+        // Create changes from analysis
+        this.queue = this.createChanges(analysis);
+        
         log.info("queue size", this.queue.length);
+        log.info(`Sync analysis: ${analysis.counts.added} to add, ${analysis.counts.removed} to remove, ${analysis.counts.updated} to update`);
 
         // Register file change event callbacks
         this.registerFileChangeCallbacks();
@@ -174,23 +153,24 @@ export class NoteChangeQueue {
      * Adds all files to the queue regardless of whether they've changed
      */
     async enqueueAllNotes(): Promise<void> {
-        // Get all markdown files in the vault
+        // Get all files that should be indexed according to current patterns
         const allFiles = this.vault.getMarkdownFiles();
         const settings = this.settingsService.get();
-        const files = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
-
-        // Add all files to the queue with their current hashes
+        const filteredFiles = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
+        
+        // Create "modified" changes for all valid files (force reprocessing of everything)
         const newQueue: NoteChange[] = [];
-
-        for (const file of files) {
+        
+        for (const file of filteredFiles) {
             newQueue.push({
                 path: file.path,
                 reason: "modified",
                 mtime: file.stat.mtime,
             });
         }
-
+        
         this.queue = newQueue;
+        log.info(`Enqueued all notes: ${newQueue.length} files queued for reprocessing`);
     }
 
     /**
@@ -215,6 +195,98 @@ export class NoteChangeQueue {
     }
 
     /**
+     * Analyzes what files need to be synchronized between vault and index
+     * 
+     * @param checkMtime Whether to check modification times for existing indexed files
+     * @returns Analysis of files that need to be added, removed, or updated
+     */
+    private analyzeSyncNeeds(checkMtime: boolean = true): SyncAnalysis {
+        // Get all markdown files and apply current exclusion patterns
+        const allFiles = this.vault.getMarkdownFiles();
+        const settings = this.settingsService.get();
+        const filteredFiles = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
+        
+        // Create map of files that should be indexed (according to current patterns)
+        const shouldBeIndexed = new Map<string, number>();
+        for (const file of filteredFiles) {
+            shouldBeIndexed.set(file.path, file.stat.mtime);
+        }
+        
+        // Get currently indexed files
+        const currentlyIndexed = new Set(this.mTimeStore.getAllPaths());
+        
+        const toAdd: FileInfo[] = [];
+        const toRemove: string[] = [];
+        const toUpdate: FileInfo[] = [];
+        
+        // Find files that should be added (not currently indexed but should be)
+        for (const [filePath, mtime] of shouldBeIndexed) {
+            if (!currentlyIndexed.has(filePath)) {
+                toAdd.push({ path: filePath, mtime });
+            } else if (checkMtime) {
+                // Check if existing indexed file needs update
+                const storedMtime = this.mTimeStore.getMTime(filePath);
+                if (storedMtime !== mtime) {
+                    toUpdate.push({ path: filePath, mtime });
+                }
+            }
+        }
+        
+        // Find files that should be removed (currently indexed but should not be)
+        for (const indexedPath of currentlyIndexed) {
+            if (!shouldBeIndexed.has(indexedPath)) {
+                toRemove.push(indexedPath);
+            }
+        }
+        
+        return {
+            toAdd,
+            toRemove,
+            toUpdate,
+            counts: {
+                added: toAdd.length,
+                removed: toRemove.length,
+                updated: toUpdate.length
+            }
+        };
+    }
+
+    /**
+     * Creates NoteChange objects from sync analysis
+     */
+    private createChanges(analysis: SyncAnalysis): NoteChange[] {
+        const changes: NoteChange[] = [];
+        
+        // Add new files
+        for (const fileInfo of analysis.toAdd) {
+            changes.push({
+                path: fileInfo.path,
+                reason: "new",
+                mtime: fileInfo.mtime
+            });
+        }
+        
+        // Update modified files
+        for (const fileInfo of analysis.toUpdate) {
+            changes.push({
+                path: fileInfo.path,
+                reason: "modified", 
+                mtime: fileInfo.mtime
+            });
+        }
+        
+        // Remove deleted/excluded files
+        for (const filePath of analysis.toRemove) {
+            changes.push({
+                path: filePath,
+                reason: "deleted"
+            });
+        }
+        
+        return changes;
+    }
+
+    /**
      * Marks a file change as processed by updating the hash store
      * This should be called after processing a file change to ensure it's not reprocessed
      * if the application restarts before the hash store is updated
@@ -236,48 +308,17 @@ export class NoteChangeQueue {
      * @returns Promise that resolves to an object with counts of changes
      */
     async applyExclusionPatterns(): Promise<{ removed: number; added: number }> {
-        const allFiles = this.vault.getMarkdownFiles();
-        const settings = this.settingsService.get();
-        const filteredFiles = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
+        // Analyze sync needs without checking mtime (we only care about inclusion/exclusion)
+        const analysis = this.analyzeSyncNeeds(false);
         
-        // Create map of currently valid files (should be indexed)
-        const shouldBeIndexed: Record<string, number> = {};
-        for (const file of filteredFiles) {
-            shouldBeIndexed[file.path] = file.stat.mtime;
-        }
-
-        // Create map of currently indexed files
-        const currentlyIndexed = new Set(this.mTimeStore.getAllPaths());
-
-        const changes: NoteChange[] = [];
-        let removedCount = 0;
-        let addedCount = 0;
-
-        // Find files that should be removed (currently indexed but should not be)
-        for (const indexedPath of currentlyIndexed) {
-            if (!shouldBeIndexed[indexedPath]) {
-                changes.push({ path: indexedPath, reason: "deleted" });
-                removedCount++;
-            }
-        }
-
-        // Find files that should be added (not currently indexed but should be)
-        for (const [filePath, mtime] of Object.entries(shouldBeIndexed)) {
-            if (!currentlyIndexed.has(filePath)) {
-                changes.push({ 
-                    path: filePath, 
-                    reason: "new",
-                    mtime: mtime
-                });
-                addedCount++;
-            }
-        }
+        // Create changes from analysis
+        const changes = this.createChanges(analysis);
         
         // Add all changes to queue for processing
         this.queue.push(...changes);
         
-        log.info(`Applied exclusion patterns: ${removedCount} files queued for removal, ${addedCount} files queued for addition`);
-        return { removed: removedCount, added: addedCount };
+        log.info(`Applied exclusion patterns: ${analysis.counts.removed} files queued for removal, ${analysis.counts.added} files queued for addition`);
+        return { removed: analysis.counts.removed, added: analysis.counts.added };
     }
 
     /**
@@ -287,54 +328,10 @@ export class NoteChangeQueue {
      * @returns Object with counts of files that would be removed and added
      */
     previewExclusionApplication(): { removed: number; added: number } {
-        const allFiles = this.vault.getMarkdownFiles();
-        const settings = this.settingsService.get();
-        const filteredFiles = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
+        // Analyze sync needs without checking mtime (we only care about inclusion/exclusion)
+        const analysis = this.analyzeSyncNeeds(false);
         
-        // Create map of currently valid files (should be indexed)
-        const shouldBeIndexed = new Set<string>();
-        for (const file of filteredFiles) {
-            shouldBeIndexed.add(file.path);
-        }
-
-        // Create map of currently indexed files
-        const currentlyIndexed = new Set(this.mTimeStore.getAllPaths());
-
-        let removedCount = 0;
-        let addedCount = 0;
-
-        // Count files that would be removed
-        for (const indexedPath of currentlyIndexed) {
-            if (!shouldBeIndexed.has(indexedPath)) {
-                removedCount++;
-            }
-        }
-
-        // Count files that would be added
-        for (const validPath of shouldBeIndexed) {
-            if (!currentlyIndexed.has(validPath)) {
-                addedCount++;
-            }
-        }
-
-        return { removed: removedCount, added: addedCount };
+        return { removed: analysis.counts.removed, added: analysis.counts.added };
     }
 
-    /**
-     * Helper method to find files that are deleted or excluded by current patterns
-     * 
-     * @param validFiles Map of file paths that should remain in the index
-     * @returns Array of NoteChange objects for files to be removed
-     */
-    private findDeletedAndExcludedFiles(validFiles: Record<string, boolean>): NoteChange[] {
-        const deletedFiles: NoteChange[] = [];
-        
-        for (const path of this.mTimeStore.getAllPaths()) {
-            if (!validFiles[path]) {
-                deletedFiles.push({ path, reason: "deleted" });
-            }
-        }
-        
-        return deletedFiles;
-    }
 }
