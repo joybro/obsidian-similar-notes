@@ -477,11 +477,34 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         };
 
-        new Setting(containerEl)
-            .setName("Indexed notes")
-            .setDesc(
-                `Notes: ${this.indexedNoteCount} | Chunks: ${this.indexedChunkCount} | Database size: ${formatBytes(this.databaseSize)}`
-            );
+        // Index statistics with excluded files count
+        const indexStatsSetting = new Setting(containerEl)
+            .setName("Index statistics");
+
+        // Function to update index statistics  
+        const updateVaultStats = () => {
+            const allFiles = this.app.vault.getMarkdownFiles();
+            
+            // Calculate actually excluded files: total files - indexed files
+            const actuallyExcludedCount = allFiles.length - this.indexedNoteCount;
+            
+            // Clear and rebuild the description with proper structure
+            indexStatsSetting.descEl.empty();
+            
+            const statsContainer = indexStatsSetting.descEl.createDiv("similar-notes-stats-container");
+            
+            const indexedStat = statsContainer.createDiv("similar-notes-stat-item");
+            indexedStat.setText(`• Indexed: ${this.indexedNoteCount} notes (${this.indexedChunkCount} chunks)`);
+            
+            const excludedStat = statsContainer.createDiv("similar-notes-stat-item");
+            excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
+            
+            const dbSizeStat = statsContainer.createDiv("similar-notes-stat-item");
+            dbSizeStat.setText(`• Database size: ${formatBytes(this.databaseSize)}`);
+        };
+
+        // Initial update
+        setTimeout(() => updateVaultStats(), 0);
 
         new Setting(containerEl)
             .setName("Reindex notes")
@@ -558,7 +581,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         excludeFolderPatterns: validPatterns,
                     });
                     
-                    // Update excluded files list
+                    // Update excluded files list (but not index stats - those reflect current index state)
                     updateExcludedFilesList();
                 });
             });
@@ -656,8 +679,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                                     
                                     new Notice(successMessage);
                                     
-                                    // Update excluded files list
+                                    // Update excluded files list and index stats (actual index state changed)
                                     updateExcludedFilesList();
+                                    updateVaultStats();
                                 } catch (error) {
                                     log.error("Failed to apply exclusion patterns:", error);
                                     new Notice(`Failed to apply exclusion patterns: ${error.message}`);
