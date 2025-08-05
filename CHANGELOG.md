@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2025-08-05
+
+-   **Database Location Change**: Moved database files from `.obsidian/` to `.obsidian/plugins/similar-notes/`
+    -   Allows cleaner exclusion of plugin directory for users who sync `.obsidian` but not plugins
+    -   Affected files: `similar-notes.json` and `similar-notes-file-mtimes.json`
+-   **Folder/File Exclusions**: Added ability to exclude specific folders and files from indexing
+    -   Configure excluded paths in settings
+    -   Supports glob patterns for flexible exclusion rules
+-   **Enhanced Index Statistics**: Settings now display additional index information
+    -   Total chunk count across all indexed notes
+    -   Database file size
+    -   Number of excluded files based on exclusion rules
+
 ## [0.8.0] - 2025-07-28
 
 -   **Mobile Support**: Plugin now fully works on Obsidian mobile apps (iOS/Android)
