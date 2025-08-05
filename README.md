@@ -44,6 +44,16 @@ Connect to any Ollama embedding model on `localhost:11434`
 -   **Orama**: Built-in vector database for fast search
 -   **Web Workers**: All processing runs in background threads
 
+## Sync Exclusions
+
+If you use file syncing tools like Syncthing, you should exclude the plugin's database files to avoid conflicts:
+
+**Files to exclude:**
+- `.obsidian/plugins/similar-notes/similar-notes.json`
+- `.obsidian/plugins/similar-notes/similar-notes-file-mtimes.json`
+
+> **Note**: Obsidian Sync appears to work fine with these files. However, if you experience any sync-related issues, consider excluding the entire plugin directory.
+
 ## License
 
 [MIT](LICENSE)
