@@ -6,7 +6,11 @@ import { NoteIndexingService } from "./application/NoteIndexingService";
 import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import type { Command } from "./commands";
-import { ShowSimilarNotesCommand, ToggleInDocumentViewCommand, ReindexAllNotesCommand } from "./commands";
+import {
+    ReindexAllNotesCommand,
+    ShowSimilarNotesCommand,
+    ToggleInDocumentViewCommand,
+} from "./commands";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesSidebarView } from "./components/SimilarNotesSidebarView";
 import { StatusBarView } from "./components/StatusBarView";
@@ -65,19 +69,24 @@ export default class MainPlugin extends Plugin {
 
     private async getPluginDataDir(): Promise<string> {
         const pluginDataDir = `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
-        
+
         // Ensure the plugin directory exists
         if (!(await this.app.vault.adapter.exists(pluginDataDir))) {
             await this.app.vault.adapter.mkdir(pluginDataDir);
         }
-        
+
         return pluginDataDir;
     }
 
-    private async migrateDataFiles(oldPath: string, newPath: string): Promise<void> {
+    private async migrateDataFiles(
+        oldPath: string,
+        newPath: string
+    ): Promise<void> {
         try {
-            if (await this.app.vault.adapter.exists(oldPath) && 
-                !(await this.app.vault.adapter.exists(newPath))) {
+            if (
+                (await this.app.vault.adapter.exists(oldPath)) &&
+                !(await this.app.vault.adapter.exists(newPath))
+            ) {
                 log.info(`Migrating file from ${oldPath} to ${newPath}`);
                 const data = await this.app.vault.adapter.read(oldPath);
                 await this.app.vault.adapter.write(newPath, data);
@@ -85,7 +94,10 @@ export default class MainPlugin extends Plugin {
                 log.info(`Successfully migrated file to plugin folder`);
             }
         } catch (error) {
-            log.error(`Failed to migrate file from ${oldPath} to ${newPath}:`, error);
+            log.error(
+                `Failed to migrate file from ${oldPath} to ${newPath}:`,
+                error
+            );
         }
     }
 
@@ -114,10 +126,10 @@ export default class MainPlugin extends Plugin {
     private async initializeServices() {
         // Get plugin data directory and ensure it exists
         const pluginDataDir = await this.getPluginDataDir();
-        
+
         // Set up file paths in plugin folder
         const fileMtimePath = `${pluginDataDir}/${fileMtimeFileName}`;
-        
+
         // Migrate existing files from old location to new location
         const oldFileMtimePath = `${this.app.vault.configDir}/${fileMtimeFileName}`;
         await this.migrateDataFiles(oldFileMtimePath, fileMtimePath);
@@ -333,7 +345,7 @@ export default class MainPlugin extends Plugin {
         const vectorSize = this.modelService.getVectorSize();
         const pluginDataDir = await this.getPluginDataDir();
         const dbPath = `${pluginDataDir}/${dbFileName}`;
-        
+
         // Migrate existing database from old location to new location
         const oldDbPath = `${this.app.vault.configDir}/${dbFileName}`;
         await this.migrateDataFiles(oldDbPath, dbPath);
@@ -363,7 +375,7 @@ export default class MainPlugin extends Plugin {
             await this.noteChunkRepository.init(vectorSize, dbPath, false);
             this.noteChangeQueue.enqueueAllNotes();
         }
-        
+
         // Pass NoteChunkRepository to the settings tab after it's initialized
         await this.settingTab.setNoteChunkRepository(this.noteChunkRepository);
 
@@ -379,7 +391,10 @@ export default class MainPlugin extends Plugin {
     }
 
     // Apply current exclusion patterns to synchronize index with current patterns
-    async applyExclusionPatterns(): Promise<{ removed: number; added: number }> {
+    async applyExclusionPatterns(): Promise<{
+        removed: number;
+        added: number;
+    }> {
         return await this.noteChangeQueue.applyExclusionPatterns();
     }
 

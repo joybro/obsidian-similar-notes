@@ -9,7 +9,7 @@ vi.mock("comlink", () => ({
 }));
 
 // Import after mocking
-import { OramaWorker } from "../orama.worker";
+const { OramaWorker } = require("../orama.worker");
 
 /**
  * Migration test for JSON to IndexedDB

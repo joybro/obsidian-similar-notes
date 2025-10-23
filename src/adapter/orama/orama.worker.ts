@@ -324,7 +324,14 @@ class OramaWorker {
 
 }
 
-export { OramaWorker };
-export type { OramaWorker as OramaWorkerType };
-
 comlink.expose(OramaWorker);
+
+// Conditional export for tests - avoid using ES6 export which breaks inline worker
+// @ts-ignore
+if (typeof module !== 'undefined' && module.exports) {
+    // @ts-ignore
+    module.exports = { OramaWorker };
+}
+
+// Type-only export for TypeScript - this gets removed at compile time
+export type { OramaWorker };
