@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeAll } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import "fake-indexeddb/auto";
 import type { DataAdapter } from "obsidian";
 
@@ -7,6 +7,9 @@ vi.mock("comlink", () => ({
     expose: vi.fn(),
     proxy: vi.fn((x) => x),
 }));
+
+// Direct import from OramaWorkerClass - much simpler!
+import { OramaWorker } from "../OramaWorkerClass";
 
 /**
  * Migration test for JSON to IndexedDB
@@ -21,23 +24,13 @@ vi.mock("comlink", () => ({
  * - Manual testing in production environment
  */
 describe("Orama Worker - JSON to IndexedDB Migration", () => {
-    // Dynamically import to work around module.exports issue
-    let OramaWorker: any;
+    let worker: OramaWorker;
     let mockAdapter: DataAdapter;
 
-    beforeAll(async () => {
-        // Dynamic import after mocking
-        const module = await import("../orama.worker");
-        // @ts-ignore - Access via module.exports
-        OramaWorker = (module as any).OramaWorker ||
-                      (typeof (module as any).default === 'function' ? (module as any).default : null);
-
-        if (!OramaWorker) {
-            throw new Error("Failed to import OramaWorker");
-        }
-    });
-
     beforeEach(() => {
+        // Simple instantiation - no dynamic import needed!
+        worker = new OramaWorker();
+
         mockAdapter = {
             exists: vi.fn(),
             read: vi.fn(),
@@ -62,8 +55,6 @@ describe("Orama Worker - JSON to IndexedDB Migration", () => {
     });
 
     it("should migrate Orama v2 JSON with nested docs.docs structure", async () => {
-        const worker = new OramaWorker();
-
         // Create test chunks matching production data
         const chunks = Array.from({ length: 10 }, (_, i) => ({
             path: `test-${i}.md`,
@@ -72,7 +63,7 @@ describe("Orama Worker - JSON to IndexedDB Migration", () => {
             content: `Content ${i}`,
             chunkIndex: 0,
             totalChunks: 1,
-            embedding: new Array(384).fill(0.1 + i * 0.01), // Slightly different embeddings
+            embedding: new Array(384).fill(0.1 + i * 0.01),
             lastUpdated: Date.now(),
         }));
 

@@ -38,9 +38,6 @@ const buildOptions = {
                 __IS_TEST__: "false", // Production build is not test
             },
             plugins: [polyfillPlugin],
-            logOverride: {
-                "commonjs-variable-in-esm": "silent", // Suppress module.exports warning
-            },
         }),
     ],
 };
@@ -62,9 +59,6 @@ const workerBuildOptions = {
     },
     external: ["node:worker_threads", ...builtins],
     plugins: [polyfillPlugin],
-    logOverride: {
-        "commonjs-variable-in-esm": "silent", // Suppress module.exports warning in test builds
-    },
 };
 
 // Helper function to analyze bundle size from metafile
