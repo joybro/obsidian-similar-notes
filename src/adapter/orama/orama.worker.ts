@@ -123,8 +123,34 @@ class OramaWorker {
             const oramaData = JSON.parse(jsonData);
 
             // Extract documents from Orama persistence format
-            const documents = oramaData.docs || [];
-            log.info(`Found ${documents.length} chunks to migrate`);
+            // Orama v2 stores docs in nested structure: { docs: { docs: { [id]: Document } } }
+            let documents: any[] = [];
+
+            // Navigate the nested structure to find the actual documents
+            let docsObject = null;
+            if (oramaData.docs?.docs && typeof oramaData.docs.docs === 'object') {
+                // Nested: oramaData.docs.docs
+                docsObject = oramaData.docs.docs;
+                log.info('Found docs at oramaData.docs.docs');
+            } else if (oramaData.docs && typeof oramaData.docs === 'object') {
+                // Direct: oramaData.docs
+                docsObject = oramaData.docs;
+                log.info('Found docs at oramaData.docs');
+            }
+
+            if (docsObject && typeof docsObject === 'object' && !Array.isArray(docsObject)) {
+                // Convert docs object to array
+                documents = Object.values(docsObject);
+                log.info(`Extracted ${documents.length} chunks from docs object`);
+            } else if (Array.isArray(docsObject)) {
+                // Fallback: if docs is already an array
+                documents = docsObject;
+                log.info(`Found ${documents.length} chunks as array`);
+            } else {
+                log.warn("Could not find documents in expected format");
+            }
+
+            log.info(`Total chunks to migrate: ${documents.length}`);
 
             if (documents.length === 0) {
                 log.info("No chunks to migrate");
@@ -133,9 +159,13 @@ class OramaWorker {
             }
 
             // Insert to IndexedDB in batches to avoid memory issues
+            // Note: Remove 'id' field from Orama docs because IndexedDB will auto-generate it
             const BATCH_SIZE = 100;
             for (let i = 0; i < documents.length; i += BATCH_SIZE) {
-                const batch = documents.slice(i, i + BATCH_SIZE);
+                const batch = documents.slice(i, i + BATCH_SIZE).map((doc: any) => {
+                    const { id, ...docWithoutId } = doc;
+                    return docWithoutId;
+                });
                 await this.storage.putMulti(batch);
 
                 const processed = Math.min(i + BATCH_SIZE, documents.length);
