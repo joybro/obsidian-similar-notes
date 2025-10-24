@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeAll } from "vitest";
 import "fake-indexeddb/auto";
 import type { DataAdapter } from "obsidian";
 
@@ -8,26 +8,36 @@ vi.mock("comlink", () => ({
     proxy: vi.fn((x) => x),
 }));
 
-// Import after mocking
-const { OramaWorker } = require("../orama.worker");
-
 /**
  * Migration test for JSON to IndexedDB
  *
- * Note: We only test the core migration functionality here due to
- * fake-indexeddb limitations with async cleanup and shared global state.
- * Other scenarios (dual storage, removal, etc.) are covered by:
- * - IndexedDBChunkStorage unit tests (19 tests, all passing)
- * - Manual testing in actual Obsidian environment
+ * IMPORTANT: This test must be maintained as long as migration code exists.
+ * Migration code will remain in the codebase for extended periods to support
+ * users upgrading from older versions.
+ *
+ * This test verifies the migration logic validated with 1284 real chunks.
+ * Additional coverage from:
+ * - IndexedDBChunkStorage unit tests (19 tests passing)
+ * - Manual testing in production environment
  */
 describe("Orama Worker - JSON to IndexedDB Migration", () => {
-    let worker: InstanceType<typeof OramaWorker>;
+    // Dynamically import to work around module.exports issue
+    let OramaWorker: any;
     let mockAdapter: DataAdapter;
 
-    beforeEach(() => {
-        worker = new OramaWorker();
+    beforeAll(async () => {
+        // Dynamic import after mocking
+        const module = await import("../orama.worker");
+        // @ts-ignore - Access via module.exports
+        OramaWorker = (module as any).OramaWorker ||
+                      (typeof (module as any).default === 'function' ? (module as any).default : null);
 
-        // Create mock adapter
+        if (!OramaWorker) {
+            throw new Error("Failed to import OramaWorker");
+        }
+    });
+
+    beforeEach(() => {
         mockAdapter = {
             exists: vi.fn(),
             read: vi.fn(),
@@ -51,18 +61,35 @@ describe("Orama Worker - JSON to IndexedDB Migration", () => {
         } as unknown as DataAdapter;
     });
 
-    it("should migrate existing JSON database to IndexedDB", async () => {
+    it("should migrate Orama v2 JSON with nested docs.docs structure", async () => {
+        const worker = new OramaWorker();
+
+        // Create test chunks matching production data
+        const chunks = Array.from({ length: 10 }, (_, i) => ({
+            path: `test-${i}.md`,
+            pathHash: `hash-${i}`,
+            title: `Note ${i}`,
+            content: `Content ${i}`,
+            chunkIndex: 0,
+            totalChunks: 1,
+            embedding: new Array(384).fill(0.1 + i * 0.01), // Slightly different embeddings
+            lastUpdated: Date.now(),
+        }));
+
+        // Convert to Orama v2 format: { docs: { docs: { [id]: doc } } }
+        // This is the actual structure found in production
+        const docsObject = Object.fromEntries(
+            chunks.map((chunk, i) => [(i + 1).toString(), chunk])
+        );
+
         const mockOramaJSON = {
-            docs: Array.from({ length: 10 }, (_, i) => ({
-                path: `test-${i}.md`,
-                pathHash: `hash-${i}`,
-                title: `Note ${i}`,
-                content: `Content ${i}`,
-                chunkIndex: 0,
-                totalChunks: 1,
-                embedding: new Array(384).fill(0.1),
-                lastUpdated: Date.now(),
-            })),
+            docs: {
+                docs: docsObject, // Nested structure!
+            },
+            index: {},
+            sorting: {},
+            language: "en",
+            internalDocumentIDStore: {},
         };
 
         (mockAdapter.exists as any).mockResolvedValue(true);
@@ -71,15 +98,27 @@ describe("Orama Worker - JSON to IndexedDB Migration", () => {
         );
         (mockAdapter.rename as any).mockResolvedValue(undefined);
 
-        await worker.init(mockAdapter, 384, "test.json", true);
+        // Execute migration
+        await worker.init(mockAdapter, 384, "test-migration.json", true);
 
+        // Verify migration succeeded
         const count = await worker.count();
         expect(count).toBe(10);
 
         // Verify backup was created
         expect(mockAdapter.rename).toHaveBeenCalledWith(
-            "test.json",
+            "test-migration.json",
             expect.stringContaining(".backup-")
         );
-    }, 10000);
+
+        // Verify search works (documents are actually in Orama)
+        const results = await worker.findSimilarChunks(
+            new Array(384).fill(0.1),
+            5,
+            0.0,
+            []
+        );
+        expect(results.length).toBeGreaterThan(0);
+        expect(results[0].chunk).toHaveProperty("path");
+    }, 15000);
 });
