@@ -190,15 +190,6 @@ export class OramaWorker {
         }
     }
 
-    async persist(): Promise<void> {
-        // NOTE: With IndexedDB, data is persisted immediately on put/putMulti.
-        // This method is kept for backward compatibility but does nothing.
-        // TODO: Remove persist() calls from main.ts in a follow-up task
-
-        log.info("persist() called - no-op with IndexedDB storage");
-        return Promise.resolve();
-    }
-
     async put(noteChunk: NoteChunkDTO): Promise<void> {
         if (!this.db) {
             throw new Error("Database not loaded");

@@ -39,11 +39,6 @@ export interface NoteChunkRepository {
     count(): Promise<number>;
 
     /**
-     * Persists NoteChunks in memory to disk.
-     */
-    persist(): Promise<void>;
-
-    /**
      * Dispose the repository and clean up resources
      * Should be called when the plugin is unloaded
      */

@@ -270,11 +270,6 @@ export default class MainPlugin extends Plugin {
         this.noteIndexingService.stopLoop();
         this.leafViewCoordinator.onUnload();
 
-        // Clear auto-save interval
-        if (this.autoSaveInterval) {
-            clearInterval(this.autoSaveInterval);
-        }
-
         // Persist and close database connections
         await this.closeStore();
 
@@ -437,11 +432,12 @@ export default class MainPlugin extends Plugin {
     }
 
     async closeStore() {
+        // Clear auto-save interval
         if (this.autoSaveInterval) {
             clearInterval(this.autoSaveInterval);
         }
 
-        await this.noteChunkRepository.persist();
+        // IndexedNoteMTimeStore still needs to persist its JSON file
         await this.indexedNotesMTimeStore.persist();
     }
 
@@ -452,14 +448,15 @@ export default class MainPlugin extends Plugin {
         }
 
         // Set up new auto-save interval
+        // NOTE: Only IndexedNoteMTimeStore needs auto-save since it uses JSON.
+        // NoteChunkRepository uses IndexedDB which auto-persists on write.
         const intervalMs = interval * 60 * 1000;
         this.autoSaveInterval = setInterval(async () => {
             try {
-                await this.noteChunkRepository.persist();
                 await this.indexedNotesMTimeStore.persist();
-                log.info("Auto-saved databases");
+                log.info("Auto-saved IndexedNoteMTimeStore");
             } catch (e) {
-                log.error("Failed to auto-save database:", e);
+                log.error("Failed to auto-save IndexedNoteMTimeStore:", e);
             }
         }, intervalMs);
     }
