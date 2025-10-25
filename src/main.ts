@@ -346,7 +346,11 @@ export default class MainPlugin extends Plugin {
         await this.migrateDataFiles(oldDbPath, dbPath);
 
         if (firstTime) {
-            await this.noteChunkRepository.init(vectorSize, dbPath, true);
+            await this.noteChunkRepository.init(
+                vectorSize,
+                dbPath,
+                true // loadExistingData
+            );
             const count = await this.noteChunkRepository.count();
             log.info(
                 "Successfully loaded existing database from",
@@ -367,7 +371,11 @@ export default class MainPlugin extends Plugin {
                     }
                 });
         } else {
-            await this.noteChunkRepository.init(vectorSize, dbPath, false);
+            await this.noteChunkRepository.init(
+                vectorSize,
+                dbPath,
+                false // loadExistingData - reindex from scratch
+            );
             this.noteChangeQueue.enqueueAllNotes();
         }
 

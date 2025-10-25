@@ -1,7 +1,7 @@
 import type { NoteChunk } from "@/domain/model/NoteChunk";
 
 export interface NoteChunkRepository {
-    init(vectorSize: number, filepath: string, restore: boolean): Promise<void>;
+    init(vectorSize: number, filepath: string, loadExistingData: boolean): Promise<void>;
 
     /**
      * Puts a NoteChunk.

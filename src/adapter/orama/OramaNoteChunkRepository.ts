@@ -18,7 +18,7 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
     async init(
         vectorSize: number,
         filepath: string,
-        loadFromFile: boolean
+        loadExistingData: boolean
     ): Promise<void> {
         const worker = await this.workerManager.initialize(InlineWorker);
 
@@ -26,7 +26,7 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
             Comlink.proxy(this.vault.adapter),
             vectorSize,
             filepath,
-            loadFromFile
+            loadExistingData
         );
     }
 

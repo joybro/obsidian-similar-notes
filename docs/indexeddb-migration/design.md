@@ -201,15 +201,18 @@ private async migrateFromJSON(adapter: DataAdapter, filepath: string): Promise<v
 - **Frequency**: Once per vault (flag stored in IndexedDB metadata)
 
 ```typescript
-async init(adapter, vectorSize, filepath, loadFromFile) {
+async init(adapter, vectorSize, filepath, loadExistingData) {
     // 1. Initialize IndexedDB
     await this.storage.init();
 
-    // 2. Check migration
+    // 2. Check migration or clear for reindex
     const alreadyMigrated = await this.storage.getMigrationFlag();
     const jsonExists = await adapter.exists(filepath);
 
-    if (!alreadyMigrated && jsonExists && loadFromFile) {
+    if (!loadExistingData) {
+        // Reindex scenario: clear IndexedDB
+        await this.storage.clear();
+    } else if (!alreadyMigrated && jsonExists) {
         await this.migrateFromJSON(adapter, filepath);
     }
 
