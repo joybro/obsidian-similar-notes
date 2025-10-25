@@ -4,7 +4,7 @@ import { WorkerManager } from "@/infrastructure/WorkerManager";
 import * as Comlink from "comlink";
 import log from "loglevel";
 import type { Vault } from "obsidian";
-import type { OramaWorker } from "./orama.worker";
+import type { OramaWorker } from "./OramaDatabase";
 // @ts-ignore
 import InlineWorker from "./orama.worker";
 

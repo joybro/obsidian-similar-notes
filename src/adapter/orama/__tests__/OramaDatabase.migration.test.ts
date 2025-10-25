@@ -8,8 +8,8 @@ vi.mock("comlink", () => ({
     proxy: vi.fn((x) => x),
 }));
 
-// Direct import from OramaWorkerClass - much simpler!
-import { OramaWorker } from "../OramaWorkerClass";
+// Direct import from OramaDatabase - much simpler!
+import { OramaWorker } from "../OramaDatabase";
 
 /**
  * Migration test for JSON to IndexedDB
