@@ -46,7 +46,7 @@ export class OramaWorker {
         adapter: DataAdapter,
         vectorSize: number,
         filepath: string,
-        loadFromFile: boolean
+        loadExistingData: boolean
     ): Promise<void> {
         this.adapter = adapter;
         this.vectorSize = vectorSize;
@@ -68,13 +68,19 @@ export class OramaWorker {
             this.storage = new IndexedDBChunkStorage();
             await this.storage.init();
 
-            // Check if migration is needed
-            const alreadyMigrated = await this.storage.getMigrationFlag();
-            const jsonExists = await this.adapter.exists(this.filepath);
+            if (!loadExistingData) {
+                // Reindex scenario: clear IndexedDB to start fresh
+                await this.storage.clear();
+                log.info("Cleared IndexedDB for reindexing");
+            } else {
+                // Normal load: check if migration is needed
+                const alreadyMigrated = await this.storage.getMigrationFlag();
+                const jsonExists = await this.adapter.exists(this.filepath);
 
-            if (!alreadyMigrated && jsonExists && loadFromFile) {
-                // Perform one-time migration from JSON to IndexedDB
-                await this.migrateFromJSON(this.filepath);
+                if (!alreadyMigrated && jsonExists) {
+                    // Perform one-time migration from JSON to IndexedDB
+                    await this.migrateFromJSON(this.filepath);
+                }
             }
 
             // Create empty Orama database
@@ -82,27 +88,31 @@ export class OramaWorker {
                 schema: this.schema,
             });
 
-            // Load data from IndexedDB in batches
-            log.info("Loading chunks from IndexedDB...");
-            let loadedCount = 0;
-            await this.storage.loadInBatches(
-                100,
-                async (batch) => {
-                    await insertMultiple(this.db!, batch as Doc[]);
-                },
-                (processed, total) => {
-                    loadedCount = processed;
-                    if (processed % 500 === 0 || processed === total) {
-                        log.info(
-                            `Loaded ${processed}/${total} chunks from IndexedDB`
-                        );
+            if (loadExistingData) {
+                // Load data from IndexedDB in batches
+                log.info("Loading chunks from IndexedDB...");
+                let loadedCount = 0;
+                await this.storage.loadInBatches(
+                    100,
+                    async (batch) => {
+                        await insertMultiple(this.db!, batch as Doc[]);
+                    },
+                    (processed, total) => {
+                        loadedCount = processed;
+                        if (processed % 500 === 0 || processed === total) {
+                            log.info(
+                                `Loaded ${processed}/${total} chunks from IndexedDB`
+                            );
+                        }
                     }
-                }
-            );
+                );
 
-            log.info(
-                `Successfully loaded ${loadedCount} chunks from IndexedDB`
-            );
+                log.info(
+                    `Successfully loaded ${loadedCount} chunks from IndexedDB`
+                );
+            } else {
+                log.info("Starting with empty database for reindexing");
+            }
         } catch (error) {
             log.error("Failed to initialize database", error);
             throw error;
