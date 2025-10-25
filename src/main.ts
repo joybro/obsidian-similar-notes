@@ -341,6 +341,10 @@ export default class MainPlugin extends Plugin {
         const pluginDataDir = await this.getPluginDataDir();
         const dbPath = `${pluginDataDir}/${dbFileName}`;
 
+        // Get vault ID for IndexedDB isolation
+        // @ts-ignore - appId exists at runtime but not in type definitions
+        const vaultId = this.app.appId as string;
+
         // Migrate existing database from old location to new location
         const oldDbPath = `${this.app.vault.configDir}/${dbFileName}`;
         await this.migrateDataFiles(oldDbPath, dbPath);
@@ -349,6 +353,7 @@ export default class MainPlugin extends Plugin {
             await this.noteChunkRepository.init(
                 vectorSize,
                 dbPath,
+                vaultId,
                 true // loadExistingData
             );
             const count = await this.noteChunkRepository.count();
@@ -374,6 +379,7 @@ export default class MainPlugin extends Plugin {
             await this.noteChunkRepository.init(
                 vectorSize,
                 dbPath,
+                vaultId,
                 false // loadExistingData - reindex from scratch
             );
             this.noteChangeQueue.enqueueAllNotes();

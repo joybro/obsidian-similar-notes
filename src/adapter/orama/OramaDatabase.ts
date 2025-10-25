@@ -46,6 +46,7 @@ export class OramaWorker {
         adapter: DataAdapter,
         vectorSize: number,
         filepath: string,
+        vaultId: string,
         loadExistingData: boolean
     ): Promise<void> {
         this.adapter = adapter;
@@ -64,9 +65,9 @@ export class OramaWorker {
         } as const;
 
         try {
-            // Initialize IndexedDB storage
+            // Initialize IndexedDB storage with vault-specific ID
             this.storage = new IndexedDBChunkStorage();
-            await this.storage.init();
+            await this.storage.init(vaultId);
 
             if (!loadExistingData) {
                 // Reindex scenario: clear IndexedDB to start fresh

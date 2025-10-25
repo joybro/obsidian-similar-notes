@@ -10,13 +10,13 @@ describe("IndexedDBChunkStorage", () => {
 
     beforeEach(async () => {
         storage = new IndexedDBChunkStorage();
-        await storage.init();
+        await storage.init("test-vault-id");
     });
 
     afterEach(async () => {
         await storage.close();
         // Clean up IndexedDB
-        indexedDB.deleteDatabase("similar-notes-chunks");
+        indexedDB.deleteDatabase("test-vault-id-similar-notes");
     });
 
     describe("Initialization", () => {
