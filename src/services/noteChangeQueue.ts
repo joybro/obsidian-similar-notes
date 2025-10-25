@@ -293,10 +293,10 @@ export class NoteChangeQueue {
      */
     async markNoteChangeProcessed(change: NoteChange): Promise<void> {
         if (change.reason === "deleted") {
-            this.mTimeStore.deleteMTime(change.path);
+            await this.mTimeStore.deleteMTime(change.path);
         } else if (change.mtime) {
             // Update the hash store with the processed hash
-            this.mTimeStore.setMTime(change.path, change.mtime);
+            await this.mTimeStore.setMTime(change.path, change.mtime);
         }
     }
 

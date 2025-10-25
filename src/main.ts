@@ -151,8 +151,10 @@ export default class MainPlugin extends Plugin {
         // Set the model service in the settings tab
         this.settingTab.setModelService(this.modelService);
 
-        // Restore persisted data
-        await this.indexedNotesMTimeStore.restore();
+        // Initialize IndexedNoteMTimeStore with vault ID
+        // @ts-ignore - appId exists at runtime but not in type definitions
+        const vaultId = this.app.appId as string;
+        await this.indexedNotesMTimeStore.init(vaultId);
 
         // Initialize dependent services
         this.noteChunkingService = new LangchainNoteChunkingService(
@@ -395,7 +397,7 @@ export default class MainPlugin extends Plugin {
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
         // Clear the mTime store to ensure all notes are reindexed
-        this.indexedNotesMTimeStore.clear();
+        await this.indexedNotesMTimeStore.clear();
         await this.init(this.settingsService.get().modelId, false, false);
     }
 
@@ -416,7 +418,7 @@ export default class MainPlugin extends Plugin {
         // modelId parameter is kept for backward compatibility but not used
         // The actual model info is taken from settings
         // Clear the mTime store to ensure all notes are reindexed
-        this.indexedNotesMTimeStore.clear();
+        await this.indexedNotesMTimeStore.clear();
         await this.init(modelId, false, true);
     }
 
