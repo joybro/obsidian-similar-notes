@@ -30,7 +30,7 @@ interface Metadata {
  * Provides memory-efficient batch loading and persistence
  */
 export class IndexedDBChunkStorage {
-    private readonly dbName = "similar-notes-chunks";
+    private dbName: string = "";
     private readonly chunksStoreName = "chunks";
     private readonly metadataStoreName = "metadata";
     private readonly version = 1;
@@ -39,8 +39,12 @@ export class IndexedDBChunkStorage {
     /**
      * Initialize the IndexedDB database
      * Creates object stores and indexes if they don't exist
+     * @param vaultId - Unique identifier for the vault (app.appId)
      */
-    async init(): Promise<void> {
+    async init(vaultId: string): Promise<void> {
+        // Use Obsidian's naming pattern: {vaultId}-{purpose}
+        this.dbName = `${vaultId}-similar-notes`;
+        log.info(`Initializing IndexedDB: ${this.dbName}`);
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.version);
 

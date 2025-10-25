@@ -90,7 +90,13 @@ describe("Orama Worker - JSON to IndexedDB Migration", () => {
         (mockAdapter.rename as any).mockResolvedValue(undefined);
 
         // Execute migration
-        await worker.init(mockAdapter, 384, "test-migration.json", true);
+        await worker.init(
+            mockAdapter,
+            384,
+            "test-migration.json",
+            "test-vault-id",
+            true
+        );
 
         // Verify migration succeeded
         const count = await worker.count();
