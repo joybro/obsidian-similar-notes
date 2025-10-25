@@ -30,12 +30,6 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         );
     }
 
-    async persist(): Promise<void> {
-        this.workerManager.ensureInitialized();
-        const worker = this.workerManager.getWorker();
-        await worker.persist();
-    }
-
     async put(noteChunk: NoteChunk): Promise<void> {
         this.workerManager.ensureInitialized();
         const worker = this.workerManager.getWorker();
