@@ -354,14 +354,6 @@ export default class MainPlugin extends Plugin {
                 vaultId,
                 true // loadExistingData
             );
-            const count = await this.noteChunkRepository.count();
-            log.info(
-                "Successfully loaded existing database from",
-                dbPath,
-                "with",
-                count,
-                "chunks"
-            );
         } else {
             await this.noteChunkRepository.init(
                 vectorSize,
