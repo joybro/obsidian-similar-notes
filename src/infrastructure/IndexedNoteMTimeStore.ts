@@ -121,14 +121,6 @@ export class IndexedNoteMTimeStore {
         return Object.keys(this.mtimes);
     }
 
-    async persist(): Promise<void> {
-        // NOTE: With IndexedDB, data is persisted immediately on set/delete.
-        // This method is kept for backward compatibility but does nothing.
-        // TODO: Remove persist() calls in a follow-up task
-        log.debug("persist() called - no-op with IndexedDB storage");
-        return Promise.resolve();
-    }
-
     /**
      * Get an Observable of the indexed note count
      */

@@ -32,7 +32,6 @@ export default class MainPlugin extends Plugin {
     private leafViewCoordinator: LeafViewCoordinator;
     private settingsService: SettingsService;
     private noteChunkRepository: NoteChunkRepository;
-    private autoSaveInterval: NodeJS.Timeout;
     private noteChangeQueue: NoteChangeQueue;
     private modelService: EmbeddingService;
     private noteRepository: NoteRepository;
@@ -272,9 +271,6 @@ export default class MainPlugin extends Plugin {
         this.noteIndexingService.stopLoop();
         this.leafViewCoordinator.onUnload();
 
-        // Persist and close database connections
-        await this.closeStore();
-
         // Explicitly dispose Orama worker
         if (this.noteChunkRepository) {
             // Call our new dispose method on the repository
@@ -366,17 +362,6 @@ export default class MainPlugin extends Plugin {
                 count,
                 "chunks"
             );
-
-            this.setupAutoSave(this.settingsService.get().autoSaveInterval);
-
-            this.settingsService
-                .getNewSettingsObservable()
-                .subscribe((newSettings) => {
-                    // If auto-save interval changed, update the interval
-                    if (newSettings.autoSaveInterval !== undefined) {
-                        this.setupAutoSave(newSettings.autoSaveInterval);
-                    }
-                });
         } else {
             await this.noteChunkRepository.init(
                 vectorSize,
@@ -445,35 +430,5 @@ export default class MainPlugin extends Plugin {
             // This ensures the service doesn't remain stopped
             this.noteIndexingService.startLoop();
         }
-    }
-
-    async closeStore() {
-        // Clear auto-save interval
-        if (this.autoSaveInterval) {
-            clearInterval(this.autoSaveInterval);
-        }
-
-        // IndexedNoteMTimeStore still needs to persist its JSON file
-        await this.indexedNotesMTimeStore.persist();
-    }
-
-    private setupAutoSave(interval: number) {
-        // Clear any existing interval
-        if (this.autoSaveInterval) {
-            clearInterval(this.autoSaveInterval);
-        }
-
-        // Set up new auto-save interval
-        // NOTE: Only IndexedNoteMTimeStore needs auto-save since it uses JSON.
-        // NoteChunkRepository uses IndexedDB which auto-persists on write.
-        const intervalMs = interval * 60 * 1000;
-        this.autoSaveInterval = setInterval(async () => {
-            try {
-                await this.indexedNotesMTimeStore.persist();
-                log.info("Auto-saved IndexedNoteMTimeStore");
-            } catch (e) {
-                log.error("Failed to auto-save IndexedNoteMTimeStore:", e);
-            }
-        }, intervalMs);
     }
 }

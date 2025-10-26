@@ -49,7 +49,6 @@ describe("SimilarNotesViewReact", () => {
     let currentFile: TFile;
     
     const mockSettings: SimilarNotesSettings = {
-        autoSaveInterval: 10,
         modelProvider: "builtin",
         modelId: "sentence-transformers/all-MiniLM-L6-v2",
         includeFrontmatter: false,
