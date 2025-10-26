@@ -2,7 +2,6 @@ import type { Plugin } from "obsidian";
 import { type Observable, Subject } from "rxjs";
 
 export interface SimilarNotesSettings {
-    autoSaveInterval: number; // in minutes
     modelProvider: "builtin" | "ollama"; // Model provider type
     modelId: string; // The model ID to use for embeddings
     ollamaUrl?: string; // Ollama server URL
@@ -18,7 +17,6 @@ export interface SimilarNotesSettings {
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
-    autoSaveInterval: 10,
     modelProvider: "builtin", // Default to built-in models
     modelId: "sentence-transformers/all-MiniLM-L6-v2",
     includeFrontmatter: false,

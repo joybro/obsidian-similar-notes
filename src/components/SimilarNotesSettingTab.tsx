@@ -157,19 +157,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        new Setting(containerEl)
-            .setName("Auto-save interval")
-            .setDesc("How often to save changes to disk (in minutes)")
-            .addText((text) => {
-                text.setValue(settings.autoSaveInterval.toString()).onChange(
-                    async (value) => {
-                        await this.settingsService.update({
-                            autoSaveInterval: Number.parseInt(value, 10),
-                        });
-                    }
-                );
-            });
-
         // Initialize and render model settings section
         if (!this.modelSettingsSection) {
             this.modelSettingsSection = new ModelSettingsSection({
