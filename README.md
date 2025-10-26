@@ -28,11 +28,13 @@ Progress appears in the status bar.
 ## Model Options
 
 ### Built-in Models (Mobile & Desktop)
+
 -   **Default**: `all-MiniLM-L6-v2` (English)
 -   **Multilingual**: `paraphrase-multilingual-MiniLM-L12-v2`
 -   **Custom**: Any Sentence Transformer model from Hugging Face
 
 ### Ollama (Desktop Only)
+
 Connect to any Ollama embedding model on `localhost:11434`
 
 > Changing models triggers re-indexing.
@@ -44,15 +46,17 @@ Connect to any Ollama embedding model on `localhost:11434`
 -   **Orama**: Built-in vector database for fast search
 -   **Web Workers**: All processing runs in background threads
 
-## Sync Exclusions
+## Multi-Device Usage
 
-If you use file syncing tools like Syncthing, you should exclude the plugin's database files to avoid conflicts:
+This plugin stores all data locally in IndexedDB, which is device-specific storage that **does not sync** across devices.
 
-**Files to exclude:**
-- `.obsidian/plugins/similar-notes/similar-notes.json`
-- `.obsidian/plugins/similar-notes/similar-notes-file-mtimes.json`
+**What this means:**
 
-> **Note**: Obsidian Sync appears to work fine with these files. However, if you experience any sync-related issues, consider excluding the entire plugin directory.
+-   Each device maintains its own independent index
+-   Obsidian Sync, iCloud, Syncthing, or any other file sync tool will **not sync the plugin's data**
+-   When you open your vault on a new device, the plugin will automatically index your notes from scratch
+
+This is by design - IndexedDB provides fast, reliable local storage that doesn't interfere with vault syncing.
 
 ## License
 
