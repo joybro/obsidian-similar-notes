@@ -168,18 +168,35 @@ export class OramaWorker {
                 return;
             }
 
+            // Filter out invalid chunks before migration
+            const validDocuments = documents.filter((doc: any) => {
+                const isValid = this.isValidChunk(doc);
+                if (!isValid) {
+                    log.warn(`Skipping invalid chunk during migration: ${doc.path} (chunk ${doc.chunkIndex})`);
+                }
+                return isValid;
+            });
+
+            log.info(`Valid chunks after filtering: ${validDocuments.length}/${documents.length}`);
+
+            if (validDocuments.length === 0) {
+                log.warn("No valid chunks to migrate after filtering");
+                await this.storage.setMigrationFlag(true);
+                return;
+            }
+
             // Insert to IndexedDB in batches to avoid memory issues
             // Note: Remove 'id' field from Orama docs because IndexedDB will auto-generate it
             const BATCH_SIZE = 100;
-            for (let i = 0; i < documents.length; i += BATCH_SIZE) {
-                const batch = documents.slice(i, i + BATCH_SIZE).map((doc: any) => {
+            for (let i = 0; i < validDocuments.length; i += BATCH_SIZE) {
+                const batch = validDocuments.slice(i, i + BATCH_SIZE).map((doc: any) => {
                     const { id, ...docWithoutId } = doc;
                     return docWithoutId;
                 });
                 await this.storage.putMulti(batch);
 
-                const processed = Math.min(i + BATCH_SIZE, documents.length);
-                log.info(`Migrated ${processed}/${documents.length} chunks`);
+                const processed = Math.min(i + BATCH_SIZE, validDocuments.length);
+                log.info(`Migrated ${processed}/${validDocuments.length} chunks`);
             }
 
             // Backup original JSON file
@@ -205,6 +222,13 @@ export class OramaWorker {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
+
+        // Validate chunk before inserting
+        if (!this.isValidChunk(noteChunk)) {
+            log.error(`Skipping invalid chunk: ${noteChunk.path} (chunk ${noteChunk.chunkIndex})`);
+            return;
+        }
+
         const pathHash = await this.calculatePathHash(noteChunk.path);
         const internalNoteChunk: NoteChunkInternal = {
             ...noteChunk,
@@ -221,8 +245,23 @@ export class OramaWorker {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
+
+        // Filter out invalid chunks
+        const validChunks = chunks.filter(chunk => {
+            const isValid = this.isValidChunk(chunk);
+            if (!isValid) {
+                log.error(`Skipping invalid chunk: ${chunk.path} (chunk ${chunk.chunkIndex})`);
+            }
+            return isValid;
+        });
+
+        if (validChunks.length === 0) {
+            log.warn("No valid chunks to insert");
+            return;
+        }
+
         const internalChunks: NoteChunkInternal[] = await Promise.all(
-            chunks.map(async (chunk) => ({
+            validChunks.map(async (chunk) => ({
                 ...chunk,
                 pathHash: await this.calculatePathHash(chunk.path),
                 lastUpdated: Date.now(),
@@ -232,6 +271,30 @@ export class OramaWorker {
         // Insert to both Orama (in-memory) and IndexedDB (persistent)
         await insertMultiple(this.db, internalChunks as Doc[]);
         await this.storage.putMulti(internalChunks);
+    }
+
+    /**
+     * Validate chunk data before inserting into database
+     * Ensures embedding is a non-empty array to prevent schema validation errors
+     */
+    private isValidChunk(chunk: NoteChunkDTO | NoteChunkInternal): boolean {
+        if (!chunk.embedding) {
+            log.warn(`Chunk has no embedding: ${chunk.path} (chunk ${chunk.chunkIndex})`);
+            return false;
+        }
+        if (!Array.isArray(chunk.embedding)) {
+            log.warn(`Chunk embedding is not an array: ${chunk.path} (chunk ${chunk.chunkIndex})`);
+            return false;
+        }
+        if (chunk.embedding.length === 0) {
+            log.warn(`Chunk embedding is empty array: ${chunk.path} (chunk ${chunk.chunkIndex})`);
+            return false;
+        }
+        if (chunk.embedding.length !== this.vectorSize) {
+            log.warn(`Chunk embedding size mismatch: expected ${this.vectorSize}, got ${chunk.embedding.length} for ${chunk.path} (chunk ${chunk.chunkIndex})`);
+            return false;
+        }
+        return true;
     }
 
     /**
