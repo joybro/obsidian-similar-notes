@@ -176,8 +176,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 plugin: this.plugin,
                 settingsService: this.settingsService,
                 app: this.app,
-                indexedNoteCount: this.indexedNoteCount,
-                indexedChunkCount: this.indexedChunkCount,
                 databaseSize: this.databaseSize,
                 mTimeStore: this.mTimeStore,
                 noteChunkRepository: this.noteChunkRepository
