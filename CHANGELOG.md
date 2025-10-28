@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2025-10-28
+
+-   **IndexedDB Storage Migration**: Migrated from JSON file storage to IndexedDB for better performance and reliability
+    -   Automatic one-time migration from JSON to IndexedDB on first load
+    -   Original JSON files backed up with timestamp during migration
+    -   Data automatically persists on write - removed auto-save interval setting
+-   **Vault Isolation**: Each Obsidian vault now maintains its own separate IndexedDB instance
+    -   Uses `app.appId` to create vault-specific databases
+    -   Prevents data conflicts when using multiple vaults on the same device
+-   **Chunk Validation**: Added validation to prevent corrupted data from being stored
+    -   Validates embedding arrays before inserting into database
+    -   Filters out invalid chunks during migration
+-   **Multi-Device Usage**: Updated README to clarify that IndexedDB data does not sync across devices
+    -   Each device maintains its own independent index
+    -   Automatic re-indexing when opening vault on a new device
+
 ## [0.9.0] - 2025-08-05
 
 -   **Database Location Change**: Moved database files from `.obsidian/` to `.obsidian/plugins/similar-notes/`
