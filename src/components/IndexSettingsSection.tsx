@@ -13,8 +13,6 @@ interface IndexSettingsSectionProps {
     plugin: MainPlugin;
     settingsService: SettingsService;
     app: App;
-    indexedNoteCount: number;
-    indexedChunkCount: number;
     databaseSize: number;
     mTimeStore?: IndexedNoteMTimeStore;
     noteChunkRepository?: NoteChunkRepository;
@@ -63,15 +61,13 @@ export class IndexSettingsSection {
     /**
      * Render the index settings section
      */
-    render(currentStats?: {
+    render(currentStats: {
         indexedNoteCount: number;
         indexedChunkCount: number;
         databaseSize: number;
     }): void {
         const { containerEl, settingsService, plugin, app } = this.props;
-        // Use current stats if provided, otherwise fall back to props
-        const { indexedNoteCount, indexedChunkCount, databaseSize } =
-            currentStats || this.props;
+        const { indexedNoteCount, indexedChunkCount, databaseSize } = currentStats;
         const settings = settingsService.get();
 
         // Create or clear the section container
