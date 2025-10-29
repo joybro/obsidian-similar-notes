@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.2] - 2025-10-29
+
+-   **Fix Reindex for 0.10.0 Users**: Extended automatic reindex to include users upgrading from v0.10.0
+    -   v0.10.0 had migration issues that could result in corrupted data
+    -   Users upgrading from v0.10.0 or earlier will now automatically trigger reindex
+    -   Ensures all users have clean, valid IndexedDB data
+
 ## [0.10.1] - 2025-10-29
 
 -   **Automatic Reindex on Upgrade**: Changed migration strategy to ensure data integrity

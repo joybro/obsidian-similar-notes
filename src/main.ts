@@ -78,12 +78,12 @@ export default class MainPlugin extends Plugin {
 
     /**
      * Check if plugin version has changed and determine if reindex is needed
-     * Returns true if upgrading to 0.10.0 or later from an earlier version
+     * Returns true if upgrading from version <= 0.10.0 (includes 0.10.0 due to migration issues)
      */
     private checkVersionUpgrade(lastVersion: string | undefined, currentVersion: string): boolean {
         // If no last version recorded, this is either a fresh install or upgrade from pre-0.10.0
         if (!lastVersion) {
-            log.info("No last version recorded - will trigger reindex for 0.10.0 IndexedDB migration");
+            log.info("No last version recorded - will trigger reindex for IndexedDB migration");
             return true;
         }
 
@@ -93,10 +93,14 @@ export default class MainPlugin extends Plugin {
         };
 
         const last = parseVersion(lastVersion);
-        const current = parseVersion(currentVersion);
 
-        // Check if upgrading from < 0.10.0 to >= 0.10.0
-        if (last[0] === 0 && last[1] < 10 && (current[0] > 0 || current[1] >= 10)) {
+        // Check if upgrading from <= 0.10.0 (including 0.10.0 which had migration issues)
+        if (last[0] === 0 && last[1] === 10 && last[2] === 0) {
+            log.info(`Upgrading from ${lastVersion} to ${currentVersion} - reindex needed due to 0.10.0 migration issues`);
+            return true;
+        }
+
+        if (last[0] === 0 && last[1] < 10) {
             log.info(`Upgrading from ${lastVersion} to ${currentVersion} - reindex needed for IndexedDB migration`);
             return true;
         }
