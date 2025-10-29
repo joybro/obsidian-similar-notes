@@ -15,7 +15,6 @@ import {
     search,
 } from "@orama/orama";
 import log from "loglevel";
-import type { DataAdapter } from "obsidian";
 
 type Schema = {
     path: "string";
@@ -33,8 +32,6 @@ export class OramaWorker {
     private db: Orama<Schema> | null = null;
     private schema: Schema;
     private vectorSize: number;
-    private filepath: string;
-    private adapter: DataAdapter;
     private storage: IndexedDBChunkStorage;
 
     setLogLevel(level: log.LogLevelDesc): void {
@@ -43,15 +40,11 @@ export class OramaWorker {
     }
 
     async init(
-        adapter: DataAdapter,
         vectorSize: number,
-        filepath: string,
         vaultId: string,
         loadExistingData: boolean
     ): Promise<void> {
-        this.adapter = adapter;
         this.vectorSize = vectorSize;
-        this.filepath = filepath;
         this.db = null;
         this.schema = {
             path: "string",
@@ -73,15 +66,6 @@ export class OramaWorker {
                 // Reindex scenario: clear IndexedDB to start fresh
                 await this.storage.clear();
                 log.info("Cleared IndexedDB for reindexing");
-            } else {
-                // Normal load: check if migration is needed
-                const alreadyMigrated = await this.storage.getMigrationFlag();
-                const jsonExists = await this.adapter.exists(this.filepath);
-
-                if (!alreadyMigrated && jsonExists) {
-                    // Perform one-time migration from JSON to IndexedDB
-                    await this.migrateFromJSON(this.filepath);
-                }
             }
 
             // Create empty Orama database
@@ -120,103 +104,6 @@ export class OramaWorker {
         }
     }
 
-    /**
-     * Migrate existing JSON database to IndexedDB
-     * This is a one-time operation performed on first load after upgrade
-     */
-    private async migrateFromJSON(filepath: string): Promise<void> {
-        try {
-            log.info("Starting migration from JSON to IndexedDB");
-
-            // Read and parse JSON file
-            const jsonData = await this.adapter.read(filepath);
-            const oramaData = JSON.parse(jsonData);
-
-            // Extract documents from Orama persistence format
-            // Orama v2 stores docs in nested structure: { docs: { docs: { [id]: Document } } }
-            let documents: any[] = [];
-
-            // Navigate the nested structure to find the actual documents
-            let docsObject = null;
-            if (oramaData.docs?.docs && typeof oramaData.docs.docs === 'object') {
-                // Nested: oramaData.docs.docs
-                docsObject = oramaData.docs.docs;
-                log.info('Found docs at oramaData.docs.docs');
-            } else if (oramaData.docs && typeof oramaData.docs === 'object') {
-                // Direct: oramaData.docs
-                docsObject = oramaData.docs;
-                log.info('Found docs at oramaData.docs');
-            }
-
-            if (docsObject && typeof docsObject === 'object' && !Array.isArray(docsObject)) {
-                // Convert docs object to array
-                documents = Object.values(docsObject);
-                log.info(`Extracted ${documents.length} chunks from docs object`);
-            } else if (Array.isArray(docsObject)) {
-                // Fallback: if docs is already an array
-                documents = docsObject;
-                log.info(`Found ${documents.length} chunks as array`);
-            } else {
-                log.warn("Could not find documents in expected format");
-            }
-
-            log.info(`Total chunks to migrate: ${documents.length}`);
-
-            if (documents.length === 0) {
-                log.info("No chunks to migrate");
-                await this.storage.setMigrationFlag(true);
-                return;
-            }
-
-            // Filter out invalid chunks before migration
-            const validDocuments = documents.filter((doc: any) => {
-                const isValid = this.isValidChunk(doc);
-                if (!isValid) {
-                    log.warn(`Skipping invalid chunk during migration: ${doc.path} (chunk ${doc.chunkIndex})`);
-                }
-                return isValid;
-            });
-
-            log.info(`Valid chunks after filtering: ${validDocuments.length}/${documents.length}`);
-
-            if (validDocuments.length === 0) {
-                log.warn("No valid chunks to migrate after filtering");
-                await this.storage.setMigrationFlag(true);
-                return;
-            }
-
-            // Insert to IndexedDB in batches to avoid memory issues
-            // Note: Remove 'id' field from Orama docs because IndexedDB will auto-generate it
-            const BATCH_SIZE = 100;
-            for (let i = 0; i < validDocuments.length; i += BATCH_SIZE) {
-                const batch = validDocuments.slice(i, i + BATCH_SIZE).map((doc: any) => {
-                    const { id, ...docWithoutId } = doc;
-                    return docWithoutId;
-                });
-                await this.storage.putMulti(batch);
-
-                const processed = Math.min(i + BATCH_SIZE, validDocuments.length);
-                log.info(`Migrated ${processed}/${validDocuments.length} chunks`);
-            }
-
-            // Backup original JSON file
-            const backupPath = `${filepath}.backup-${Date.now()}`;
-            await this.adapter.rename(filepath, backupPath);
-            log.info(`Migration complete. Backup saved to ${backupPath}`);
-
-            // Set migration flag to prevent re-migration
-            await this.storage.setMigrationFlag(true);
-        } catch (error) {
-            log.error("Migration failed:", error);
-
-            // Rollback: Clear IndexedDB on failure
-            await this.storage.clear();
-
-            throw new Error(
-                "Failed to migrate from JSON to IndexedDB. Please report this issue."
-            );
-        }
-    }
 
     async put(noteChunk: NoteChunkDTO): Promise<void> {
         if (!this.db) {

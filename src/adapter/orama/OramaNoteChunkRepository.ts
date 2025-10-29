@@ -17,16 +17,13 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
 
     async init(
         vectorSize: number,
-        filepath: string,
         vaultId: string,
         loadExistingData: boolean
     ): Promise<void> {
         const worker = await this.workerManager.initialize(InlineWorker);
 
         await worker.init(
-            Comlink.proxy(this.vault.adapter),
             vectorSize,
-            filepath,
             vaultId,
             loadExistingData
         );
