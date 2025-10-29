@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.1] - 2025-10-29
+
+-   **Automatic Reindex on Upgrade**: Changed migration strategy to ensure data integrity
+    -   Previous JSON storage format had issues where embeddings were not properly stored in some cases
+    -   Instead of attempting to migrate potentially corrupted JSON data, plugin now automatically triggers full reindex on upgrade to v0.10.1
+    -   All notes will be re-indexed with the new IndexedDB storage format
+    -   Ensures all users start with clean, valid data in IndexedDB
+
 ## [0.10.0] - 2025-10-28
 
 -   **IndexedDB Storage Migration**: Migrated from JSON file storage to IndexedDB for better performance and reliability
