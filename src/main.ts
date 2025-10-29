@@ -26,7 +26,6 @@ import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
 
 const dbFileName = "similar-notes.json";
-const fileMtimeFileName = "similar-notes-file-mtimes.json";
 
 export default class MainPlugin extends Plugin {
     private leafViewCoordinator: LeafViewCoordinator;
@@ -52,6 +51,17 @@ export default class MainPlugin extends Plugin {
         this.settingsService = new SettingsService(this);
         await this.settingsService.load();
 
+        // Check if plugin version has changed and trigger reindex if needed
+        const settings = this.settingsService.get();
+        const currentVersion = this.manifest.version;
+        const needsReindex = this.checkVersionUpgrade(settings.lastPluginVersion, currentVersion);
+
+        if (needsReindex) {
+            log.info(`Plugin upgraded from ${settings.lastPluginVersion || 'unknown'} to ${currentVersion}. Will trigger reindex.`);
+            // Update version in settings
+            await this.settingsService.update({ lastPluginVersion: currentVersion });
+        }
+
         // Add settings tab (IndexedNoteMTimeStore will be set later)
         this.settingTab = new SimilarNotesSettingTab(
             this,
@@ -63,7 +73,35 @@ export default class MainPlugin extends Plugin {
         this.registerEvents();
 
         // Defer all other initialization to onLayoutReady
-        this.app.workspace.onLayoutReady(() => this.initializeServices());
+        this.app.workspace.onLayoutReady(() => this.initializeServices(needsReindex));
+    }
+
+    /**
+     * Check if plugin version has changed and determine if reindex is needed
+     * Returns true if upgrading to 0.10.0 or later from an earlier version
+     */
+    private checkVersionUpgrade(lastVersion: string | undefined, currentVersion: string): boolean {
+        // If no last version recorded, this is either a fresh install or upgrade from pre-0.10.0
+        if (!lastVersion) {
+            log.info("No last version recorded - will trigger reindex for 0.10.0 IndexedDB migration");
+            return true;
+        }
+
+        // Parse versions
+        const parseVersion = (v: string): number[] => {
+            return v.split('.').map(n => parseInt(n, 10) || 0);
+        };
+
+        const last = parseVersion(lastVersion);
+        const current = parseVersion(currentVersion);
+
+        // Check if upgrading from < 0.10.0 to >= 0.10.0
+        if (last[0] === 0 && last[1] < 10 && (current[0] > 0 || current[1] >= 10)) {
+            log.info(`Upgrading from ${lastVersion} to ${currentVersion} - reindex needed for IndexedDB migration`);
+            return true;
+        }
+
+        return false;
     }
 
     private async getPluginDataDir(): Promise<string> {
@@ -122,23 +160,10 @@ export default class MainPlugin extends Plugin {
         );
     }
 
-    private async initializeServices() {
-        // Get plugin data directory and ensure it exists
-        const pluginDataDir = await this.getPluginDataDir();
-
-        // Set up file paths in plugin folder
-        const fileMtimePath = `${pluginDataDir}/${fileMtimeFileName}`;
-
-        // Migrate existing files from old location to new location
-        const oldFileMtimePath = `${this.app.vault.configDir}/${fileMtimeFileName}`;
-        await this.migrateDataFiles(oldFileMtimePath, fileMtimePath);
-
+    private async initializeServices(needsReindex: boolean = false) {
         // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
-        this.indexedNotesMTimeStore = new IndexedNoteMTimeStore(
-            this.app.vault,
-            fileMtimePath
-        );
+        this.indexedNotesMTimeStore = new IndexedNoteMTimeStore();
 
         // Now that mTimeStore is initialized, set it in the settings tab
         this.settingTab.setMTimeStore(this.indexedNotesMTimeStore);
@@ -226,7 +251,8 @@ export default class MainPlugin extends Plugin {
         this.registerCommands();
 
         // Complete initialization
-        await this.init(this.settingsService.get().modelId, true, false);
+        // If needsReindex is true, trigger a reindex to migrate from JSON to IndexedDB
+        await this.init(this.settingsService.get().modelId, true, needsReindex);
     }
 
     private registerCommands() {
@@ -350,14 +376,12 @@ export default class MainPlugin extends Plugin {
         if (firstTime) {
             await this.noteChunkRepository.init(
                 vectorSize,
-                dbPath,
                 vaultId,
                 true // loadExistingData
             );
         } else {
             await this.noteChunkRepository.init(
                 vectorSize,
-                dbPath,
                 vaultId,
                 false // loadExistingData - reindex from scratch
             );

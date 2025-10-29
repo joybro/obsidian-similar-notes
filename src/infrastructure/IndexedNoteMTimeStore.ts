@@ -1,5 +1,4 @@
 import log from "loglevel";
-import type { Vault } from "obsidian";
 import { BehaviorSubject, type Observable } from "rxjs";
 import { IndexedDBMTimeStorage } from "./IndexedDBMTimeStorage";
 
@@ -8,11 +7,9 @@ export class IndexedNoteMTimeStore {
     private indexedNoteCount$ = new BehaviorSubject<number>(0);
     private storage: IndexedDBMTimeStorage;
     private vaultId: string = "";
-    private jsonPath: string = "";
 
-    constructor(private vault: Vault, fileMtimePath: string) {
+    constructor() {
         this.storage = new IndexedDBMTimeStorage();
-        this.jsonPath = fileMtimePath;
     }
 
     /**
@@ -25,53 +22,11 @@ export class IndexedNoteMTimeStore {
         // Initialize IndexedDB storage
         await this.storage.init(vaultId);
 
-        // Check if migration is needed
-        const alreadyMigrated = await this.storage.getMigrationFlag();
-        const jsonExists = await this.vault.adapter.exists(this.jsonPath);
-
-        if (!alreadyMigrated && jsonExists) {
-            // Perform one-time migration from JSON to IndexedDB
-            await this.migrateFromJSON();
-        }
-
         // Load all mtimes from IndexedDB to memory cache
         this.mtimes = await this.storage.getAll();
         const noteCount = Object.keys(this.mtimes).length;
         this.indexedNoteCount$.next(noteCount);
         log.info("Loaded", noteCount, "modification times from IndexedDB");
-    }
-
-    /**
-     * Migrate existing JSON data to IndexedDB
-     * This is a one-time operation performed on first load after upgrade
-     */
-    private async migrateFromJSON(): Promise<void> {
-        try {
-            log.info("Starting migration from JSON to IndexedDB for mtimes");
-
-            // Read JSON file
-            const jsonData = await this.vault.adapter.read(this.jsonPath);
-            const mtimes = JSON.parse(jsonData) as Record<string, number>;
-
-            // Migrate to IndexedDB
-            const entries = Object.entries(mtimes);
-            log.info(`Migrating ${entries.length} mtime entries to IndexedDB`);
-
-            for (const [path, mtime] of entries) {
-                await this.storage.set(path, mtime);
-            }
-
-            // Set migration flag
-            await this.storage.setMigrationFlag(true);
-
-            // Backup JSON file
-            const backupPath = `${this.jsonPath}.backup-${Date.now()}`;
-            await this.vault.adapter.rename(this.jsonPath, backupPath);
-            log.info(`Migration complete. JSON backed up to: ${backupPath}`);
-        } catch (error) {
-            log.error("Failed to migrate mtimes from JSON:", error);
-            throw error;
-        }
     }
 
     /**

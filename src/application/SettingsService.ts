@@ -14,6 +14,7 @@ export interface SimilarNotesSettings {
     regexpTestInputText: string; // Saved test input for RegExp testing
     noteDisplayMode: "title" | "path" | "smart"; // How to display note names in results
     showAtBottom: boolean; // Whether to show similar notes at the bottom of notes
+    lastPluginVersion?: string; // Last version of the plugin that was run
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
