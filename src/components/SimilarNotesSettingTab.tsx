@@ -11,7 +11,6 @@ import { IndexSettingsSection } from "./IndexSettingsSection";
 export class SimilarNotesSettingTab extends PluginSettingTab {
     private indexedNoteCount: number = 0;
     private indexedChunkCount: number = 0;
-    private databaseSize: number = 0;
     private subscription: { unsubscribe: () => void } | null = null;
     private mTimeStore?: IndexedNoteMTimeStore;
     private modelService?: EmbeddingService;
@@ -52,11 +51,10 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             .getIndexedNoteCount$()
             .subscribe(async (count) => {
                 this.indexedNoteCount = count;
-                // Update chunk count and database size when note count changes
+                // Update chunk count when note count changes
                 if (this.noteChunkRepository) {
                     try {
                         this.indexedChunkCount = await this.noteChunkRepository.count();
-                        await this.updateDatabaseSize();
                     } catch (error) {
                         log.error("Failed to update chunk count", error);
                     }
@@ -66,8 +64,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     if (this.indexSettingsSection) {
                         this.indexSettingsSection.updateStats({
                             indexedNoteCount: this.indexedNoteCount,
-                            indexedChunkCount: this.indexedChunkCount,
-                            databaseSize: this.databaseSize
+                            indexedChunkCount: this.indexedChunkCount
                         });
                     } else {
                         this.display();
@@ -77,25 +74,22 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     }
 
     /**
-     * Set the NoteChunkRepository to get chunk count and database info.
+     * Set the NoteChunkRepository to get chunk count.
      * This allows the NoteChunkRepository to be initialized after the tab is created.
      */
     async setNoteChunkRepository(noteChunkRepository: NoteChunkRepository): Promise<void> {
         this.noteChunkRepository = noteChunkRepository;
-        
+
         // Get the initial chunk count
         if (this.noteChunkRepository) {
             try {
                 this.indexedChunkCount = await this.noteChunkRepository.count();
-                // Update the database size
-                await this.updateDatabaseSize();
                 // Update stats without full redraw if possible
                 if (this.containerEl.isShown()) {
                     if (this.indexSettingsSection) {
                         this.indexSettingsSection.updateStats({
                             indexedNoteCount: this.indexedNoteCount,
-                            indexedChunkCount: this.indexedChunkCount,
-                            databaseSize: this.databaseSize
+                            indexedChunkCount: this.indexedChunkCount
                         });
                     } else {
                         this.display();
@@ -104,25 +98,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             } catch (error) {
                 log.error("Failed to get chunk count", error);
             }
-        }
-    }
-
-    /**
-     * Update the database size by checking the file size on disk
-     */
-    private async updateDatabaseSize(): Promise<void> {
-        try {
-            const pluginDataDir = `${this.plugin.app.vault.configDir}/plugins/${this.plugin.manifest.id}`;
-            const dbPath = `${pluginDataDir}/similar-notes.json`;
-            
-            if (await this.plugin.app.vault.adapter.exists(dbPath)) {
-                const stat = await this.plugin.app.vault.adapter.stat(dbPath);
-                if (stat) {
-                    this.databaseSize = stat.size;
-                }
-            }
-        } catch (error) {
-            log.error("Failed to get database size", error);
         }
     }
 
@@ -176,15 +151,13 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 plugin: this.plugin,
                 settingsService: this.settingsService,
                 app: this.app,
-                databaseSize: this.databaseSize,
                 mTimeStore: this.mTimeStore,
                 noteChunkRepository: this.noteChunkRepository
             });
         }
         this.indexSettingsSection.render({
             indexedNoteCount: this.indexedNoteCount,
-            indexedChunkCount: this.indexedChunkCount,
-            databaseSize: this.databaseSize
+            indexedChunkCount: this.indexedChunkCount
         });
 
         // Add spacing between Index and Display sections

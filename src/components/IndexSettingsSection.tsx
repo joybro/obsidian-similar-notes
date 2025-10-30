@@ -13,7 +13,6 @@ interface IndexSettingsSectionProps {
     plugin: MainPlugin;
     settingsService: SettingsService;
     app: App;
-    databaseSize: number;
     mTimeStore?: IndexedNoteMTimeStore;
     noteChunkRepository?: NoteChunkRepository;
 }
@@ -23,7 +22,6 @@ export class IndexSettingsSection {
     private statsContainer?: HTMLElement;
     private indexedStat?: HTMLElement;
     private excludedStat?: HTMLElement;
-    private dbSizeStat?: HTMLElement;
 
     constructor(private props: IndexSettingsSectionProps) {}
 
@@ -33,28 +31,16 @@ export class IndexSettingsSection {
     updateStats(stats: {
         indexedNoteCount: number;
         indexedChunkCount: number;
-        databaseSize: number;
     }): void {
-        if (this.indexedStat && this.excludedStat && this.dbSizeStat) {
+        if (this.indexedStat && this.excludedStat) {
             const { app } = this.props;
             const allFiles = app.vault.getMarkdownFiles();
             const actuallyExcludedCount = allFiles.length - stats.indexedNoteCount;
-            
-            const formatBytes = (bytes: number): string => {
-                if (bytes === 0) return "0 Bytes";
-                const k = 1024;
-                const sizes = ["Bytes", "KB", "MB", "GB"];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return (
-                    parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-                );
-            };
 
             this.indexedStat.setText(
                 `• Indexed: ${stats.indexedNoteCount} notes (${stats.indexedChunkCount} chunks)`
             );
             this.excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
-            this.dbSizeStat.setText(`• Database size: ${formatBytes(stats.databaseSize)}`);
         }
     }
 
@@ -64,10 +50,9 @@ export class IndexSettingsSection {
     render(currentStats: {
         indexedNoteCount: number;
         indexedChunkCount: number;
-        databaseSize: number;
     }): void {
         const { containerEl, settingsService, plugin, app } = this.props;
-        const { indexedNoteCount, indexedChunkCount, databaseSize } = currentStats;
+        const { indexedNoteCount, indexedChunkCount } = currentStats;
         const settings = settingsService.get();
 
         // Create or clear the section container
@@ -80,30 +65,18 @@ export class IndexSettingsSection {
             this.statsContainer = undefined;
             this.indexedStat = undefined;
             this.excludedStat = undefined;
-            this.dbSizeStat = undefined;
         } else {
             this.sectionContainer.empty();
             // Reset stats container references when section is cleared
             this.statsContainer = undefined;
             this.indexedStat = undefined;
             this.excludedStat = undefined;
-            this.dbSizeStat = undefined;
         }
 
         // Add spacing before the Index heading for visual separation
         this.sectionContainer.createDiv("setting-item-separator");
 
         new Setting(this.sectionContainer).setName("Index").setHeading();
-
-        const formatBytes = (bytes: number): string => {
-            if (bytes === 0) return "0 Bytes";
-            const k = 1024;
-            const sizes = ["Bytes", "KB", "MB", "GB"];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return (
-                parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-            );
-        };
 
         // Index statistics with excluded files count
         const indexStatsSetting = new Setting(this.sectionContainer).setName(
@@ -117,7 +90,6 @@ export class IndexSettingsSection {
             );
             this.indexedStat = this.statsContainer.createDiv("similar-notes-stat-item");
             this.excludedStat = this.statsContainer.createDiv("similar-notes-stat-item");
-            this.dbSizeStat = this.statsContainer.createDiv("similar-notes-stat-item");
         }
 
         // Function to update index statistics
@@ -128,12 +100,11 @@ export class IndexSettingsSection {
             const actuallyExcludedCount = allFiles.length - indexedNoteCount;
 
             // Update text content only, preserving DOM structure
-            if (this.indexedStat && this.excludedStat && this.dbSizeStat) {
+            if (this.indexedStat && this.excludedStat) {
                 this.indexedStat.setText(
                     `• Indexed: ${indexedNoteCount} notes (${indexedChunkCount} chunks)`
                 );
                 this.excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
-                this.dbSizeStat.setText(`• Database size: ${formatBytes(databaseSize)}`);
             }
         };
 
