@@ -68,7 +68,13 @@ export class SimilarNoteFinder {
         // Sort by score in descending order
         uniqueResultsArray.sort((a, b) => b.score - a.score);
 
-        log.info("uniqueResultsArray", uniqueResultsArray);
+        log.info(
+            `Found ${uniqueResultsArray.length} unique similar notes (sorted by relevance):`,
+            uniqueResultsArray.map((r) => ({
+                path: r.chunk.path,
+                score: r.score.toFixed(3),
+            }))
+        );
 
         // Convert to SimilarNote format
         const similarNotes = uniqueResultsArray.map(
