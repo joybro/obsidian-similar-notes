@@ -2,7 +2,8 @@ import type { SettingsService } from "@/application/SettingsService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import { filterMarkdownFiles } from "@/utils/folderExclusion";
 import log from "loglevel";
-import type { EventRef, TFile, Vault } from "obsidian";
+import { TFile } from "obsidian";
+import type { EventRef, TAbstractFile, Vault } from "obsidian";
 
 export type NoteChange = {
     path: string;
@@ -127,6 +128,39 @@ export class NoteChangeQueue {
             }
         });
         this.eventRefs.push(deleteRef);
+
+        // Register callback for file rename/move
+        const renameRef = this.vault.on("rename", (file: TAbstractFile, oldPath: string) => {
+            if (file instanceof TFile && file.extension === "md") {
+                const settings = this.settingsService.get();
+
+                // Remove old path from queue if it exists
+                this.queue = this.queue.filter(
+                    (change) => change.path !== oldPath && change.path !== file.path
+                );
+
+                // Add deletion change for old path to clean up old data
+                this.queue.push({
+                    path: oldPath,
+                    reason: "deleted" as const,
+                });
+
+                // Check if new path should be indexed (not excluded by patterns)
+                const files = filterMarkdownFiles([file], settings.excludeFolderPatterns);
+                if (files.length > 0) {
+                    // Add new path to queue for indexing
+                    this.queue.push({
+                        path: file.path,
+                        reason: "new" as const,
+                        mtime: file.stat.mtime,
+                    });
+                    log.info(`File renamed/moved: ${oldPath} -> ${file.path}`);
+                } else {
+                    log.info(`File renamed/moved to excluded location: ${oldPath} -> ${file.path}`);
+                }
+            }
+        });
+        this.eventRefs.push(renameRef);
     }
 
     /**

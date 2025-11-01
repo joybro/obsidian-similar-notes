@@ -4,20 +4,39 @@ import type { TFile, Vault } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { NoteChangeQueue } from "../noteChangeQueue";
 
-// Helper function to create mock TFile objects
-const createMockTFile = (path: string, mtime: number): TFile => ({
-    path,
-    name: path.split('/').pop() || '',
-    extension: path.split('.').pop() || '',
-    basename: path.split('/').pop()?.split('.')[0] || '',
-    stat: { 
-        mtime, 
-        ctime: mtime, // typically ctime is same or before mtime
-        size: 100 // arbitrary file size
-    },
-    vault: {} as any,
-    parent: {} as any
+// Mock TFile class - defined inside vi.mock to make instanceof work
+vi.mock("obsidian", () => {
+    class MockTFileClass {
+        path: string;
+        name: string;
+        extension: string;
+        basename: string;
+        stat: { mtime: number; ctime: number; size: number };
+        vault: any;
+        parent: any;
+
+        constructor(path: string, mtime: number) {
+            this.path = path;
+            this.name = path.split('/').pop() || '';
+            this.extension = path.split('.').pop() || '';
+            this.basename = path.split('/').pop()?.split('.')[0] || '';
+            this.stat = { mtime, ctime: mtime, size: 100 };
+            this.vault = {} as any;
+            this.parent = {} as any;
+        }
+    }
+
+    return { TFile: MockTFileClass };
 });
+
+// Import the mocked TFile to use in tests
+import { TFile as MockedTFile } from "obsidian";
+
+// Helper function to create mock TFile objects
+const createMockTFile = (path: string, mtime: number): TFile => {
+    // @ts-ignore - MockedTFile constructor signature differs from TFile
+    return new MockedTFile(path, mtime) as unknown as TFile;
+};
 
 // Mock Vault with only the methods we need
 type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on" | "offref">;
@@ -88,7 +107,7 @@ describe("FileChangeQueue", () => {
         expect(changes[1].mtime).toBe(2000);
 
         // Should have registered event callbacks
-        expect(mockVault.on).toHaveBeenCalledTimes(3);
+        expect(mockVault.on).toHaveBeenCalledTimes(4);
         expect(mockVault.on).toHaveBeenCalledWith(
             "create",
             expect.any(Function)
@@ -99,6 +118,10 @@ describe("FileChangeQueue", () => {
         );
         expect(mockVault.on).toHaveBeenCalledWith(
             "delete",
+            expect.any(Function)
+        );
+        expect(mockVault.on).toHaveBeenCalledWith(
+            "rename",
             expect.any(Function)
         );
     });
@@ -190,17 +213,19 @@ describe("FileChangeQueue", () => {
     });
 
     describe("file change event callbacks", () => {
-        let createCallback: (file: TFile) => Promise<void>;
-        let modifyCallback: (file: TFile) => Promise<void>;
-        let deleteCallback: (file: TFile) => Promise<void>;
+        let createCallback: (file: TFile) => void | Promise<void>;
+        let modifyCallback: (file: TFile) => void | Promise<void>;
+        let deleteCallback: (file: TFile) => void | Promise<void>;
+        let renameCallback: (file: TFile, oldPath: string) => void | Promise<void>;
         const unregisterCreate = vi.fn();
         const unregisterModify = vi.fn();
         const unregisterDelete = vi.fn();
+        const unregisterRename = vi.fn();
 
         beforeEach(async () => {
             // Capture the callbacks when they're registered
             (mockVault.on as ReturnType<typeof vi.fn>).mockImplementation(
-                (event: string, callback: (file: TFile) => Promise<void>) => {
+                (event: string, callback: (file: TFile, oldPath?: string) => void | Promise<void>) => {
                     if (event === "create") {
                         createCallback = callback;
                         return unregisterCreate;
@@ -212,6 +237,10 @@ describe("FileChangeQueue", () => {
                     if (event === "delete") {
                         deleteCallback = callback;
                         return unregisterDelete;
+                    }
+                    if (event === "rename") {
+                        renameCallback = callback as (file: TFile, oldPath: string) => void | Promise<void>;
+                        return unregisterRename;
                     }
                     return () => {};
                 }
@@ -326,12 +355,57 @@ describe("FileChangeQueue", () => {
             expect(fileChangeQueue.getFileChangeCount()).toBe(0);
         });
 
+        test("should handle file rename events", () => {
+            expect(fileChangeQueue.getFileChangeCount()).toBe(0);
+
+            // Create a renamed file (file1.md -> renamed.md)
+            const renamedFile = createMockTFile("renamed.md", 1000);
+
+            // Ensure callback is defined
+            expect(renameCallback).toBeDefined();
+
+            // Simulate a file rename event
+            renameCallback(renamedFile, "file1.md");
+
+            // Should have added 2 changes to the queue: delete old path, add new path
+            expect(fileChangeQueue.getFileChangeCount()).toBe(2);
+
+            const changes = fileChangeQueue.pollFileChanges(2);
+            expect(changes[0].path).toBe("file1.md");
+            expect(changes[0].reason).toBe("deleted");
+            expect(changes[1].path).toBe("renamed.md");
+            expect(changes[1].reason).toBe("new");
+            expect(changes[1].mtime).toBe(1000);
+        });
+
+        test("should handle file rename to excluded folder", () => {
+            expect(fileChangeQueue.getFileChangeCount()).toBe(0);
+
+            // Mock settings with exclusion patterns
+            mockSettingsService.get = vi.fn().mockReturnValue({
+                excludeFolderPatterns: ["excluded/**"],
+            });
+
+            // Create a renamed file to excluded folder
+            const renamedFile = createMockTFile("excluded/renamed.md", 1000);
+
+            // Simulate a file rename event
+            renameCallback(renamedFile, "file1.md");
+
+            // Should have added only 1 change: delete old path (no new path added)
+            expect(fileChangeQueue.getFileChangeCount()).toBe(1);
+
+            const changes = fileChangeQueue.pollFileChanges(1);
+            expect(changes[0].path).toBe("file1.md");
+            expect(changes[0].reason).toBe("deleted");
+        });
+
         test("should unregister callbacks on cleanup", async () => {
             // Clean up the queue
             fileChangeQueue.cleanup();
 
             // Should have called vault.offref for each event ref
-            expect(mockVault.offref).toHaveBeenCalledTimes(3);
+            expect(mockVault.offref).toHaveBeenCalledTimes(4);
         });
     });
 
