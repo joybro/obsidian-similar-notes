@@ -101,13 +101,20 @@ export class NoteIndexingService {
             return;
         }
 
-        const noteChunks = await Promise.all(
-            splitted.map(async (chunk) =>
-                chunk.withEmbedding(
-                    await this.embeddingService.embedText(chunk.content)
+        let noteChunks;
+        try {
+            noteChunks = await Promise.all(
+                splitted.map(async (chunk) =>
+                    chunk.withEmbedding(
+                        await this.embeddingService.embedText(chunk.content)
+                    )
                 )
-            )
-        );
+            );
+        } catch (error) {
+            log.error("Failed to generate embeddings for note:", path, error);
+            // Error notice is already shown by the provider, just skip this note
+            return;
+        }
 
         log.info("chunks", noteChunks);
 
