@@ -1,6 +1,8 @@
 import { Notice } from "obsidian";
 import { Subject } from "rxjs";
 
+const PLUGIN_NAME = "Similar Notes";
+
 export interface ErrorHandlerConfig {
     providerName: string;
     errorSubject: Subject<string | null>;
@@ -102,7 +104,7 @@ export function handleEmbeddingLoadError(
     );
 
     // Show notice to user
-    new Notice(`Failed to load ${config.providerName} model: ${userFriendlyMessage}`, 8000);
+    new Notice(`${PLUGIN_NAME}: Failed to load ${config.providerName} model: ${userFriendlyMessage}`, 8000);
 
     // Emit error state
     config.errorSubject.next(userFriendlyMessage);
@@ -168,7 +170,7 @@ export function handleEmbeddingRuntimeError(
     const errorKey = `${config.providerName}-runtime`;
     throttledNoticeManager.showThrottled(
         errorKey,
-        `${config.providerName} error: ${userFriendlyMessage}`,
+        `${PLUGIN_NAME}: ${config.providerName} error: ${userFriendlyMessage}`,
         8000
     );
 
