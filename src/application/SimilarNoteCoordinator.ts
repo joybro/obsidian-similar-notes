@@ -4,6 +4,7 @@ import type {
 } from "@/components/NoteBottomViewReact";
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
+import log from "loglevel";
 import type { TFile, Vault } from "obsidian";
 import { BehaviorSubject } from "rxjs";
 import type { SettingsService } from "./SettingsService";
@@ -107,10 +108,19 @@ export class SimilarNoteCoordinator {
                 sourceChunk: showSourceChunk
                     ? similarNote.sourceChunk
                     : undefined,
+                path: similarNote.path,
             }))
-            .filter(
-                (viewModel) => viewModel.file !== null
-            ) as SimilarNoteEntry[];
+            .filter((viewModel) => {
+                if (viewModel.file === null) {
+                    log.error(
+                        `Stale data detected: similar note not found in vault (path: ${viewModel.path}). ` +
+                        `This may indicate the file was renamed/moved but the index was not updated.`
+                    );
+                    return false;
+                }
+                return true;
+            })
+            .map(({ path, ...rest }) => rest) as SimilarNoteEntry[];
 
         this.cache.set(file.path, {
             mtime: file.stat.mtime,
