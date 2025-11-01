@@ -95,17 +95,83 @@ export function handleEmbeddingLoadError(
     config: ErrorHandlerConfig
 ): never {
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    
+
     const userFriendlyMessage = extractUserFriendlyMessage(
-        errorMessage, 
+        errorMessage,
         config.customPatterns
     );
-    
+
     // Show notice to user
     new Notice(`Failed to load ${config.providerName} model: ${userFriendlyMessage}`, 8000);
-    
+
     // Emit error state
     config.errorSubject.next(userFriendlyMessage);
-    
+
     throw error;
+}
+
+/**
+ * Throttled notice manager for runtime errors
+ */
+class ThrottledNoticeManager {
+    private lastNoticeTime = new Map<string, number>();
+    private readonly DEFAULT_COOLDOWN = 60000; // 1 minute
+
+    /**
+     * Show a notice with throttling based on error key
+     */
+    showThrottled(
+        errorKey: string,
+        message: string,
+        duration = 8000,
+        cooldown = this.DEFAULT_COOLDOWN
+    ): void {
+        const now = Date.now();
+        const lastTime = this.lastNoticeTime.get(errorKey) || 0;
+
+        if (now - lastTime > cooldown) {
+            new Notice(message, duration);
+            this.lastNoticeTime.set(errorKey, now);
+        }
+    }
+
+    /**
+     * Reset throttle state for a specific error key or all
+     */
+    reset(errorKey?: string): void {
+        if (errorKey) {
+            this.lastNoticeTime.delete(errorKey);
+        } else {
+            this.lastNoticeTime.clear();
+        }
+    }
+}
+
+// Singleton instance
+export const throttledNoticeManager = new ThrottledNoticeManager();
+
+/**
+ * Handle embedding runtime errors (during embedText/embedTexts calls)
+ */
+export function handleEmbeddingRuntimeError(
+    error: unknown,
+    config: ErrorHandlerConfig
+): void {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+    const userFriendlyMessage = extractUserFriendlyMessage(
+        errorMessage,
+        config.customPatterns
+    );
+
+    // Show throttled notice to user
+    const errorKey = `${config.providerName}-runtime`;
+    throttledNoticeManager.showThrottled(
+        errorKey,
+        `${config.providerName} error: ${userFriendlyMessage}`,
+        8000
+    );
+
+    // Emit error state
+    config.errorSubject.next(userFriendlyMessage);
 }
