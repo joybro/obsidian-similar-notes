@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.3] - 2025-11-01
+
+### Fixed
+
+-   **File Rename/Move Handling**: Plugin now properly detects and handles file rename/move operations
+    -   Automatically removes old path data from index when files are renamed or moved
+    -   Re-indexes files at their new location
+    -   Prevents stale data accumulation in the index
+
+### Improved
+
+-   **Ollama Error Notifications**: Added user-friendly error notifications for Ollama connection failures
+    -   Clear notifications when Ollama server is unreachable
+    -   Throttled notifications (1 per minute) to prevent spam
+    -   Error states propagated to UI via observables
+    -   Graceful error handling - indexing continues even when embedding fails
+-   **Error Message Clarity**: All error notifications now include "Similar Notes:" prefix
+    -   Makes it easy to identify which plugin the error is from
+    -   Consistent error message format across the plugin
+-   **Stale Data Logging**: Added error logging when similar notes reference non-existent files
+    -   Helps diagnose cases where index contains outdated file references
+    -   Logs include file path for easier debugging
+    -   Makes it clear when fewer similar notes are shown due to stale data
+
 ## [0.10.2] - 2025-10-29
 
 -   **Fix Reindex for 0.10.0 Users**: Extended automatic reindex to include users upgrading from v0.10.0
