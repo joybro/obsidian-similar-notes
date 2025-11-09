@@ -21,6 +21,12 @@ export interface NoteChunkRepository {
     removeByPath(path: string): Promise<boolean>;
 
     /**
+     * Gets all NoteChunks associated with a specific file path.
+     * @returns An array of NoteChunks for the given path
+     */
+    getByPath(path: string): Promise<NoteChunk[]>;
+
+    /**
      * Finds and returns NoteChunks that are most similar to the given embedding vector.
      *
      * @param queryEmbedding - The embedding vector to use as the search criteria

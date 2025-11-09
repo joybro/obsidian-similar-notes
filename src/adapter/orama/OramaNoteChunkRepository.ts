@@ -47,6 +47,14 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         return await worker.removeByPath(path);
     }
 
+    async getByPath(path: string): Promise<NoteChunk[]> {
+        this.workerManager.ensureInitialized();
+        const worker = this.workerManager.getWorker();
+        return await worker
+            .getByPath(path)
+            .then((chunks) => chunks.map((chunk) => NoteChunk.fromDTO(chunk)));
+    }
+
     async findSimilarChunks(
         queryEmbedding: number[],
         limit: number,
