@@ -222,6 +222,25 @@ export class OramaWorker {
         return removedCount > 0;
     }
 
+    async getByPath(path: string): Promise<NoteChunkDTO[]> {
+        if (!this.db) {
+            throw new Error("Database not loaded");
+        }
+
+        // Get chunks directly from IndexedDB to ensure embeddings are included
+        // Text-based search in Orama doesn't return vector fields
+        const chunks = await this.storage.getByPath(path);
+
+        return chunks.map((chunk) => ({
+            path: chunk.path,
+            title: chunk.title,
+            content: chunk.content,
+            chunkIndex: chunk.chunkIndex,
+            totalChunks: chunk.totalChunks,
+            embedding: chunk.embedding,
+        }));
+    }
+
     async findSimilarChunks(
         queryEmbedding: number[],
         limit: number,

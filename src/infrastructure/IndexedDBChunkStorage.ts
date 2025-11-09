@@ -144,6 +144,44 @@ export class IndexedDBChunkStorage {
     }
 
     /**
+     * Get all chunks for a given note path
+     * Returns an array of chunks
+     */
+    async getByPath(path: string): Promise<NoteChunkInternal[]> {
+        this.ensureInitialized();
+
+        return new Promise((resolve, reject) => {
+            const transaction = this.db!.transaction(
+                [this.chunksStoreName],
+                "readonly"
+            );
+            const store = transaction.objectStore(this.chunksStoreName);
+            const index = store.index("path");
+
+            const request = index.openCursor(IDBKeyRange.only(path));
+            const chunks: NoteChunkInternal[] = [];
+
+            request.onsuccess = (event) => {
+                const cursor = (event.target as IDBRequest<IDBCursorWithValue>)
+                    .result;
+
+                if (cursor) {
+                    chunks.push(cursor.value);
+                    cursor.continue();
+                } else {
+                    // No more matching records
+                    resolve(chunks);
+                }
+            };
+
+            request.onerror = () => {
+                log.error("Failed to get chunks by path:", request.error);
+                reject(request.error);
+            };
+        });
+    }
+
+    /**
      * Remove all chunks for a given note path
      * Returns the number of chunks removed
      */

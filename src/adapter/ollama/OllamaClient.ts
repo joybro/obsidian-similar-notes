@@ -75,28 +75,41 @@ export class OllamaClient {
      */
     async generateEmbedding(model: string, text: string): Promise<number[]> {
         try {
+            // Debug logging: track text length and request details
+            const textLength = text.length;
+            const textByteSize = new Blob([text]).size;
+            log.debug(`[Ollama] Generating embedding - text length: ${textLength} chars, ${textByteSize} bytes`);
+
+            const requestBody = JSON.stringify({
+                model,
+                prompt: text
+            } as OllamaEmbeddingRequest);
+            const requestSize = new Blob([requestBody]).size;
+            log.debug(`[Ollama] Request payload size: ${requestSize} bytes`);
+
+            const startTime = Date.now();
             const response = await fetch(`${this.baseUrl}/api/embeddings`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    model,
-                    prompt: text
-                } as OllamaEmbeddingRequest)
+                body: requestBody
             });
-            
+            const elapsed = Date.now() - startTime;
+
             if (!response.ok) {
                 const errorText = await response.text();
+                log.error(`[Ollama] Embedding failed after ${elapsed}ms - status: ${response.status}, text length: ${textLength}, request size: ${requestSize} bytes`);
                 throw new Error(`Failed to generate embedding: ${response.statusText}. ${errorText}`);
             }
-            
+
+            log.debug(`[Ollama] Embedding successful in ${elapsed}ms`);
             const data: OllamaEmbeddingResponse = await response.json();
-            
+
             if (!data.embedding || !Array.isArray(data.embedding)) {
                 throw new Error("Invalid embedding response from Ollama");
             }
-            
+
             return data.embedding;
         } catch (error) {
             log.error("Failed to generate embedding", error);

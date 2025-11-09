@@ -18,18 +18,29 @@ export class SimilarNoteFinder {
             return [];
         }
 
-        const splitted = await this.noteChunkingService.split(note);
-        if (splitted.length === 0) {
-            return [];
-        }
+        log.info(`[SimilarNoteFinder] ===== Finding similar notes for: ${note.path} =====`);
 
-        const noteChunks = await Promise.all(
-            splitted.map(async (chunk) =>
-                chunk.withEmbedding(
-                    await this.modelService.embedText(chunk.content)
+        // Try to get already indexed chunks first
+        let noteChunks = await this.noteChunkRepository.getByPath(note.path);
+
+        // If not found in repository, generate new embeddings
+        if (!noteChunks || noteChunks.length === 0) {
+            log.info(`[SimilarNoteFinder] No indexed chunks found, generating new embeddings for: ${note.path}`);
+            const splitted = await this.noteChunkingService.split(note);
+            if (splitted.length === 0) {
+                return [];
+            }
+
+            noteChunks = await Promise.all(
+                splitted.map(async (chunk) =>
+                    chunk.withEmbedding(
+                        await this.modelService.embedText(chunk.content)
+                    )
                 )
-            )
-        );
+            );
+        } else {
+            log.debug(`[SimilarNoteFinder] Using ${noteChunks.length} pre-indexed chunks for: ${note.path}`);
+        }
 
         // Get search results for each embedding and flatten them into a single array
         const searchResultsArrays = await Promise.all(

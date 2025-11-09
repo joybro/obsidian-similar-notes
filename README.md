@@ -39,6 +39,23 @@ Connect to any Ollama embedding model on `localhost:11434`
 
 > Changing models triggers re-indexing.
 
+#### Known Issues with Ollama
+
+**Ollama v0.12.5+ has known stability issues** that may cause embedding failures with error messages like:
+
+- `500 Internal Server Error`
+- `EOF` errors in Ollama logs
+- Random failures even with small payloads
+
+This is a [known bug in Ollama](https://github.com/ollama/ollama/issues/12585) affecting the llama.cpp backend. The plugin automatically detects safe payload sizes, but failures may still occur randomly.
+
+**Workaround**: If you experience frequent failures, consider:
+- Using the built-in Transformers.js models instead (more stable)
+- Waiting for an Ollama update that fixes this issue
+- Using an older Ollama version (< v0.12.5) if possible
+
+The plugin will automatically use larger chunk sizes once Ollama releases a fix.
+
 ## Technical Details
 
 -   **Transformers.js**: Runs Hugging Face models directly in Obsidian

@@ -36,7 +36,7 @@ export class NoteIndexingService {
             }
 
             const change = changes[0];
-            log.info("processing change", change.path);
+            log.info(`[NoteIndexingService] ===== Processing change: ${change.path} (${change.reason}) =====`);
 
             if (change.reason === "deleted") {
                 await this.processDeletedNote(change.path);
@@ -101,6 +101,7 @@ export class NoteIndexingService {
             return;
         }
 
+        log.info(`[NoteIndexingService] Generating embeddings for ${splitted.length} chunks (for indexing)`);
         let noteChunks;
         try {
             noteChunks = await Promise.all(
@@ -116,7 +117,7 @@ export class NoteIndexingService {
             return;
         }
 
-        log.info("chunks", noteChunks);
+        log.info(`[NoteIndexingService] Successfully generated embeddings, saving to repository`);
 
         const wasRemoved = await this.noteChunkRepository.removeByPath(
             note.path
@@ -124,16 +125,19 @@ export class NoteIndexingService {
         await this.noteChunkRepository.putMulti(noteChunks);
 
         log.info(
-            "count of chunks in embedding store",
+            `[NoteIndexingService] Saved ${noteChunks.length} chunks to repository. Total chunks in store:`,
             await this.noteChunkRepository.count()
         );
 
         // Only calculate similar notes if this is the currently active file
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile.path === note.path) {
+            log.info(`[NoteIndexingService] File is currently active, triggering similar note search`);
             this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(
                 note.path
             );
+        } else {
+            log.info(`[NoteIndexingService] File is not currently active, skipping similar note search`);
         }
     }
 }
