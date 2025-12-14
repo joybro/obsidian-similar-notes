@@ -58,7 +58,7 @@ export class SimilarNoteCoordinator {
     }
 
     async onFileOpen(file: TFile | null) {
-        if (!file) {
+        if (!file || file.extension !== "md") {
             return;
         }
 
