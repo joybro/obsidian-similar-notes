@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.4] - 2025-12-14
+
+### Fixed
+
+-   **Skip Non-Markdown Files**: Binary files (images, PDFs, etc.) no longer trigger unnecessary embedding generation
+    -   Previously, opening an image or PDF would attempt to embed the binary data as text
+    -   Now only `.md` files are processed for similar notes lookup
+    -   Eliminates wasted API calls and meaningless search results
+
+### Improved
+
+-   **Ollama Bug Workarounds**: Added automatic detection and workarounds for Ollama v0.12.5+ bugs
+    -   Auto-detect max token limits to avoid random embedding failures
+    -   Conservative token counting (3.5 chars/token) for better payload estimation
+    -   Sequential processing to match Ollama's server-side queuing behavior
+-   **Duplicate Embedding Prevention**: Check repository before generating new embeddings
+    -   Avoids regenerating embeddings for already-indexed chunks
+    -   Reduces unnecessary API calls during similar notes lookup
+-   **Enhanced Logging**: Comprehensive logging for troubleshooting Ollama issues
+    -   Payload sizes, token counts, and timing information logged
+    -   Helps diagnose embedding failures and performance issues
+
 ## [0.10.3] - 2025-11-01
 
 ### Fixed
