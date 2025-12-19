@@ -19,3 +19,6 @@ design
 
 # claude code settings
 .claude
+
+# local development
+scripts/install-local.sh
