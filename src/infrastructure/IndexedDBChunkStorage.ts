@@ -30,7 +30,7 @@ interface Metadata {
  * Provides memory-efficient batch loading and persistence
  */
 export class IndexedDBChunkStorage {
-    private dbName: string = "";
+    private dbName = "";
     private readonly chunksStoreName = "chunks";
     private readonly metadataStoreName = "metadata";
     private readonly version = 1;

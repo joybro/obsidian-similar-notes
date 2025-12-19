@@ -6,7 +6,7 @@ export class IndexedNoteMTimeStore {
     private mtimes: Record<string, number> = {};
     private indexedNoteCount$ = new BehaviorSubject<number>(0);
     private storage: IndexedDBMTimeStorage;
-    private vaultId: string = "";
+    private vaultId = "";
 
     constructor() {
         this.storage = new IndexedDBMTimeStorage();

@@ -22,7 +22,7 @@ interface Metadata {
  * Provides persistent storage for tracking indexed notes
  */
 export class IndexedDBMTimeStorage {
-    private dbName: string = "";
+    private dbName = "";
     private readonly mtimesStoreName = "mtimes";
     private readonly metadataStoreName = "metadata";
     private readonly version = 1;

@@ -104,7 +104,7 @@ class TransformersWorker {
     async handleLoad(
         modelId: string,
         progress_callback: (progress: number) => void,
-        useGPU: boolean = true
+        useGPU = true
     ): Promise<{ vectorSize: number; maxTokens: number }> {
         log.info(`Loading model: ${modelId}, useGPU: ${useGPU}`);
         const transformers = await importTransformers();

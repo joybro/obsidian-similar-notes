@@ -17,7 +17,7 @@ interface ModelSettingsSectionProps {
 export class ModelSettingsSection {
     private downloadProgressSubscription?: { unsubscribe: () => void };
     private modelErrorSubscription?: { unsubscribe: () => void };
-    private currentDownloadProgress: number = 100;
+    private currentDownloadProgress = 100;
     private currentModelError: string | null = null;
     private sectionContainer?: HTMLElement;
 

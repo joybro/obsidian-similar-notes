@@ -234,7 +234,7 @@ export class NoteChangeQueue {
      * @param checkMtime Whether to check modification times for existing indexed files
      * @returns Analysis of files that need to be added, removed, or updated
      */
-    private analyzeSyncNeeds(checkMtime: boolean = true): SyncAnalysis {
+    private analyzeSyncNeeds(checkMtime = true): SyncAnalysis {
         // Get all markdown files and apply current exclusion patterns
         const allFiles = this.vault.getMarkdownFiles();
         const settings = this.settingsService.get();

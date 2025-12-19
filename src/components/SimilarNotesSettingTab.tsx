@@ -9,8 +9,8 @@ import { ModelSettingsSection } from "./ModelSettingsSection";
 import { IndexSettingsSection } from "./IndexSettingsSection";
 
 export class SimilarNotesSettingTab extends PluginSettingTab {
-    private indexedNoteCount: number = 0;
-    private indexedChunkCount: number = 0;
+    private indexedNoteCount = 0;
+    private indexedChunkCount = 0;
     private subscription: { unsubscribe: () => void } | null = null;
     private mTimeStore?: IndexedNoteMTimeStore;
     private modelService?: EmbeddingService;

@@ -41,7 +41,7 @@ export interface OllamaModelInfo {
 export class OllamaClient {
     private baseUrl: string;
 
-    constructor(baseUrl: string = "http://localhost:11434") {
+    constructor(baseUrl = "http://localhost:11434") {
         this.baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     }
 
