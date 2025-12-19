@@ -12,8 +12,8 @@ vi.mock("obsidian", () => {
         extension: string;
         basename: string;
         stat: { mtime: number; ctime: number; size: number };
-        vault: any;
-        parent: any;
+        vault: unknown;
+        parent: unknown;
 
         constructor(path: string, mtime: number) {
             this.path = path;
@@ -21,8 +21,8 @@ vi.mock("obsidian", () => {
             this.extension = path.split('.').pop() || '';
             this.basename = path.split('/').pop()?.split('.')[0] || '';
             this.stat = { mtime, ctime: mtime, size: 100 };
-            this.vault = {} as any;
-            this.parent = {} as any;
+            this.vault = {} as unknown;
+            this.parent = {} as unknown;
         }
     }
 
@@ -34,13 +34,14 @@ import { TFile as MockedTFile } from "obsidian";
 
 // Helper function to create mock TFile objects
 const createMockTFile = (path: string, mtime: number): TFile => {
-    // @ts-ignore - MockedTFile constructor signature differs from TFile
+    // MockedTFile constructor signature differs from TFile, but it's intentional for testing
     return new MockedTFile(path, mtime) as unknown as TFile;
 };
 
 // Mock Vault with only the methods we need
 type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on" | "offref">;
 
+// eslint-disable-next-line max-lines-per-function
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
     let mockMTimeStore: IndexedNoteMTimeStore;
@@ -61,9 +62,11 @@ describe("FileChangeQueue", () => {
                 if (file.path === "file2.md") return "content2";
                 return "";
             }),
-            on: vi.fn().mockImplementation((event, callback) => {
+            on: vi.fn().mockImplementation((_event, _callback) => {
                 // Return a function that can be called to unregister the event
-                return () => {};
+                return () => {
+                    // Mock unregister function
+                };
             }),
             offref: vi.fn(),
         };
@@ -242,7 +245,9 @@ describe("FileChangeQueue", () => {
                         renameCallback = callback as (file: TFile, oldPath: string) => void | Promise<void>;
                         return unregisterRename;
                     }
-                    return () => {};
+                    return () => {
+                        // Mock unregister function
+                    };
                 }
             );
 
@@ -464,9 +469,11 @@ describe("FileChangeQueue", () => {
                     if (file.path === "file2.md") return "content2";
                     return "";
                 }),
-                on: vi.fn().mockImplementation((event, callback) => {
+                on: vi.fn().mockImplementation((_event, _callback) => {
                     // Return a function that can be called to unregister the event
-                    return () => {};
+                    return () => {
+                        // Mock unregister function
+                    };
                 }),
                 offref: vi.fn(),
             };

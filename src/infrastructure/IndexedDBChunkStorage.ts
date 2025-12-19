@@ -21,7 +21,7 @@ export interface NoteChunkInternal {
  */
 interface Metadata {
     key: string;
-    value: any;
+    value: boolean;
     timestamp: number;
 }
 
@@ -95,9 +95,13 @@ export class IndexedDBChunkStorage {
      */
     async put(chunk: NoteChunkInternal): Promise<void> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.chunksStoreName],
                 "readwrite"
             );
@@ -119,13 +123,17 @@ export class IndexedDBChunkStorage {
      */
     async putMulti(chunks: NoteChunkInternal[]): Promise<void> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         if (chunks.length === 0) {
             return;
         }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.chunksStoreName],
                 "readwrite"
             );
@@ -149,9 +157,13 @@ export class IndexedDBChunkStorage {
      */
     async getByPath(path: string): Promise<NoteChunkInternal[]> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.chunksStoreName],
                 "readonly"
             );
@@ -187,9 +199,13 @@ export class IndexedDBChunkStorage {
      */
     async removeByPath(path: string): Promise<number> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.chunksStoreName],
                 "readwrite"
             );
@@ -225,9 +241,13 @@ export class IndexedDBChunkStorage {
      */
     async count(): Promise<number> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.chunksStoreName],
                 "readonly"
             );
@@ -261,8 +281,13 @@ export class IndexedDBChunkStorage {
         const total = await this.count();
         let processed = 0;
 
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
+
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.chunksStoreName],
                 "readonly"
             );
@@ -277,7 +302,7 @@ export class IndexedDBChunkStorage {
 
                 if (cursor) {
                     // Remove the IndexedDB id field before passing to Orama
-                    const { id, ...chunk } = cursor.value;
+                    const { id: _id, ...chunk } = cursor.value;
                     batch.push(chunk as NoteChunkInternal);
 
                     if (batch.length >= batchSize) {
@@ -332,9 +357,13 @@ export class IndexedDBChunkStorage {
      */
     async clear(): Promise<void> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.chunksStoreName],
                 "readwrite"
             );
@@ -359,9 +388,13 @@ export class IndexedDBChunkStorage {
      */
     async getMigrationFlag(): Promise<boolean> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.metadataStoreName],
                 "readonly"
             );
@@ -386,9 +419,13 @@ export class IndexedDBChunkStorage {
      */
     async setMigrationFlag(value: boolean): Promise<void> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.metadataStoreName],
                 "readwrite"
             );

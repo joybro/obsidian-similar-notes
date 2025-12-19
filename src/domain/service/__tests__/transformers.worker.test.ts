@@ -15,8 +15,8 @@ describe("TransformersWorker", () => {
                 return task();
             },
             handleLoad: async (
-                modelId: string,
-                progress_callback: (progress: number) => void
+                _modelId: string,
+                _progress_callback: (progress: number) => void
             ) => {
                 return {
                     vectorSize: 384, // Mock vector size
@@ -42,7 +42,9 @@ describe("TransformersWorker", () => {
     it("should load the model successfully and return vector size and max tokens", async () => {
         const response = await workerInstance.handleLoad(
             "sentence-transformers/all-MiniLM-L6-v2",
-            () => {}
+            () => {
+                // Mock progress callback
+            }
         );
 
         expect(response).toEqual({
@@ -57,7 +59,9 @@ describe("TransformersWorker", () => {
         // First load the model
         await workerInstance.handleLoad(
             "sentence-transformers/all-MiniLM-L6-v2",
-            () => {}
+            () => {
+                // Mock progress callback
+            }
         );
 
         // Then embed texts
@@ -75,7 +79,9 @@ describe("TransformersWorker", () => {
         // First load the model
         await workerInstance.handleLoad(
             "sentence-transformers/all-MiniLM-L6-v2",
-            () => {}
+            () => {
+                // Mock progress callback
+            }
         );
 
         // Then unload it
@@ -95,8 +101,8 @@ describe("TransformersWorker", () => {
                 return task();
             },
             handleLoad: async (
-                modelId: string,
-                progress_callback: (progress: number) => void
+                _modelId: string,
+                _progress_callback: (progress: number) => void
             ) => {
                 return {
                     vectorSize: 384,
@@ -123,7 +129,9 @@ describe("TransformersWorker", () => {
         // First load the model
         await workerInstance.handleLoad(
             "sentence-transformers/all-MiniLM-L6-v2",
-            () => {}
+            () => {
+                // Mock progress callback
+            }
         );
 
         // Then count tokens
@@ -146,8 +154,8 @@ describe("TransformersWorker", () => {
                 return task();
             },
             handleLoad: async (
-                modelId: string,
-                progress_callback: (progress: number) => void
+                _modelId: string,
+                _progress_callback: (progress: number) => void
             ) => {
                 return {
                     vectorSize: 384,
