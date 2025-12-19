@@ -1,6 +1,14 @@
 import type { Plugin } from "obsidian";
 import { type Observable, Subject } from "rxjs";
 
+export interface CachedModelInfo {
+    modelId: string;              // Which model this info belongs to
+    parameterCount?: number;      // Total parameter count
+    parameterSize?: string;       // Human-readable size (e.g., "22.7M")
+    embeddingLength?: number;     // Embedding dimensions
+    quantizationLevel?: string;   // Quantization level (for Ollama)
+}
+
 export interface SimilarNotesSettings {
     modelProvider: "builtin" | "ollama"; // Model provider type
     modelId: string; // The model ID to use for embeddings
@@ -15,6 +23,7 @@ export interface SimilarNotesSettings {
     noteDisplayMode: "title" | "path" | "smart"; // How to display note names in results
     showAtBottom: boolean; // Whether to show similar notes at the bottom of notes
     lastPluginVersion?: string; // Last version of the plugin that was run
+    cachedModelInfo?: CachedModelInfo; // Cached model information
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
