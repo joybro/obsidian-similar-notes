@@ -1,5 +1,7 @@
-import { OllamaClient, type OllamaModelInfo } from "@/adapter/ollama";
+import { HuggingFaceClient } from "@/adapter/huggingface";
+import { OllamaClient } from "@/adapter/ollama";
 import type { SettingsService } from "@/application/SettingsService";
+import type { CachedModelInfo } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import { Notice, Setting } from "obsidian";
 import type { App } from "obsidian";
@@ -30,9 +32,6 @@ export class ModelSettingsSection {
 
     // Apply button reference for direct updates
     private applyButton?: any;
-
-    // Cached Ollama model info
-    private ollamaModelInfo?: OllamaModelInfo | null;
 
     constructor(private props: ModelSettingsSectionProps) {
         if (props.modelService) {
@@ -115,50 +114,9 @@ export class ModelSettingsSection {
 
         new Setting(this.sectionContainer!).setName("Model").setHeading();
 
-        // Current model display
-        const gpuStatus =
-            settings.modelProvider === "builtin" && settings.useGPU
-                ? " (GPU)"
-                : "";
-
-        let currentModelDesc: string;
-        if (settings.modelProvider === "builtin") {
-            currentModelDesc = `Built-in: ${settings.modelId}${gpuStatus}`;
-        } else if (settings.modelProvider === "ollama") {
-            if (settings.ollamaModel) {
-                currentModelDesc = `Ollama: ${settings.ollamaModel}`;
-                // Add model info if available
-                if (this.ollamaModelInfo) {
-                    const info = this.ollamaModelInfo;
-                    const parts: string[] = [];
-                    if (info.parameterSize && info.parameterSize !== 'unknown') {
-                        parts.push(info.parameterSize);
-                    }
-                    if (info.quantizationLevel && info.quantizationLevel !== 'unknown') {
-                        parts.push(info.quantizationLevel);
-                    }
-                    if (info.embeddingLength) {
-                        parts.push(`${info.embeddingLength}-dim`);
-                    }
-                    if (parts.length > 0) {
-                        currentModelDesc += ` (${parts.join(', ')})`;
-                    }
-                }
-            } else {
-                currentModelDesc = "Not configured";
-            }
-        } else {
-            currentModelDesc = "Not configured";
-        }
-
-        // Fetch Ollama model info if needed (async, will trigger re-render)
-        if (
-            settings.modelProvider === "ollama" &&
-            settings.ollamaModel &&
-            this.ollamaModelInfo === undefined
-        ) {
-            this.fetchOllamaModelInfo(settings.ollamaUrl, settings.ollamaModel);
-        }
+        // Current model display - use cached model info from settings
+        const cachedInfo = settings.cachedModelInfo;
+        let currentModelDesc = this.buildCurrentModelDescription(settings, cachedInfo);
 
         // Add download progress if downloading
         if (
@@ -172,7 +130,7 @@ export class ModelSettingsSection {
 
         // Add error status if there's an error
         if (this.currentModelError) {
-            currentModelDesc += ` - Failed: ${this.currentModelError}`;
+            currentModelDesc += ` - Error: ${this.currentModelError}`;
         }
 
         new Setting(this.sectionContainer!)
@@ -442,10 +400,17 @@ export class ModelSettingsSection {
                 app,
                 builtinMessage,
                 async () => {
+                    // Fetch model info from Hugging Face API
+                    const cachedModelInfo = await this.fetchAndCacheModelInfo(
+                        "builtin",
+                        modelId
+                    );
+
                     await settingsService.update({
                         modelProvider: this.tempModelProvider,
                         modelId: modelId,
                         useGPU: this.tempUseGPU ?? settings.useGPU,
+                        cachedModelInfo,
                     });
                     plugin.changeModel(modelId);
                     // Clear temporary state after successful apply
@@ -463,10 +428,18 @@ export class ModelSettingsSection {
                 app,
                 ollamaMessage,
                 async () => {
+                    // Fetch model info from Ollama API
+                    const cachedModelInfo = await this.fetchAndCacheModelInfo(
+                        "ollama",
+                        this.tempOllamaModel || "",
+                        this.tempOllamaUrl
+                    );
+
                     await settingsService.update({
                         modelProvider: this.tempModelProvider,
                         ollamaUrl: this.tempOllamaUrl,
                         ollamaModel: this.tempOllamaModel,
+                        cachedModelInfo,
                     });
                     // Trigger model change with new settings
                     plugin.changeModel(this.tempOllamaModel || "");
@@ -485,25 +458,99 @@ export class ModelSettingsSection {
         this.tempOllamaUrl = undefined;
         this.tempOllamaModel = undefined;
         this.tempUseGPU = undefined;
-        // Clear cached model info so it gets re-fetched for the new model
-        this.ollamaModelInfo = undefined;
     }
 
-    private async fetchOllamaModelInfo(
-        ollamaUrl: string | undefined,
-        modelName: string
-    ): Promise<void> {
-        const url = ollamaUrl || "http://localhost:11434";
-        const client = new OllamaClient(url);
+    private buildCurrentModelDescription(
+        settings: any,
+        cachedInfo?: CachedModelInfo
+    ): string {
+        const currentModelId =
+            settings.modelProvider === "builtin"
+                ? settings.modelId
+                : settings.ollamaModel;
 
-        try {
-            this.ollamaModelInfo = await client.getModelInfo(modelName);
-        } catch {
-            this.ollamaModelInfo = null;
+        // Check if cached info matches current model
+        const hasValidCache =
+            cachedInfo && cachedInfo.modelId === currentModelId;
+
+        if (settings.modelProvider === "builtin") {
+            const parts: string[] = [];
+
+            if (hasValidCache) {
+                if (cachedInfo.parameterSize) {
+                    parts.push(cachedInfo.parameterSize);
+                }
+                if (cachedInfo.embeddingLength) {
+                    parts.push(`${cachedInfo.embeddingLength}-dim`);
+                }
+            }
+
+            // Add GPU/CPU status
+            parts.push(settings.useGPU ? "GPU" : "CPU");
+
+            return `Built-in: ${settings.modelId} (${parts.join(", ")})`;
         }
 
-        // Re-render to display the fetched info
-        this.render();
+        if (settings.modelProvider === "ollama") {
+            if (!settings.ollamaModel) {
+                return "Not configured";
+            }
+
+            const parts: string[] = [];
+
+            if (hasValidCache) {
+                if (cachedInfo.parameterSize) {
+                    parts.push(cachedInfo.parameterSize);
+                }
+                if (cachedInfo.quantizationLevel) {
+                    parts.push(cachedInfo.quantizationLevel);
+                }
+                if (cachedInfo.embeddingLength) {
+                    parts.push(`${cachedInfo.embeddingLength}-dim`);
+                }
+            }
+
+            if (parts.length > 0) {
+                return `Ollama: ${settings.ollamaModel} (${parts.join(", ")})`;
+            }
+            return `Ollama: ${settings.ollamaModel}`;
+        }
+
+        return "Not configured";
+    }
+
+    private async fetchAndCacheModelInfo(
+        provider: "builtin" | "ollama",
+        modelId: string,
+        ollamaUrl?: string
+    ): Promise<CachedModelInfo | undefined> {
+        if (provider === "builtin") {
+            const client = new HuggingFaceClient();
+            const info = await client.getModelInfo(modelId);
+
+            if (info) {
+                return {
+                    modelId,
+                    parameterCount: info.parameterCount,
+                    parameterSize: info.parameterSize,
+                };
+            }
+        } else if (provider === "ollama") {
+            const url = ollamaUrl || "http://localhost:11434";
+            const client = new OllamaClient(url);
+            const info = await client.getModelInfo(modelId);
+
+            if (info) {
+                return {
+                    modelId,
+                    parameterSize: info.parameterSize,
+                    embeddingLength: info.embeddingLength,
+                    quantizationLevel: info.quantizationLevel,
+                };
+            }
+        }
+
+        return undefined;
     }
 
     private updateApplyButtonState(settings: any): void {
