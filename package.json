@@ -8,7 +8,9 @@
         "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
         "version": "node version-bump.mjs && git add manifest.json versions.json",
         "test": "node esbuild.config.mjs workers-only && vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "lint": "eslint src --ext .ts,.tsx",
+        "lint:fix": "eslint src --ext .ts,.tsx --fix"
     },
     "keywords": [
         "obsidian",
@@ -35,6 +37,9 @@
         "builtin-modules": "^3.3.0",
         "esbuild": "^0.25.1",
         "esbuild-plugin-inline-worker": "^0.1.1",
+        "eslint": "^8.57.1",
+        "eslint-plugin-react": "^7.37.5",
+        "eslint-plugin-react-hooks": "^7.0.1",
         "fake-indexeddb": "^6.2.4",
         "jsdom": "^26.0.0",
         "ts-node": "^10.9.2",
