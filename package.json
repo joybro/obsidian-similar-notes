@@ -6,6 +6,7 @@
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+        "install-local": "npm run build && ./scripts/install-local.sh",
         "version": "node version-bump.mjs && git add manifest.json versions.json",
         "test": "node esbuild.config.mjs workers-only && vitest run",
         "test:watch": "vitest",
