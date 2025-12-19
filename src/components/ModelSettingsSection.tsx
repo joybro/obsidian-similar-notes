@@ -1,4 +1,4 @@
-import { OllamaClient } from "@/adapter/ollama";
+import { OllamaClient, type OllamaModelInfo } from "@/adapter/ollama";
 import type { SettingsService } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import { Notice, Setting } from "obsidian";
@@ -30,6 +30,9 @@ export class ModelSettingsSection {
 
     // Apply button reference for direct updates
     private applyButton?: any;
+
+    // Cached Ollama model info
+    private ollamaModelInfo?: OllamaModelInfo | null;
 
     constructor(private props: ModelSettingsSectionProps) {
         if (props.modelService) {
@@ -117,12 +120,45 @@ export class ModelSettingsSection {
             settings.modelProvider === "builtin" && settings.useGPU
                 ? " (GPU)"
                 : "";
-        let currentModelDesc =
-            settings.modelProvider === "builtin"
-                ? `Built-in: ${settings.modelId}${gpuStatus}`
-                : settings.modelProvider === "ollama"
-                ? `Ollama: ${settings.ollamaModel || "Not configured"}`
-                : "Not configured";
+
+        let currentModelDesc: string;
+        if (settings.modelProvider === "builtin") {
+            currentModelDesc = `Built-in: ${settings.modelId}${gpuStatus}`;
+        } else if (settings.modelProvider === "ollama") {
+            if (settings.ollamaModel) {
+                currentModelDesc = `Ollama: ${settings.ollamaModel}`;
+                // Add model info if available
+                if (this.ollamaModelInfo) {
+                    const info = this.ollamaModelInfo;
+                    const parts: string[] = [];
+                    if (info.parameterSize && info.parameterSize !== 'unknown') {
+                        parts.push(info.parameterSize);
+                    }
+                    if (info.quantizationLevel && info.quantizationLevel !== 'unknown') {
+                        parts.push(info.quantizationLevel);
+                    }
+                    if (info.embeddingLength) {
+                        parts.push(`${info.embeddingLength}-dim`);
+                    }
+                    if (parts.length > 0) {
+                        currentModelDesc += ` (${parts.join(', ')})`;
+                    }
+                }
+            } else {
+                currentModelDesc = "Not configured";
+            }
+        } else {
+            currentModelDesc = "Not configured";
+        }
+
+        // Fetch Ollama model info if needed (async, will trigger re-render)
+        if (
+            settings.modelProvider === "ollama" &&
+            settings.ollamaModel &&
+            this.ollamaModelInfo === undefined
+        ) {
+            this.fetchOllamaModelInfo(settings.ollamaUrl, settings.ollamaModel);
+        }
 
         // Add download progress if downloading
         if (
@@ -449,6 +485,25 @@ export class ModelSettingsSection {
         this.tempOllamaUrl = undefined;
         this.tempOllamaModel = undefined;
         this.tempUseGPU = undefined;
+        // Clear cached model info so it gets re-fetched for the new model
+        this.ollamaModelInfo = undefined;
+    }
+
+    private async fetchOllamaModelInfo(
+        ollamaUrl: string | undefined,
+        modelName: string
+    ): Promise<void> {
+        const url = ollamaUrl || "http://localhost:11434";
+        const client = new OllamaClient(url);
+
+        try {
+            this.ollamaModelInfo = await client.getModelInfo(modelName);
+        } catch {
+            this.ollamaModelInfo = null;
+        }
+
+        // Re-render to display the fetched info
+        this.render();
     }
 
     private updateApplyButtonState(settings: any): void {

@@ -30,6 +30,14 @@ export interface OllamaEmbeddingResponse {
     embedding: number[];
 }
 
+export interface OllamaModelInfo {
+    parameterSize: string;      // e.g., "566.70M"
+    quantizationLevel: string;  // e.g., "F16"
+    family: string;             // e.g., "bert"
+    embeddingLength?: number;   // e.g., 1024
+    contextLength?: number;     // e.g., 8192
+}
+
 export class OllamaClient {
     private baseUrl: string;
 
@@ -114,6 +122,56 @@ export class OllamaClient {
         } catch (error) {
             log.error("Failed to generate embedding", error);
             throw error;
+        }
+    }
+
+    /**
+     * Get detailed information about a specific model
+     */
+    async getModelInfo(modelName: string): Promise<OllamaModelInfo | null> {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/show`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: modelName })
+            });
+
+            if (!response.ok) {
+                log.warn(`Failed to get model info for ${modelName}: ${response.statusText}`);
+                return null;
+            }
+
+            const data = await response.json();
+
+            const details = data.details || {};
+            const modelInfo = data.model_info || {};
+
+            // Find embedding length from model_info (varies by architecture)
+            const embeddingLength =
+                modelInfo['bert.embedding_length'] ||
+                modelInfo['nomic_bert.embedding_length'] ||
+                modelInfo['llama.embedding_length'] ||
+                undefined;
+
+            // Find context length from model_info
+            const contextLength =
+                modelInfo['bert.context_length'] ||
+                modelInfo['nomic_bert.context_length'] ||
+                modelInfo['llama.context_length'] ||
+                undefined;
+
+            return {
+                parameterSize: details.parameter_size || 'unknown',
+                quantizationLevel: details.quantization_level || 'unknown',
+                family: details.family || 'unknown',
+                embeddingLength,
+                contextLength
+            };
+        } catch (error) {
+            log.error(`Failed to get model info for ${modelName}`, error);
+            return null;
         }
     }
 
