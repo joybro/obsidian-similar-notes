@@ -44,101 +44,19 @@ export class IndexSettingsSection {
         }
     }
 
-    /**
-     * Render the index settings section
-     */
-    render(currentStats: {
-        indexedNoteCount: number;
-        indexedChunkCount: number;
-    }): void {
-        const { containerEl, settingsService, plugin, app } = this.props;
-        const { indexedNoteCount, indexedChunkCount } = currentStats;
+    private renderFolderExclusionSettings(updateVaultStats: () => void): void {
+        const { settingsService } = this.props;
         const settings = settingsService.get();
 
-        // Create or clear the section container
-        // Check if sectionContainer exists and is still connected to the DOM
-        if (!this.sectionContainer || !this.sectionContainer.parentElement) {
-            this.sectionContainer = containerEl.createDiv(
-                "index-settings-section"
-            );
-            // Reset stats container references when section is recreated
-            this.statsContainer = undefined;
-            this.indexedStat = undefined;
-            this.excludedStat = undefined;
-        } else {
-            this.sectionContainer.empty();
-            // Reset stats container references when section is cleared
-            this.statsContainer = undefined;
-            this.indexedStat = undefined;
-            this.excludedStat = undefined;
-        }
-
-        // Add spacing before the Index heading for visual separation
-        this.sectionContainer.createDiv("setting-item-separator");
-
-        new Setting(this.sectionContainer).setName("Index").setHeading();
-
-        // Index statistics with excluded files count
-        const indexStatsSetting = new Setting(this.sectionContainer).setName(
-            "Index statistics"
-        );
-
-        // Create persistent stats container structure once
-        if (!this.statsContainer) {
-            this.statsContainer = indexStatsSetting.descEl.createDiv(
-                "similar-notes-stats-container"
-            );
-            this.indexedStat = this.statsContainer.createDiv("similar-notes-stat-item");
-            this.excludedStat = this.statsContainer.createDiv("similar-notes-stat-item");
-        }
-
-        // Function to update index statistics
-        const updateVaultStats = () => {
-            const allFiles = app.vault.getMarkdownFiles();
-
-            // Calculate actually excluded files: total files - indexed files
-            const actuallyExcludedCount = allFiles.length - indexedNoteCount;
-
-            // Update text content only, preserving DOM structure
-            if (this.indexedStat && this.excludedStat) {
-                this.indexedStat.setText(
-                    `• Indexed: ${indexedNoteCount} notes (${indexedChunkCount} chunks)`
-                );
-                this.excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
-            }
+        let updateExcludedFilesList: () => void = () => {
+            // Will be set by renderExcludedFilesPreview
         };
 
-        // Initial update
-        setTimeout(() => updateVaultStats(), 0);
+        const updateExcludedFilesListWrapper = () => {
+            updateExcludedFilesList();
+        };
 
-        new Setting(this.sectionContainer)
-            .setName("Reindex notes")
-            .setDesc("Rebuild the similarity index for all notes")
-            .addButton((button) => {
-                button.setButtonText("Reindex").onClick(async () => {
-                    await plugin.reindexNotes();
-                });
-            });
-
-        new Setting(this.sectionContainer)
-            .setName("Include frontmatter in indexing and search")
-            .setDesc(
-                "If enabled, the frontmatter of each note will be included in the similarity index and search."
-            )
-            .addToggle((toggle) => {
-                toggle
-                    .setValue(settings.includeFrontmatter)
-                    .onChange(async (value) => {
-                        await settingsService.update({
-                            includeFrontmatter: value,
-                        });
-                    });
-            });
-
-        let updateExcludedFilesList: () => void;
-
-        // Add UI for folder exclusion patterns
-        new Setting(this.sectionContainer)
+        new Setting(this.sectionContainer!)
             .setName("Exclude folders from indexing")
             .setDesc(
                 "Enter glob patterns to exclude folders/files from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes."
@@ -149,24 +67,18 @@ export class IndexSettingsSection {
                 text.setValue(settings.excludeFolderPatterns.join("\n"));
                 text.setPlaceholder("Templates/\nArchive/\n*.tmp\n**/drafts/*");
 
-                // Store error status
                 let hasError = false;
-
-                // Style for highlighting invalid patterns
                 const errorClass = "similar-notes-regexp-error";
 
                 text.onChange(async (value) => {
-                    // Reset error state
                     hasError = false;
                     text.inputEl.removeClass(errorClass);
 
-                    // Process each line as a pattern
                     const patterns = value
                         .split("\n")
                         .map((line) => line.trim())
                         .filter((line) => line.length > 0);
 
-                    // Validate patterns
                     const validPatterns: string[] = [];
                     for (const pattern of patterns) {
                         if (isValidGlobPattern(pattern)) {
@@ -176,33 +88,38 @@ export class IndexSettingsSection {
                         }
                     }
 
-                    // Apply error styling if needed
                     if (hasError) {
                         text.inputEl.addClass(errorClass);
                     }
 
-                    // Only save valid patterns
                     await settingsService.update({
                         excludeFolderPatterns: validPatterns,
                     });
 
-                    // Update excluded files list (but not index stats - those reflect current index state)
-                    updateExcludedFilesList();
+                    updateExcludedFilesListWrapper();
                 });
             });
 
-        // Add excluded files preview
-        const excludedFilesSetting = new Setting(this.sectionContainer).setDesc(
-            ""
-        );
+        this.renderExcludedFilesPreview((fn) => {
+            updateExcludedFilesList = fn;
+        });
+        this.renderApplyExclusionButton(updateExcludedFilesListWrapper, updateVaultStats);
 
+        setTimeout(() => updateExcludedFilesListWrapper(), 0);
+    }
+
+    private renderExcludedFilesPreview(
+        setUpdateFunction: (fn: () => void) => void
+    ): void {
+        const { app, settingsService } = this.props;
+
+        const excludedFilesSetting = new Setting(this.sectionContainer!).setDesc("");
         const excludedFilesDescription = excludedFilesSetting.descEl;
         const excludedFilesList = excludedFilesSetting.controlEl.createDiv(
             "similar-notes-excluded-files-list"
         );
 
-        // Function to update excluded files list
-        updateExcludedFilesList = () => {
+        const updateExcludedFilesList = () => {
             const allFiles = app.vault.getMarkdownFiles();
             const currentSettings = settingsService.get();
             const patterns = currentSettings.excludeFolderPatterns;
@@ -216,7 +133,6 @@ export class IndexSettingsSection {
                 <div style="font-size: var(--font-ui-smaller); color: var(--text-muted);">${excludedFiles.length} files total</div>
             `;
 
-            // Clear and populate list
             excludedFilesList.empty();
 
             if (excludedFiles.length === 0) {
@@ -225,7 +141,6 @@ export class IndexSettingsSection {
                 );
                 emptyMessage.setText("No files excluded");
             } else {
-                // Show up to 5 files with scroll
                 excludedFiles
                     .slice(0, Math.min(100, excludedFiles.length))
                     .forEach((file) => {
@@ -233,16 +148,21 @@ export class IndexSettingsSection {
                             "similar-notes-excluded-file-item"
                         );
                         fileItem.setText(file.path);
-                        fileItem.title = file.path; // Show full path on hover
+                        fileItem.title = file.path;
                     });
             }
         };
 
-        // Update list when settings change
-        setTimeout(() => updateExcludedFilesList(), 0);
+        setUpdateFunction(updateExcludedFilesList);
+    }
 
-        // Add "Apply exclusion patterns" button
-        new Setting(this.sectionContainer)
+    private renderApplyExclusionButton(
+        updateExcludedFilesList: () => void,
+        updateVaultStats: () => void
+    ): void {
+        const { app, plugin } = this.props;
+
+        new Setting(this.sectionContainer!)
             .setName("Apply exclusion patterns")
             .setDesc(
                 "Synchronize the index with current exclusion patterns without full reindexing"
@@ -263,7 +183,6 @@ export class IndexSettingsSection {
                             return;
                         }
 
-                        // Show confirmation modal
                         let message = "Apply exclusion patterns?\n\n";
                         if (preview.removed > 0 && preview.added > 0) {
                             message += `This will remove ${preview.removed} files and add ${preview.added} files to the similarity index.`;
@@ -279,18 +198,11 @@ export class IndexSettingsSection {
                             message,
                             async () => {
                                 try {
-                                    new Notice(
-                                        "Applying exclusion patterns..."
-                                    );
-                                    const result =
-                                        await plugin.applyExclusionPatterns();
+                                    new Notice("Applying exclusion patterns...");
+                                    const result = await plugin.applyExclusionPatterns();
 
-                                    let successMessage =
-                                        "✓ Exclusion patterns applied";
-                                    if (
-                                        result.removed > 0 &&
-                                        result.added > 0
-                                    ) {
+                                    let successMessage = "✓ Exclusion patterns applied";
+                                    if (result.removed > 0 && result.added > 0) {
                                         successMessage += ` - ${result.removed} files queued for removal, ${result.added} files queued for indexing`;
                                     } else if (result.removed > 0) {
                                         successMessage += ` - ${result.removed} files queued for removal`;
@@ -300,45 +212,28 @@ export class IndexSettingsSection {
 
                                     new Notice(successMessage);
 
-                                    // Update excluded files list and index stats (actual index state changed)
                                     updateExcludedFilesList();
                                     updateVaultStats();
                                 } catch (error) {
-                                    log.error(
-                                        "Failed to apply exclusion patterns:",
-                                        error
-                                    );
+                                    log.error("Failed to apply exclusion patterns:", error);
                                     new Notice(
                                         `Failed to apply exclusion patterns: ${error.message}`
                                     );
                                 }
                             },
-                            () => {} // Cancel callback
+                            () => {
+                                // User cancelled
+                            }
                         ).open();
                     });
             });
+    }
 
-        // Function to process test input - called whenever regex patterns or input text changes
-        const processTestInput = () => {
-            const inputText = testInputTextArea?.value || "";
-            let outputText = inputText;
+    private renderContentExclusionSettings(processTestInput: () => void): void {
+        const { settingsService } = this.props;
+        const settings = settingsService.get();
 
-            try {
-                const currentSettings = settingsService.get();
-                const patterns = currentSettings.excludeRegexPatterns;
-
-                for (const pattern of patterns) {
-                    const regex = new RegExp(pattern, "gm");
-                    outputText = outputText.replace(regex, "");
-                }
-                testOutputTextArea.value = outputText;
-            } catch (e) {
-                testOutputTextArea.value = `Error processing RegExp: ${e.message}`;
-            }
-        };
-
-        // Add UI for regex pattern settings
-        new Setting(this.sectionContainer)
+        new Setting(this.sectionContainer!)
             .setName("Exclude content from indexing")
             .setDesc(
                 "Enter regular expressions to exclude content from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes."
@@ -347,25 +242,16 @@ export class IndexSettingsSection {
                 text.inputEl.rows = 5;
                 text.inputEl.cols = 40;
                 text.setValue(settings.excludeRegexPatterns.join("\n"));
-                // Store error status of each line
                 const errorMessages: Map<number, string> = new Map();
-
-                // Style for highlighting invalid patterns
                 const errorLineClass = "similar-notes-regexp-error";
 
-                // Apply error styles if needed
                 const applyErrorStyles = () => {
                     const textArea = text.inputEl;
-
-                    // Reset all previous error styles
                     textArea.removeClass(errorLineClass);
                     textArea.title = "";
 
-                    // If there are errors, apply error styles
                     if (errorMessages.size > 0) {
                         textArea.addClass(errorLineClass);
-
-                        // Create tooltip with error messages
                         const tooltipMessages = Array.from(
                             errorMessages.entries()
                         )
@@ -379,43 +265,37 @@ export class IndexSettingsSection {
                 };
 
                 text.onChange(async (value) => {
-                    // Clear previous errors
                     errorMessages.clear();
-
-                    // Process and validate each line
                     const lines = value.split("\n");
                     const validPatterns: string[] = [];
 
-                    // Check each pattern for validity
                     lines.forEach((pattern, index) => {
-                        // Skip empty lines
                         if (pattern.trim().length === 0) return;
 
-                        // Validate the pattern
                         try {
                             new RegExp(pattern);
                             validPatterns.push(pattern);
                         } catch (e) {
-                            // Store error message for this line
                             errorMessages.set(index, e.message);
                         }
                     });
 
-                    // Apply error styles
                     applyErrorStyles();
 
-                    // Save only valid patterns
                     await settingsService.update({
                         excludeRegexPatterns: validPatterns,
                     });
 
-                    // Update test output when patterns change
                     processTestInput();
                 });
             });
+    }
 
-        // Add RegExp tester UI
-        const regExpTesterContainer = this.sectionContainer.createDiv(
+    private renderRegExpTester(): () => void {
+        const { settingsService } = this.props;
+        const settings = settingsService.get();
+
+        const regExpTesterContainer = this.sectionContainer!.createDiv(
             "similar-notes-regexp-tester"
         );
         regExpTesterContainer.addClass("setting-item");
@@ -462,18 +342,138 @@ export class IndexSettingsSection {
         testOutputTextArea.readOnly = true;
         testOutputTextArea.placeholder = "Filtered content will appear here";
 
-        // Update test output and save input text when it changes
+        const processTestInput = () => {
+            const inputText = testInputTextArea?.value || "";
+            let outputText = inputText;
+
+            try {
+                const currentSettings = settingsService.get();
+                const patterns = currentSettings.excludeRegexPatterns;
+
+                for (const pattern of patterns) {
+                    const regex = new RegExp(pattern, "gm");
+                    outputText = outputText.replace(regex, "");
+                }
+                testOutputTextArea.value = outputText;
+            } catch (e) {
+                testOutputTextArea.value = `Error processing RegExp: ${e.message}`;
+            }
+        };
+
         testInputTextArea.addEventListener("input", () => {
-            // Save the test input text to settings
             settingsService.update({
                 regexpTestInputText: testInputTextArea.value,
             });
-
-            // Process the input to update the output
             processTestInput();
         });
 
-        // Initialize output when settings tab opens
         setTimeout(() => processTestInput(), 0);
+
+        return processTestInput;
+    }
+
+    /**
+     * Render the index settings section
+     */
+    render(currentStats: {
+        indexedNoteCount: number;
+        indexedChunkCount: number;
+    }): void {
+        this.initializeSectionContainer();
+
+        const updateVaultStats = this.renderIndexStatistics(
+            currentStats.indexedNoteCount,
+            currentStats.indexedChunkCount
+        );
+
+        this.renderBasicIndexSettings();
+        this.renderFolderExclusionSettings(updateVaultStats);
+
+        const processTestInput = this.renderRegExpTester();
+        this.renderContentExclusionSettings(processTestInput);
+    }
+
+    private initializeSectionContainer(): void {
+        const { containerEl } = this.props;
+
+        if (!this.sectionContainer || !this.sectionContainer.parentElement) {
+            this.sectionContainer = containerEl.createDiv(
+                "index-settings-section"
+            );
+            this.statsContainer = undefined;
+            this.indexedStat = undefined;
+            this.excludedStat = undefined;
+        } else {
+            this.sectionContainer.empty();
+            this.statsContainer = undefined;
+            this.indexedStat = undefined;
+            this.excludedStat = undefined;
+        }
+
+        this.sectionContainer.createDiv("setting-item-separator");
+        new Setting(this.sectionContainer).setName("Index").setHeading();
+    }
+
+    private renderIndexStatistics(
+        indexedNoteCount: number,
+        indexedChunkCount: number
+    ): () => void {
+        const { app } = this.props;
+
+        const indexStatsSetting = new Setting(this.sectionContainer!).setName(
+            "Index statistics"
+        );
+
+        if (!this.statsContainer) {
+            this.statsContainer = indexStatsSetting.descEl.createDiv(
+                "similar-notes-stats-container"
+            );
+            this.indexedStat = this.statsContainer.createDiv("similar-notes-stat-item");
+            this.excludedStat = this.statsContainer.createDiv("similar-notes-stat-item");
+        }
+
+        const updateVaultStats = () => {
+            const allFiles = app.vault.getMarkdownFiles();
+            const actuallyExcludedCount = allFiles.length - indexedNoteCount;
+
+            if (this.indexedStat && this.excludedStat) {
+                this.indexedStat.setText(
+                    `• Indexed: ${indexedNoteCount} notes (${indexedChunkCount} chunks)`
+                );
+                this.excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
+            }
+        };
+
+        setTimeout(() => updateVaultStats(), 0);
+        return updateVaultStats;
+    }
+
+    private renderBasicIndexSettings(): void {
+        const { plugin, settingsService } = this.props;
+        const settings = settingsService.get();
+
+        new Setting(this.sectionContainer!)
+            .setName("Reindex notes")
+            .setDesc("Rebuild the similarity index for all notes")
+            .addButton((button) => {
+                button.setButtonText("Reindex").onClick(async () => {
+                    await plugin.reindexNotes();
+                });
+            });
+
+        new Setting(this.sectionContainer!)
+            .setName("Include frontmatter in indexing and search")
+            .setDesc(
+                "If enabled, the frontmatter of each note will be included in the similarity index and search."
+            )
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(settings.includeFrontmatter)
+                    .onChange(async (value) => {
+                        await settingsService.update({
+                            includeFrontmatter: value,
+                        });
+                    });
+            });
     }
 }
