@@ -1,4 +1,5 @@
 import log from "loglevel";
+import { requestUrl } from "obsidian";
 
 export interface HuggingFaceModelInfo {
     parameterCount?: number;      // Total parameter count
@@ -35,20 +36,26 @@ export class HuggingFaceClient {
 
     async getModelInfo(modelId: string): Promise<HuggingFaceModelInfo | null> {
         try {
-            const response = await fetch(`${this.baseUrl}/${modelId}`);
+            // Use Obsidian's requestUrl to avoid CORS issues
+            const response = await requestUrl({
+                url: `${this.baseUrl}/${modelId}`,
+                method: "GET",
+            });
 
-            if (!response.ok) {
-                log.warn(`Failed to get model info for ${modelId}: ${response.statusText}`);
+            if (response.status !== 200) {
+                log.warn(`Failed to get model info for ${modelId}: status ${response.status}`);
                 return null;
             }
 
-            const data: HuggingFaceApiResponse = await response.json();
+            const data: HuggingFaceApiResponse = response.json;
 
             const parameterCount = data.safetensors?.total;
             const parameterSize = parameterCount
                 ? formatParameterCount(parameterCount)
                 : undefined;
             const modelType = data.config?.model_type;
+
+            log.debug(`Fetched model info for ${modelId}:`, { parameterCount, parameterSize, modelType });
 
             return {
                 parameterCount,
