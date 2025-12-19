@@ -164,7 +164,7 @@ export default class MainPlugin extends Plugin {
         );
     }
 
-    private async initializeServices(needsReindex: boolean = false) {
+    private async initializeServices(needsReindex = false) {
         // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
         this.indexedNotesMTimeStore = new IndexedNoteMTimeStore();
