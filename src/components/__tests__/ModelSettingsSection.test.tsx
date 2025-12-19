@@ -4,15 +4,25 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 vi.mock("obsidian");
 
 // Track Setting calls for testing
-let settingCallCount = 0;
+let _settingCallCount = 0;
 
 // Mock ModelSettingsSection that demonstrates the fix
 class FixedModelSettingsSection {
-    private props: any;
+    private props: {
+        containerEl: HTMLElement;
+        plugin: { changeModel: () => void };
+        settingsService: { get: () => unknown; update: () => Promise<void> };
+        app: Record<string, unknown>;
+    };
     private renderCallCount = 0;
     private sectionContainer?: HTMLElement;
 
-    constructor(props: any) {
+    constructor(props: {
+        containerEl: HTMLElement;
+        plugin: { changeModel: () => void };
+        settingsService: { get: () => unknown; update: () => Promise<void> };
+        app: Record<string, unknown>;
+    }) {
         this.props = props;
     }
 
@@ -38,7 +48,7 @@ class FixedModelSettingsSection {
             div.dataset.renderCall = this.renderCallCount.toString();
             div.dataset.settingIndex = i.toString();
             this.sectionContainer.appendChild(div); // Add to section, not main container
-            settingCallCount++;
+            _settingCallCount++;
         }
     }
 
@@ -49,14 +59,17 @@ class FixedModelSettingsSection {
 
 describe("ModelSettingsSection Render Behavior", () => {
     let mockContainerEl: HTMLElement;
-    let mockSettingsService: any;
-    let mockPlugin: any;
-    let mockApp: any;
+    let mockSettingsService: {
+        get: () => unknown;
+        update: () => Promise<void>;
+    };
+    let mockPlugin: { changeModel: () => void };
+    let mockApp: Record<string, unknown>;
     let modelSettingsSection: FixedModelSettingsSection;
 
     beforeEach(() => {
         // Reset the counter
-        settingCallCount = 0;
+        _settingCallCount = 0;
         
         // Create a real DOM element for testing
         mockContainerEl = document.createElement("div");

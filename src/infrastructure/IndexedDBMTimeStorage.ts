@@ -13,7 +13,7 @@ export interface MTimeEntry {
  */
 interface Metadata {
     key: string;
-    value: any;
+    value: boolean;
     timestamp: number;
 }
 
@@ -56,7 +56,7 @@ export class IndexedDBMTimeStorage {
 
                 // Create mtimes object store
                 if (!db.objectStoreNames.contains(this.mtimesStoreName)) {
-                    const mtimesStore = db.createObjectStore(
+                    db.createObjectStore(
                         this.mtimesStoreName,
                         { keyPath: "path" }
                     );
@@ -79,9 +79,13 @@ export class IndexedDBMTimeStorage {
      */
     async get(path: string): Promise<number | undefined> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.mtimesStoreName],
                 "readonly"
             );
@@ -105,9 +109,13 @@ export class IndexedDBMTimeStorage {
      */
     async set(path: string, mtime: number): Promise<void> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.mtimesStoreName],
                 "readwrite"
             );
@@ -131,9 +139,13 @@ export class IndexedDBMTimeStorage {
      */
     async delete(path: string): Promise<void> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.mtimesStoreName],
                 "readwrite"
             );
@@ -156,9 +168,13 @@ export class IndexedDBMTimeStorage {
      */
     async getAll(): Promise<Record<string, number>> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.mtimesStoreName],
                 "readonly"
             );
@@ -186,9 +202,13 @@ export class IndexedDBMTimeStorage {
      */
     async clear(): Promise<void> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.mtimesStoreName],
                 "readwrite"
             );
@@ -212,9 +232,13 @@ export class IndexedDBMTimeStorage {
      */
     async getMigrationFlag(): Promise<boolean> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.metadataStoreName],
                 "readonly"
             );
@@ -238,9 +262,13 @@ export class IndexedDBMTimeStorage {
      */
     async setMigrationFlag(value: boolean): Promise<void> {
         this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction(
+            const transaction = db.transaction(
                 [this.metadataStoreName],
                 "readwrite"
             );
