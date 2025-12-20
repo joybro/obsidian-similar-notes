@@ -141,6 +141,20 @@ const SearchResult = ({
         setIsCollapsed((prev) => !prev);
     };
 
+    const handleDragStart = (e: React.DragEvent) => {
+        // Create wiki-style link using full path without extension
+        // This ensures the correct file is linked even with duplicate basenames
+        const pathWithoutExtension = note.file.path.replace(/\.md$/, "");
+        const linkText = `[[${pathWithoutExtension}]]`;
+
+        // Set multiple data types for maximum compatibility
+        e.dataTransfer.setData("text/plain", linkText);
+        e.dataTransfer.setData("text/html", `<a href="${note.file.path}">${linkText}</a>`);
+
+        // Set effectAllowed to "all" to ensure Obsidian accepts the drop
+        e.dataTransfer.effectAllowed = "all";
+    };
+
     return (
         <div
             className={
@@ -152,6 +166,7 @@ const SearchResult = ({
             <div
                 className="tree-item-self search-result-file-title is-clickable"
                 draggable="true"
+                onDragStart={handleDragStart}
                 onClick={(e) => onNoteClick(e, note.file)}
                 onKeyDown={() => {}}
                 onContextMenu={(e) => onContextMenu(e, note.file)}
