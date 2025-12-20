@@ -61,7 +61,7 @@ async function importTransformers(): Promise<Transformers> {
             configurable: true,
         });
 
-        // @ts-ignore
+        // @ts-expect-error - Dynamic import for transformers library
         return await import("@huggingface/transformers");
     } catch (error) {
         throw new Error(
@@ -112,7 +112,7 @@ class TransformersWorker {
             "feature-extraction",
             modelId,
             {
-                // @ts-ignore
+                // @ts-expect-error - dtype is a valid option but not in type definitions
                 dtype: "fp32",
                 device: useGPU ? "webgpu" : "wasm", // Use WebGPU if enabled, otherwise fall back to WASM
                 progress_callback: (progress: ProgressInfo) => {
@@ -149,7 +149,7 @@ class TransformersWorker {
 
     async handleUnload(): Promise<void> {
         if (this.extractor) {
-            // @ts-ignore
+            // @ts-expect-error - dispose method exists at runtime
             if (typeof this.extractor.dispose === "function") {
                 await this.extractor.dispose();
             }
