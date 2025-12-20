@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.5] - 2025-12-20
+
+### Added
+
+-   **Drag and Drop Support**: Drag similar notes to insert links directly into your documents
+    -   Drag any similar note from the results to insert a `[[note-link]]` at the drop location
+    -   Works in both sidebar and bottom view
+-   **Model Information Display**: Settings now show detailed model information
+    -   Built-in models display dimension, size, and language support
+    -   Ollama models show embedding dimensions from the server
+    -   Model info is cached to reduce API calls
+
+### Other
+
+-   Added ESLint configuration for code quality
+-   Various code refactoring and type safety improvements
+
 ## [0.10.4] - 2025-12-14
 
 ### Fixed
