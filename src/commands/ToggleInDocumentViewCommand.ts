@@ -4,7 +4,7 @@ import type { Command } from "./Command";
 
 export class ToggleInDocumentViewCommand implements Command {
     id = "toggle-in-document-view";
-    name = "Toggle in-document view";
+    name = "Toggle footer view";
 
     constructor(private settingsService: SettingsService) {}
 

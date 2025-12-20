@@ -4,7 +4,7 @@ import type { Command } from "./Command";
 
 export class ShowSimilarNotesCommand implements Command {
     id = "show-similar-notes";
-    name = "Show Similar Notes";
+    name = "Show in sidebar";
 
     constructor(private mainPlugin: MainPlugin) {}
 
