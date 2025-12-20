@@ -164,6 +164,26 @@ export default class MainPlugin extends Plugin {
         );
     }
 
+    private registerEditorDropEvent() {
+        // Register editor-drop event for drag and drop link insertion
+        this.registerEvent(
+            this.app.workspace.on("editor-drop", (evt, editor) => {
+                // Get the plain text data
+                const plainText = evt.dataTransfer?.getData("text/plain");
+
+                // Check if this looks like a wiki-style link from Similar Notes
+                // We identify it by the pattern: [[...]]
+                if (plainText && /^\[\[.+\]\]$/.test(plainText)) {
+                    // Prevent default behavior to avoid double insertion
+                    evt.preventDefault();
+
+                    // Insert the link at the cursor position
+                    editor.replaceSelection(plainText);
+                }
+            })
+        );
+    }
+
     private async initializeServices(needsReindex = false) {
         // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
@@ -253,6 +273,9 @@ export default class MainPlugin extends Plugin {
 
         // Register commands
         this.registerCommands();
+
+        // Register editor-drop event handler
+        this.registerEditorDropEvent();
 
         // Complete initialization
         // If needsReindex is true, trigger a reindex to migrate from JSON to IndexedDB
