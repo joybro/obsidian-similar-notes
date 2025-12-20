@@ -200,7 +200,7 @@ export default class MainPlugin extends Plugin {
         this.settingTab.setModelService(this.modelService);
 
         // Initialize IndexedNoteMTimeStore with vault ID
-        // @ts-ignore - appId exists at runtime but not in type definitions
+        // @ts-expect-error - appId exists at runtime but not in type definitions
         const vaultId = this.app.appId as string;
         await this.indexedNotesMTimeStore.init(vaultId);
 
@@ -350,11 +350,8 @@ export default class MainPlugin extends Plugin {
             this.modelService.setLogLevel(level);
         }
 
-        if (this.noteChunkRepository) {
-            const repository = this.noteChunkRepository as any;
-            if (typeof repository.setLogLevel === "function") {
-                repository.setLogLevel(level);
-            }
+        if (this.noteChunkRepository?.setLogLevel) {
+            this.noteChunkRepository.setLogLevel(level);
         }
     }
 
@@ -393,7 +390,7 @@ export default class MainPlugin extends Plugin {
         const dbPath = `${pluginDataDir}/${dbFileName}`;
 
         // Get vault ID for IndexedDB isolation
-        // @ts-ignore - appId exists at runtime but not in type definitions
+        // @ts-expect-error - appId exists at runtime but not in type definitions
         const vaultId = this.app.appId as string;
 
         // Migrate existing database from old location to new location

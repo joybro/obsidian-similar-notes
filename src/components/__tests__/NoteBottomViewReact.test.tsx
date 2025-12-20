@@ -20,7 +20,6 @@ const createMockTFile = (path: string): TFile => ({
     parent: {} as any
 });
 import NoteBottomViewReact from "../NoteBottomViewReact";
-import type { SimilarNotesSettings } from "@/application/SettingsService";
 
 // Vitest will automatically use the mock from src/__mocks__/obsidian.ts
 vi.mock("obsidian");
@@ -47,19 +46,6 @@ describe("SimilarNotesViewReact", () => {
         noteDisplayMode: "title" | "path" | "smart";
     }>;
     let currentFile: TFile;
-    
-    const mockSettings: SimilarNotesSettings = {
-        modelProvider: "builtin",
-        modelId: "sentence-transformers/all-MiniLM-L6-v2",
-        includeFrontmatter: false,
-        showSourceChunk: false,
-        useGPU: true,
-        excludeFolderPatterns: [],
-        excludeRegexPatterns: [],
-        regexpTestInputText: "",
-        noteDisplayMode: "title",
-        showAtBottom: true,
-    };
 
     beforeEach(() => {
         mockOpenLinkText = vi.fn();

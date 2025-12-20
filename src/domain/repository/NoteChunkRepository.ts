@@ -1,6 +1,11 @@
+import type { LogLevelDesc } from "loglevel";
 import type { NoteChunk } from "@/domain/model/NoteChunk";
 
 export interface NoteChunkRepository {
+    /**
+     * Sets the log level for the repository
+     */
+    setLogLevel?(level: LogLevelDesc): void;
     init(vectorSize: number, vaultId: string, loadExistingData: boolean): Promise<void>;
 
     /**

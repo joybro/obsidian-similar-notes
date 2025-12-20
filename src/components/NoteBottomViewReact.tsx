@@ -1,7 +1,7 @@
 import { getNoteDisplayText } from "@/utils/displayUtils";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { Menu } from "obsidian";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import type { Observable } from "rxjs";
 
 export interface SimilarNoteEntry {
@@ -111,9 +111,12 @@ const SearchResult = ({
     const animationDuration = 200;
 
     // Execute when isCollapsed state changes
-    useEffect(() => {
+    // Using useLayoutEffect to synchronize animation states before paint
+    // This pattern is intentional for animation synchronization
+    useLayoutEffect(() => {
         if (isCollapsed) {
             // When collapsing: Start the animation
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsAnimating(true);
 
             // Remove from DOM after animation completes
@@ -122,18 +125,19 @@ const SearchResult = ({
                 setIsAnimating(false);
             }, animationDuration);
             return () => clearTimeout(timer);
-        } else {
-            // When expanding:
-            // 1. First render in collapsed state
-            setShouldRender(true);
-            setIsAnimating(true);
-
-            // 2. Start animation in the next frame
-            const timer = setTimeout(() => {
-                setIsAnimating(false);
-            }, 20); // Short delay to ensure browser has time to render the collapsed state
-            return () => clearTimeout(timer);
         }
+        // When expanding:
+        // 1. First render in collapsed state
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setShouldRender(true);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setIsAnimating(true);
+
+        // 2. Start animation in the next frame
+        const timer = setTimeout(() => {
+            setIsAnimating(false);
+        }, 20); // Short delay to ensure browser has time to render the collapsed state
+        return () => clearTimeout(timer);
     }, [isCollapsed]);
 
     const toggleCollapse = (e: React.MouseEvent) => {
@@ -168,7 +172,7 @@ const SearchResult = ({
                 draggable="true"
                 onDragStart={handleDragStart}
                 onClick={(e) => onNoteClick(e, note.file)}
-                onKeyDown={() => {}}
+                onKeyDown={undefined}
                 onContextMenu={(e) => onContextMenu(e, note.file)}
             >
                 <div
@@ -177,7 +181,7 @@ const SearchResult = ({
                             ? "tree-item-icon collapse-icon is-collapsed"
                             : "tree-item-icon collapse-icon"
                     }
-                    onKeyDown={() => {}}
+                    onKeyDown={undefined}
                     onClick={toggleCollapse}
                 >
                     <svg
@@ -273,20 +277,17 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
         "title" | "path" | "smart"
     >("title");
 
-    const handleNewViewModel = (model: NoteBottomViewModel) => {
-        if (leaf.file !== model.currentFile) {
-            return;
-        }
-
-        setSimilarNotes(model.similarNoteEntries);
-        setNoteDisplayMode(model.noteDisplayMode);
-    };
-
-    // biome-ignore lint/correctness/useExhaustiveDependencies(handleNewViewModel):
     useEffect(() => {
-        const sub = bottomViewModelSubject$.subscribe(handleNewViewModel);
+        const sub = bottomViewModelSubject$.subscribe((model: NoteBottomViewModel) => {
+            if (leaf.file !== model.currentFile) {
+                return;
+            }
+
+            setSimilarNotes(model.similarNoteEntries);
+            setNoteDisplayMode(model.noteDisplayMode);
+        });
         return () => sub.unsubscribe();
-    }, [bottomViewModelSubject$]);
+    }, [bottomViewModelSubject$, leaf.file]);
 
     const openNote = (file: TFile, newTab = false) => {
         workspace.openLinkText(file.path, "", newTab);
