@@ -247,8 +247,11 @@
 }
 
 @keyframes semantic-search-spin {
+    from {
+        transform: translateY(-50%) rotate(0deg);
+    }
     to {
-        transform: rotate(360deg);
+        transform: translateY(-50%) rotate(360deg);
     }
 }
 
