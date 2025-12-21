@@ -32,6 +32,7 @@ export class TextSearchService {
 
     /**
      * Find similar notes based on input text
+     * If text exceeds token limit, it will be truncated to fit
      */
     async findSimilarNotesFromText(
         text: string,
@@ -42,18 +43,15 @@ export class TextSearchService {
         // Check token limit
         const { tokenCount, maxTokens, isOverLimit } = await this.checkTokenLimit(text);
 
+        // Truncate text if over limit
+        let searchText = text;
         if (isOverLimit) {
-            log.warn(`[TextSearchService] Text exceeds token limit: ${tokenCount}/${maxTokens}`);
-            return {
-                similarNotes: [],
-                tokenCount,
-                maxTokens,
-                isOverLimit: true,
-            };
+            log.warn(`[TextSearchService] Text exceeds token limit: ${tokenCount}/${maxTokens}, truncating...`);
+            searchText = await this.embeddingService.truncateToMaxTokens(text);
         }
 
-        // Generate embedding for the input text
-        const embedding = await this.embeddingService.embedText(text);
+        // Generate embedding for the (possibly truncated) text
+        const embedding = await this.embeddingService.embedText(searchText);
 
         // Find similar chunks (no exclusions for text search)
         const results = await this.noteChunkRepository.findSimilarChunks(
@@ -95,7 +93,7 @@ export class TextSearchService {
             similarNotes,
             tokenCount,
             maxTokens,
-            isOverLimit: false,
+            isOverLimit,
         };
     }
 

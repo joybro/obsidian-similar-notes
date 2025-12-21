@@ -192,6 +192,43 @@ export class EmbeddingService {
         return this.provider.getMaxTokens();
     }
 
+    /**
+     * Truncate text to fit within the maximum token limit
+     * Uses binary search for efficiency
+     */
+    async truncateToMaxTokens(text: string): Promise<string> {
+        if (!this.provider) {
+            throw new Error("No embedding provider initialized");
+        }
+
+        const maxTokens = this.provider.getMaxTokens();
+        const tokenCount = await this.provider.countTokens(text);
+
+        if (tokenCount <= maxTokens) {
+            return text;
+        }
+
+        // Binary search to find the right truncation point
+        let left = 0;
+        let right = text.length;
+        let result = "";
+
+        while (left < right) {
+            const mid = Math.floor((left + right + 1) / 2);
+            const truncated = text.substring(0, mid);
+            const count = await this.provider.countTokens(truncated);
+
+            if (count <= maxTokens) {
+                result = truncated;
+                left = mid;
+            } else {
+                right = mid - 1;
+            }
+        }
+
+        return result;
+    }
+
     public isModelLoaded(): boolean {
         return this.provider?.isModelLoaded() ?? false;
     }
