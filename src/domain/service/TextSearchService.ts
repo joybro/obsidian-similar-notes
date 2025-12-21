@@ -35,7 +35,7 @@ export class TextSearchService {
      */
     async findSimilarNotesFromText(
         text: string,
-        limit: number = 10
+        limit = 10
     ): Promise<TextSearchResult> {
         log.info(`[TextSearchService] Searching for similar notes with text: "${text.substring(0, 50)}..."`);
 
