@@ -80,6 +80,7 @@ export class OramaWorker {
                 await this.storage.loadInBatches(
                     100,
                     async (batch) => {
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         await insertMultiple(this.db!, batch as Doc[]);
                     },
                     (processed, total) => {
@@ -255,6 +256,7 @@ export class OramaWorker {
         let offset = 0;
         let allResults: { chunk: NoteChunkDTO; score: number }[] = [];
 
+        // eslint-disable-next-line no-constant-condition
         while (true) {
             const searchParams: SearchParams<Orama<Schema>> = {
                 mode: "vector",

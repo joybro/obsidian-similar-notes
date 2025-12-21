@@ -1,4 +1,4 @@
-import type { Plugin, Notice } from "obsidian";
+import type { Plugin } from "obsidian";
 import { Notice as ObsidianNotice } from "obsidian";
 import MainPlugin from "../main";
 import type { Command } from "./Command";

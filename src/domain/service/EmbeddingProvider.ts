@@ -9,7 +9,7 @@ export interface EmbeddingProvider {
     /**
      * Load the embedding model
      */
-    loadModel(modelId: string, config?: any): Promise<ModelInfo>;
+    loadModel(modelId: string, config?: unknown): Promise<ModelInfo>;
 
     /**
      * Unload the current model and clean up resources

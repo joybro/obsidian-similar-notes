@@ -119,9 +119,7 @@ export class NoteIndexingService {
 
         log.info(`[NoteIndexingService] Successfully generated embeddings, saving to repository`);
 
-        const wasRemoved = await this.noteChunkRepository.removeByPath(
-            note.path
-        );
+        await this.noteChunkRepository.removeByPath(note.path);
         await this.noteChunkRepository.putMulti(noteChunks);
 
         log.info(

@@ -38,7 +38,7 @@ export class VaultNoteRepository implements NoteRepository {
 
         if (!cache?.frontmatterPosition) return raw;
 
-        const { start, end } = cache.frontmatterPosition;
+        const { end } = cache.frontmatterPosition;
         const lines = raw.split("\n");
 
         return lines.slice(end.line + 1).join("\n");

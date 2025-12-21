@@ -85,7 +85,7 @@ export class BaseViewManager<TView extends Component> implements ViewManager<TVi
     /**
      * Handle settings changes that might affect view creation
      */
-    handleSettingsChange(changes: Record<string, any>): void {
+    handleSettingsChange(changes: Record<string, unknown>): void {
         if (this.config.onSettingsChange) {
             this.config.onSettingsChange(changes);
         }

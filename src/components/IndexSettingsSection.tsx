@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { SettingsService } from "@/application/SettingsService";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";

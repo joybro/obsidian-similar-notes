@@ -10,7 +10,7 @@ const createMockFile = (path: string): TFile => ({
     stat: { mtime: 0, ctime: 0, size: 0 },
     basename: "",
     parent: null,
-    vault: null as any,
+    vault: null as unknown as TFile["vault"],
 } as TFile);
 
 describe("folderExclusion", () => {

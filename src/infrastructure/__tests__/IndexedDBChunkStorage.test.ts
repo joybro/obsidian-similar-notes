@@ -5,24 +5,28 @@ import {
     type NoteChunkInternal,
 } from "../IndexedDBChunkStorage";
 
-describe("IndexedDBChunkStorage", () => {
-    let storage: IndexedDBChunkStorage;
+// Helper function to create mock chunks
+function createMockChunk(
+    overrides?: Partial<NoteChunkInternal>
+): NoteChunkInternal {
+    return {
+        path: "default.md",
+        pathHash: "hash123",
+        title: "Default Note",
+        content: "Default content",
+        chunkIndex: 0,
+        totalChunks: 1,
+        embedding: new Array(384).fill(0.1),
+        lastUpdated: Date.now(),
+        ...overrides,
+    };
+}
 
-    beforeEach(async () => {
-        storage = new IndexedDBChunkStorage();
-        await storage.init("test-vault-id");
-    });
-
-    afterEach(async () => {
-        await storage.close();
-        // Clean up IndexedDB
-        indexedDB.deleteDatabase("test-vault-id-similar-notes");
-    });
-
+function describeInitialization(storage: () => IndexedDBChunkStorage) {
     describe("Initialization", () => {
         it("should initialize database successfully", async () => {
-            expect(storage).toBeDefined();
-            const count = await storage.count();
+            expect(storage()).toBeDefined();
+            const count = await storage().count();
             expect(count).toBe(0);
         });
 
@@ -34,7 +38,9 @@ describe("IndexedDBChunkStorage", () => {
             );
         });
     });
+}
 
+function describeBasicCRUD(storage: () => IndexedDBChunkStorage) {
     describe("Basic CRUD Operations", () => {
         it("should store and count a single chunk", async () => {
             const chunk = createMockChunk({
@@ -42,9 +48,9 @@ describe("IndexedDBChunkStorage", () => {
                 content: "Test content",
             });
 
-            await storage.put(chunk);
+            await storage().put(chunk);
 
-            const count = await storage.count();
+            const count = await storage().count();
             expect(count).toBe(1);
         });
 
@@ -53,16 +59,16 @@ describe("IndexedDBChunkStorage", () => {
                 createMockChunk({ path: `test-${i}.md` })
             );
 
-            await storage.putMulti(chunks);
+            await storage().putMulti(chunks);
 
-            const count = await storage.count();
+            const count = await storage().count();
             expect(count).toBe(100);
         });
 
         it("should handle empty putMulti", async () => {
-            await storage.putMulti([]);
+            await storage().putMulti([]);
 
-            const count = await storage.count();
+            const count = await storage().count();
             expect(count).toBe(0);
         });
 
@@ -73,15 +79,15 @@ describe("IndexedDBChunkStorage", () => {
                 createMockChunk({ path: "other.md", chunkIndex: 0 }),
             ];
 
-            await storage.putMulti(chunks);
-            const removed = await storage.removeByPath("test.md");
+            await storage().putMulti(chunks);
+            const removed = await storage().removeByPath("test.md");
 
             expect(removed).toBe(2);
-            expect(await storage.count()).toBe(1);
+            expect(await storage().count()).toBe(1);
         });
 
         it("should return 0 when removing non-existent path", async () => {
-            const removed = await storage.removeByPath("non-existent.md");
+            const removed = await storage().removeByPath("non-existent.md");
             expect(removed).toBe(0);
         });
 
@@ -90,13 +96,15 @@ describe("IndexedDBChunkStorage", () => {
                 createMockChunk({ path: `test-${i}.md` })
             );
 
-            await storage.putMulti(chunks);
-            await storage.clear();
+            await storage().putMulti(chunks);
+            await storage().clear();
 
-            expect(await storage.count()).toBe(0);
+            expect(await storage().count()).toBe(0);
         });
     });
+}
 
+function describeBatchLoading(storage: () => IndexedDBChunkStorage) {
     describe("Batch Loading", () => {
         it("should load chunks in batches", async () => {
             const totalChunks = 250;
@@ -104,10 +112,10 @@ describe("IndexedDBChunkStorage", () => {
                 createMockChunk({ path: `test-${i}.md` })
             );
 
-            await storage.putMulti(chunks);
+            await storage().putMulti(chunks);
 
             const loadedBatches: NoteChunkInternal[][] = [];
-            await storage.loadInBatches(100, async (batch) => {
+            await storage().loadInBatches(100, async (batch) => {
                 loadedBatches.push([...batch]);
             });
 
@@ -122,7 +130,7 @@ describe("IndexedDBChunkStorage", () => {
 
         it("should handle empty database in batch loading", async () => {
             const batches: NoteChunkInternal[][] = [];
-            await storage.loadInBatches(100, async (batch) => {
+            await storage().loadInBatches(100, async (batch) => {
                 batches.push(batch);
             });
 
@@ -134,14 +142,14 @@ describe("IndexedDBChunkStorage", () => {
                 createMockChunk({ path: `test-${i}.md` })
             );
 
-            await storage.putMulti(chunks);
+            await storage().putMulti(chunks);
 
             const progressReports: Array<{
                 processed: number;
                 total: number;
             }> = [];
 
-            await storage.loadInBatches(
+            await storage().loadInBatches(
                 100,
                 async () => {
                     // Process batch
@@ -165,10 +173,10 @@ describe("IndexedDBChunkStorage", () => {
                 })
             );
 
-            await storage.putMulti(originalChunks);
+            await storage().putMulti(originalChunks);
 
             const loaded: NoteChunkInternal[] = [];
-            await storage.loadInBatches(50, async (batch) => {
+            await storage().loadInBatches(50, async (batch) => {
                 loaded.push(...batch);
             });
 
@@ -180,33 +188,37 @@ describe("IndexedDBChunkStorage", () => {
             expect(loadedPaths).toEqual(originalPaths);
         });
     });
+}
 
+function describeMetadataStore(storage: () => IndexedDBChunkStorage) {
     describe("Metadata Store", () => {
         it("should default migration flag to false", async () => {
-            expect(await storage.getMigrationFlag()).toBe(false);
+            expect(await storage().getMigrationFlag()).toBe(false);
         });
 
         it("should store and retrieve migration flag", async () => {
-            await storage.setMigrationFlag(true);
-            expect(await storage.getMigrationFlag()).toBe(true);
+            await storage().setMigrationFlag(true);
+            expect(await storage().getMigrationFlag()).toBe(true);
 
-            await storage.setMigrationFlag(false);
-            expect(await storage.getMigrationFlag()).toBe(false);
+            await storage().setMigrationFlag(false);
+            expect(await storage().getMigrationFlag()).toBe(false);
         });
     });
+}
 
+function describeLargeDataset(storage: () => IndexedDBChunkStorage) {
     describe("Large Dataset Handling", () => {
         it("should handle 1000 chunks without issues", async () => {
             const chunks = Array.from({ length: 1000 }, (_, i) =>
                 createMockChunk({ path: `test-${i}.md` })
             );
 
-            await storage.putMulti(chunks);
+            await storage().putMulti(chunks);
 
-            expect(await storage.count()).toBe(1000);
+            expect(await storage().count()).toBe(1000);
 
             const loaded: NoteChunkInternal[] = [];
-            await storage.loadInBatches(100, async (batch) => {
+            await storage().loadInBatches(100, async (batch) => {
                 loaded.push(...batch);
             });
 
@@ -219,10 +231,10 @@ describe("IndexedDBChunkStorage", () => {
                 embedding: new Array(768).fill(0.5),
             });
 
-            await storage.put(chunk);
+            await storage().put(chunk);
 
             const loaded: NoteChunkInternal[] = [];
-            await storage.loadInBatches(1, async (batch) => {
+            await storage().loadInBatches(1, async (batch) => {
                 loaded.push(...batch);
             });
 
@@ -230,13 +242,15 @@ describe("IndexedDBChunkStorage", () => {
             expect(loaded[0].embedding[0]).toBe(0.5);
         });
     });
+}
 
+function describeErrorHandling(storage: () => IndexedDBChunkStorage) {
     describe("Error Handling", () => {
         it("should handle database close gracefully", async () => {
-            await storage.close();
+            await storage().close();
 
             // Operations after close should fail
-            await expect(storage.count()).rejects.toThrow();
+            await expect(storage().count()).rejects.toThrow();
         });
 
         it("should handle concurrent writes", async () => {
@@ -248,14 +262,16 @@ describe("IndexedDBChunkStorage", () => {
             );
 
             await Promise.all([
-                storage.putMulti(chunks1),
-                storage.putMulti(chunks2),
+                storage().putMulti(chunks1),
+                storage().putMulti(chunks2),
             ]);
 
-            expect(await storage.count()).toBe(100);
+            expect(await storage().count()).toBe(100);
         });
     });
+}
 
+function describePathIndex(storage: () => IndexedDBChunkStorage) {
     describe("Path Index", () => {
         it("should efficiently query by path using index", async () => {
             const chunks = [
@@ -270,32 +286,40 @@ describe("IndexedDBChunkStorage", () => {
                 ),
             ];
 
-            await storage.putMulti(chunks);
+            await storage().putMulti(chunks);
 
-            const removedA = await storage.removeByPath("note-a.md");
+            const removedA = await storage().removeByPath("note-a.md");
             expect(removedA).toBe(5);
-            expect(await storage.count()).toBe(13);
+            expect(await storage().count()).toBe(13);
 
-            const removedC = await storage.removeByPath("note-c.md");
+            const removedC = await storage().removeByPath("note-c.md");
             expect(removedC).toBe(10);
-            expect(await storage.count()).toBe(3);
+            expect(await storage().count()).toBe(3);
         });
     });
-});
-
-// Helper function to create mock chunks
-function createMockChunk(
-    overrides?: Partial<NoteChunkInternal>
-): NoteChunkInternal {
-    return {
-        path: "default.md",
-        pathHash: "hash123",
-        title: "Default Note",
-        content: "Default content",
-        chunkIndex: 0,
-        totalChunks: 1,
-        embedding: new Array(384).fill(0.1),
-        lastUpdated: Date.now(),
-        ...overrides,
-    };
 }
+
+describe("IndexedDBChunkStorage", () => {
+    let storage: IndexedDBChunkStorage;
+
+    beforeEach(async () => {
+        storage = new IndexedDBChunkStorage();
+        await storage.init("test-vault-id");
+    });
+
+    afterEach(async () => {
+        await storage.close();
+        // Clean up IndexedDB
+        indexedDB.deleteDatabase("test-vault-id-similar-notes");
+    });
+
+    const getStorage = () => storage;
+
+    describeInitialization(getStorage);
+    describeBasicCRUD(getStorage);
+    describeBatchLoading(getStorage);
+    describeMetadataStore(getStorage);
+    describeLargeDataset(getStorage);
+    describeErrorHandling(getStorage);
+    describePathIndex(getStorage);
+});
