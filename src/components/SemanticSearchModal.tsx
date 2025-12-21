@@ -9,6 +9,36 @@ import type { TextSearchService } from "@/domain/service/TextSearchService";
 const MIN_SEARCH_LENGTH = 3;
 const DEBOUNCE_MS = 300;
 
+// Platform-specific modifier keys
+const isMac = typeof navigator !== "undefined" && navigator.platform.includes("Mac");
+const MOD_KEY = isMac ? "\u2318" : "Ctrl";
+const ALT_KEY = isMac ? "\u2325" : "Alt";
+
+const SearchInstructions: React.FC = () => (
+    <div className="prompt-instructions">
+        <div className="prompt-instruction">
+            <span className="prompt-instruction-command">↑↓</span>
+            <span>to navigate</span>
+        </div>
+        <div className="prompt-instruction">
+            <span className="prompt-instruction-command">↵</span>
+            <span>to open</span>
+        </div>
+        <div className="prompt-instruction">
+            <span className="prompt-instruction-command">{MOD_KEY} ↵</span>
+            <span>to open in new tab</span>
+        </div>
+        <div className="prompt-instruction">
+            <span className="prompt-instruction-command">{MOD_KEY} {ALT_KEY} ↵</span>
+            <span>to open to the right</span>
+        </div>
+        <div className="prompt-instruction">
+            <span className="prompt-instruction-command">esc</span>
+            <span>to dismiss</span>
+        </div>
+    </div>
+);
+
 interface SearchResultItemProps {
     note: SimilarNote;
     file: TFile | null;
@@ -30,7 +60,6 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
 }) => {
     const itemRef = useRef<HTMLDivElement>(null);
 
-    // Scroll into view when selected
     useEffect(() => {
         if (isSelected && itemRef.current) {
             itemRef.current.scrollIntoView({ block: "nearest" });
@@ -72,41 +101,14 @@ interface SemanticSearchContentProps {
     onClose: () => void;
 }
 
-const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
-    app,
-    textSearchService,
-    noteDisplayMode,
-    onClose,
-}) => {
+function useSemanticSearch(textSearchService: TextSearchService) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<SimilarNote[]>([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isSearching, setIsSearching] = useState(false);
     const [tokenWarning, setTokenWarning] = useState<string | null>(null);
-
-    const inputRef = useRef<HTMLInputElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Focus input on mount
-    useEffect(() => {
-        inputRef.current?.focus();
-    }, []);
-
-    // Get TFile objects for results
-    const resultFiles = useMemo(() => {
-        return results.map((note) => {
-            const file = app.vault.getAbstractFileByPath(note.path);
-            return file instanceof app.vault.adapter.constructor
-                ? null
-                : (file as TFile | null);
-        });
-    }, [results, app.vault]);
-
-    const allFiles = useMemo(() => {
-        return resultFiles.filter((f): f is TFile => f !== null);
-    }, [resultFiles]);
-
-    // Search function
     const performSearch = useCallback(
         async (searchQuery: string) => {
             if (searchQuery.length < MIN_SEARCH_LENGTH) {
@@ -140,24 +142,44 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
         [textSearchService]
     );
 
-    // Debounced search
     useEffect(() => {
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
-        }
-
-        debounceRef.current = setTimeout(() => {
-            performSearch(query);
-        }, DEBOUNCE_MS);
-
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => performSearch(query), DEBOUNCE_MS);
         return () => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
-            }
+            if (debounceRef.current) clearTimeout(debounceRef.current);
         };
     }, [query, performSearch]);
 
-    // Open note function
+    return { query, setQuery, results, selectedIndex, setSelectedIndex, isSearching, tokenWarning };
+}
+
+const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
+    app,
+    textSearchService,
+    noteDisplayMode,
+    onClose,
+}) => {
+    const { query, setQuery, results, selectedIndex, setSelectedIndex, isSearching, tokenWarning } =
+        useSemanticSearch(textSearchService);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        inputRef.current?.focus();
+    }, []);
+
+    const resultFiles = useMemo(() => {
+        return results.map((note) => {
+            const file = app.vault.getAbstractFileByPath(note.path);
+            return file instanceof app.vault.adapter.constructor
+                ? null
+                : (file as TFile | null);
+        });
+    }, [results, app.vault]);
+
+    const allFiles = useMemo(() => {
+        return resultFiles.filter((f): f is TFile => f !== null);
+    }, [resultFiles]);
+
     const openNote = useCallback(
         (index: number, newTab: boolean, split: boolean) => {
             const note = results[index];
@@ -167,7 +189,6 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
             if (!file) return;
 
             if (split) {
-                // Open in split view to the right
                 const leaf = app.workspace.getLeaf("split", "vertical");
                 leaf.openFile(file as TFile);
             } else {
@@ -178,7 +199,6 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
         [results, app.vault, app.workspace, onClose]
     );
 
-    // Keyboard navigation
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
             switch (e.key) {
@@ -206,14 +226,9 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                     break;
             }
         },
-        [results, selectedIndex, openNote, onClose]
+        [setSelectedIndex, results, selectedIndex, openNote, onClose]
     );
 
-    // Platform-specific modifier key display
-    const modKey = navigator.platform.includes("Mac") ? "\u2318" : "Ctrl";
-    const altKey = navigator.platform.includes("Mac") ? "\u2325" : "Alt";
-
-    // Use a wrapper div to handle keyboard events (fragments can't have event handlers)
     return (
         <div className="semantic-search-wrapper" onKeyDown={handleKeyDown}>
             <div className="prompt-input-container">
@@ -225,9 +240,7 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                 />
-                {isSearching && (
-                    <div className="semantic-search-spinner" />
-                )}
+                {isSearching && <div className="semantic-search-spinner" />}
                 {tokenWarning && (
                     <div className="semantic-search-warning">{tokenWarning}</div>
                 )}
@@ -243,8 +256,8 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                     !isSearching &&
                     results.length === 0 &&
                     !tokenWarning && (
-                        <div className="prompt-empty-state">No similar notes found</div>
-                    )}
+                    <div className="prompt-empty-state">No similar notes found</div>
+                )}
                 {results.map((note, index) => {
                     const file = app.vault.getAbstractFileByPath(note.path) as TFile | null;
                     return (
@@ -262,28 +275,7 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                 })}
             </div>
 
-            <div className="prompt-instructions">
-                <div className="prompt-instruction">
-                    <span className="prompt-instruction-command">↑↓</span>
-                    <span>to navigate</span>
-                </div>
-                <div className="prompt-instruction">
-                    <span className="prompt-instruction-command">↵</span>
-                    <span>to open</span>
-                </div>
-                <div className="prompt-instruction">
-                    <span className="prompt-instruction-command">{modKey} ↵</span>
-                    <span>to open in new tab</span>
-                </div>
-                <div className="prompt-instruction">
-                    <span className="prompt-instruction-command">{modKey} {altKey} ↵</span>
-                    <span>to open to the right</span>
-                </div>
-                <div className="prompt-instruction">
-                    <span className="prompt-instruction-command">esc</span>
-                    <span>to dismiss</span>
-                </div>
-            </div>
+            <SearchInstructions />
         </div>
     );
 };
