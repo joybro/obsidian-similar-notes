@@ -157,17 +157,17 @@ interface MockButton {
     removeCta: () => MockButton;
 }
 
-// Extend HTMLElement interface for Obsidian-style methods
-interface ObsidianHTMLElement extends HTMLElement {
+// Obsidian-style methods type for prototype extension
+type ObsidianHTMLElementMethods = {
     createDiv(className?: string): HTMLDivElement;
     createEl(tagName: string, className?: string): HTMLElement;
-}
+};
 
 // Only add these extensions in test environment to avoid type conflicts
 if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
     // Add createDiv method to HTMLElement prototype for testing
-    if (typeof window !== 'undefined' && window.HTMLElement && !(HTMLElement.prototype as ObsidianHTMLElement).createDiv) {
-        (HTMLElement.prototype as ObsidianHTMLElement).createDiv = function(className?: string): HTMLDivElement {
+    if (typeof window !== 'undefined' && window.HTMLElement && !(HTMLElement.prototype as unknown as ObsidianHTMLElementMethods).createDiv) {
+        (HTMLElement.prototype as unknown as ObsidianHTMLElementMethods).createDiv = function(this: HTMLElement, className?: string): HTMLDivElement {
             const div = document.createElement('div');
             if (className) {
                 div.className = className;
@@ -176,7 +176,7 @@ if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
             return div;
         };
 
-        (HTMLElement.prototype as ObsidianHTMLElement).createEl = function(tagName: string, className?: string): HTMLElement {
+        (HTMLElement.prototype as unknown as ObsidianHTMLElementMethods).createEl = function(this: HTMLElement, tagName: string, className?: string): HTMLElement {
             const el = document.createElement(tagName);
             if (className) {
                 el.className = className;

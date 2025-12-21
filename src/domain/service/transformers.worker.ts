@@ -149,7 +149,6 @@ class TransformersWorker {
 
     async handleUnload(): Promise<void> {
         if (this.extractor) {
-            // @ts-expect-error - dispose method exists at runtime
             if (typeof this.extractor.dispose === "function") {
                 await this.extractor.dispose();
             }
