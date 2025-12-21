@@ -1,12 +1,20 @@
 import { HuggingFaceClient } from "@/adapter/huggingface";
 import { OllamaClient } from "@/adapter/ollama";
 import type { SettingsService } from "@/application/SettingsService";
-import type { CachedModelInfo } from "@/application/SettingsService";
+import type {
+    CachedModelInfo,
+    SimilarNotesSettings,
+} from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
-import { Notice, Setting } from "obsidian";
-import type { App } from "obsidian";
+import { Setting } from "obsidian";
+import type { App, ButtonComponent } from "obsidian";
 import type MainPlugin from "../main";
+import {
+    renderApplyButton,
+    renderBuiltinModelSettings,
+} from "./BuiltinModelSettingsSection";
 import { LoadModelModal } from "./LoadModelModal";
+import { renderOllamaSettings } from "./OllamaSettingsSection";
 
 interface ModelSettingsSectionProps {
     containerEl: HTMLElement;
@@ -31,7 +39,7 @@ export class ModelSettingsSection {
     private tempUseGPU?: boolean;
 
     // Apply button reference for direct updates
-    private applyButton?: any;
+    private applyButton?: ButtonComponent;
 
     constructor(private props: ModelSettingsSectionProps) {
         if (props.modelService) {
@@ -112,7 +120,8 @@ export class ModelSettingsSection {
         this.tempOllamaModel = this.tempOllamaModel ?? settings.ollamaModel;
         this.tempUseGPU = this.tempUseGPU ?? settings.useGPU;
 
-        new Setting(this.sectionContainer!).setName("Model").setHeading();
+        const sectionContainer = this.sectionContainer;
+        new Setting(sectionContainer).setName("Model").setHeading();
 
         // Current model display - use cached model info from settings
         const cachedInfo = settings.cachedModelInfo;
@@ -133,12 +142,12 @@ export class ModelSettingsSection {
             currentModelDesc += ` - Error: ${this.currentModelError}`;
         }
 
-        new Setting(this.sectionContainer!)
+        new Setting(sectionContainer)
             .setName("Current model")
             .setDesc(currentModelDesc);
 
         // Model Provider Selection
-        new Setting(this.sectionContainer!)
+        new Setting(sectionContainer)
             .setName("Model provider")
             .setDesc("Choose between built-in models or Ollama")
             .addDropdown((dropdown) => {
@@ -155,229 +164,76 @@ export class ModelSettingsSection {
 
         // Provider-specific settings
         if (this.tempModelProvider === "builtin") {
-            this.renderBuiltinModelSettings(settings);
+            this.renderBuiltinModelSettings(settings, sectionContainer);
         } else if (this.tempModelProvider === "ollama") {
-            this.renderOllamaModelSettings(settings);
+            this.renderOllamaModelSettings(settings, sectionContainer);
         }
 
         // Model Apply Button
-        this.renderApplyButton(settings);
+        this.renderApplyButton(settings, sectionContainer);
     }
 
-    private renderBuiltinModelSettings(settings: any): void {
-        const recommendedModels = [
-            "sentence-transformers/all-MiniLM-L6-v2",
-            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-        ];
-
-        new Setting(this.sectionContainer!)
-            .setName("Recommended models")
-            .setDesc("Select from recommended embedding models")
-            .addDropdown((dropdown) => {
-                for (const model of recommendedModels) {
-                    dropdown.addOption(model, model);
-                }
-                dropdown.setValue(this.tempModelId || settings.modelId);
-                dropdown.onChange((value) => {
-                    this.tempModelId = value;
-                    this.render(); // Redraw to update Apply button state
-                });
-            });
-
-        new Setting(this.sectionContainer!)
-            .setName("Custom model")
-            .setDesc("Enter a custom model ID from Hugging Face")
-            .addText((text) => {
-                text.setValue(this.tempModelId || "").onChange((value) => {
-                    this.tempModelId = value;
-                    // Don't redraw for text input to avoid losing focus
-                    this.updateApplyButtonState(settings);
-                });
-            });
-
-        new Setting(this.sectionContainer!)
-            .setName("Use GPU acceleration")
-            .setDesc(
-                "If enabled, WebGPU will be used for model inference. Disable if you experience issues with GPU acceleration."
-            )
-            .addToggle((toggle) => {
-                toggle
-                    .setValue(this.tempUseGPU ?? settings.useGPU)
-                    .onChange((value) => {
-                        this.tempUseGPU = value;
-                        // Delay redraw to allow toggle animation to complete
-                        setTimeout(() => {
-                            this.render(); // Redraw to update Apply button state
-                        }, 150);
-                    });
-            });
+    private renderBuiltinModelSettings(
+        settings: SimilarNotesSettings,
+        sectionContainer: HTMLElement
+    ): void {
+        renderBuiltinModelSettings({
+            sectionContainer,
+            settings,
+            tempModelId: this.tempModelId,
+            tempUseGPU: this.tempUseGPU,
+            onModelIdChange: (value) => {
+                this.tempModelId = value;
+            },
+            onUseGPUChange: (value) => {
+                this.tempUseGPU = value;
+            },
+            onRender: () => this.render(),
+            updateApplyButtonState: () => this.updateApplyButtonState(settings),
+        });
     }
 
-    private renderOllamaModelSettings(settings: any): void {
-        const ollamaUrl =
-            this.tempOllamaUrl ||
-            settings.ollamaUrl ||
-            "http://localhost:11434";
-        const ollamaClient = new OllamaClient(ollamaUrl);
-
-        // State for Ollama models
-        let ollamaModels: string[] = [];
-        let modelLoadError: string | null = null;
-
-        // Function to fetch Ollama models
-        const fetchOllamaModels = async () => {
-            modelLoadError = null;
-
-            try {
-                ollamaModels = await ollamaClient.getModelNames();
-            } catch (error) {
-                modelLoadError =
-                    error instanceof Error
-                        ? error.message
-                        : "Failed to fetch models";
-                ollamaModels = [];
-            }
-        };
-
-        new Setting(this.sectionContainer!)
-            .setName("Ollama server URL")
-            .setDesc(
-                "URL of your Ollama server (default: http://localhost:11434)"
-            )
-            .addText((text) => {
-                text.setPlaceholder("http://localhost:11434")
-                    .setValue(ollamaUrl)
-                    .onChange((value) => {
-                        this.tempOllamaUrl = value;
-                        // Update client URL and refresh the page
-                        ollamaClient.setBaseUrl(value);
-                        this.render();
-                    });
-            });
-
-        // Create the model dropdown setting
-        const modelSetting = new Setting(this.sectionContainer!)
-            .setName("Ollama model")
-            .setDesc("Select an Ollama model for embeddings");
-
-        let dropdownComponent: any;
-        modelSetting.addDropdown((dropdown) => {
-            dropdownComponent = dropdown;
-            dropdown.addOption("", "Loading models...");
-            dropdown.setValue(this.tempOllamaModel || "");
-            dropdown.onChange((value) => {
+    private renderOllamaModelSettings(
+        settings: SimilarNotesSettings,
+        sectionContainer: HTMLElement
+    ): void {
+        renderOllamaSettings({
+            sectionContainer,
+            settings,
+            tempOllamaUrl: this.tempOllamaUrl,
+            tempOllamaModel: this.tempOllamaModel,
+            onOllamaUrlChange: (value) => {
+                this.tempOllamaUrl = value;
+            },
+            onOllamaModelChange: (value) => {
                 this.tempOllamaModel = value;
-                this.render(); // Redraw to update Apply button state
-            });
+            },
+            onRender: () => this.render(),
         });
-
-        // Add refresh button
-        modelSetting.addButton((button) => {
-            button
-                .setButtonText("Refresh")
-                .setTooltip("Refresh model list")
-                .onClick(async () => {
-                    await fetchOllamaModels();
-                    this.render(); // Redraw to update dropdown
-                });
-        });
-
-        // Fetch models on load
-        fetchOllamaModels().then(() => {
-            // Update dropdown with fetched models
-            dropdownComponent.selectEl.empty();
-
-            if (modelLoadError) {
-                dropdownComponent.addOption("", `Error: ${modelLoadError}`);
-            } else if (ollamaModels.length === 0) {
-                dropdownComponent.addOption("", "No models found");
-            } else {
-                dropdownComponent.addOption("", "Select a model");
-                ollamaModels.forEach((model) => {
-                    dropdownComponent.addOption(model, model);
-                });
-
-                // Set current value if it exists in the list
-                if (
-                    this.tempOllamaModel &&
-                    ollamaModels.includes(this.tempOllamaModel)
-                ) {
-                    dropdownComponent.setValue(this.tempOllamaModel);
-                }
-            }
-        });
-
-        // Test connection button
-        new Setting(this.sectionContainer!)
-            .setName("Test connection")
-            .setDesc(
-                "Test the connection to Ollama server and selected model"
-            )
-            .addButton((button) => {
-                button.setButtonText("Test").onClick(async () => {
-                    const model = this.tempOllamaModel;
-                    if (!model) {
-                        new Notice("Please select a model first");
-                        return;
-                    }
-
-                    new Notice(
-                        `Testing connection to ${ollamaUrl} with model ${model}...`
-                    );
-
-                    try {
-                        const success = await ollamaClient.testModel(model);
-                        if (success) {
-                            new Notice(
-                                "Connection successful! Model is ready for embeddings."
-                            );
-                        } else {
-                            new Notice(
-                                `Connection failed: Model test failed`
-                            );
-                        }
-                    } catch (error) {
-                        new Notice(`Connection failed: ${error}`);
-                    }
-                });
-            });
     }
 
-    private renderApplyButton(settings: any): void {
+    private renderApplyButton(
+        settings: SimilarNotesSettings,
+        sectionContainer: HTMLElement
+    ): void {
         const hasChanges = this.hasModelChanges(settings);
-        const buttonText =
-            this.tempModelProvider === "builtin"
-                ? "Load & Apply"
-                : "Apply Changes";
-        const buttonDesc = hasChanges
-            ? "Apply the selected model configuration. This will rebuild the similarity index."
-            : "No changes to apply. Modify settings above to enable this button.";
 
-        new Setting(this.sectionContainer!)
-            .setName("Apply model changes")
-            .setDesc(buttonDesc)
-            .addButton((button) => {
-                this.applyButton = button; // Store reference for updates
-                button
-                    .setButtonText(buttonText)
-                    .setDisabled(!hasChanges)
-                    .onClick(async () => {
-                        if (hasChanges) {
-                            await this.applyModelChanges(settings);
-                        }
-                    });
-
-                if (hasChanges) {
-                    button.setCta();
-                }
-            });
+        renderApplyButton({
+            sectionContainer,
+            hasChanges,
+            tempModelProvider: this.tempModelProvider,
+            onApply: () => this.applyModelChanges(settings),
+            onButtonCreated: (button) => {
+                this.applyButton = button;
+            },
+        });
     }
 
-    private hasModelChanges(settings: any): boolean {
+    private hasModelChanges(settings: SimilarNotesSettings): boolean {
         return (
             this.tempModelProvider !== settings.modelProvider ||
             (this.tempModelProvider === "builtin" &&
-                this.tempModelId &&
+                this.tempModelId !== undefined &&
                 this.tempModelId !== settings.modelId) ||
             (this.tempModelProvider === "ollama" &&
                 (this.tempOllamaUrl !== settings.ollamaUrl ||
@@ -387,7 +243,7 @@ export class ModelSettingsSection {
         );
     }
 
-    private async applyModelChanges(settings: any): Promise<void> {
+    private async applyModelChanges(settings: SimilarNotesSettings): Promise<void> {
         const { plugin, settingsService, app } = this.props;
 
         if (this.tempModelProvider === "builtin") {
@@ -417,7 +273,8 @@ export class ModelSettingsSection {
                     this.clearTempState();
                     this.render();
                 },
-                () => {} // Cancel callback
+                // Cancel callback - no action needed
+                Function.prototype as () => void
             ).open();
         } else if (this.tempModelProvider === "ollama") {
             // Ollama model - show confirmation modal
@@ -447,7 +304,8 @@ export class ModelSettingsSection {
                     this.clearTempState();
                     this.render();
                 },
-                () => {} // Cancel callback
+                // Cancel callback - no action needed
+                Function.prototype as () => void
             ).open();
         }
     }
@@ -461,7 +319,7 @@ export class ModelSettingsSection {
     }
 
     private buildCurrentModelDescription(
-        settings: any,
+        settings: SimilarNotesSettings,
         cachedInfo?: CachedModelInfo
     ): string {
         const currentModelId =
@@ -553,7 +411,7 @@ export class ModelSettingsSection {
         return undefined;
     }
 
-    private updateApplyButtonState(settings: any): void {
+    private updateApplyButtonState(settings: SimilarNotesSettings): void {
         if (!this.applyButton) return;
 
         const hasChanges = this.hasModelChanges(settings);
