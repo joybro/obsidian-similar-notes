@@ -8,6 +8,7 @@ import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import type { Command } from "./commands";
 import {
     ReindexAllNotesCommand,
+    SemanticSearchCommand,
     ShowSimilarNotesCommand,
     ToggleInDocumentViewCommand,
 } from "./commands";
@@ -20,6 +21,7 @@ import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
 import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
 import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
+import { TextSearchService } from "./domain/service/TextSearchService";
 import { IndexedNoteMTimeStore } from "./infrastructure/IndexedNoteMTimeStore";
 import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
@@ -36,6 +38,7 @@ export default class MainPlugin extends Plugin {
     private noteRepository: NoteRepository;
     private noteChunkingService: NoteChunkingService;
     private similarNoteFinder: SimilarNoteFinder;
+    private textSearchService: TextSearchService;
     private similarNoteCoordinator: SimilarNoteCoordinator;
     private noteIndexingService: NoteIndexingService;
     private indexedNotesMTimeStore: IndexedNoteMTimeStore;
@@ -215,6 +218,11 @@ export default class MainPlugin extends Plugin {
             this.modelService
         );
 
+        this.textSearchService = new TextSearchService(
+            this.noteChunkRepository,
+            this.modelService
+        );
+
         this.similarNoteCoordinator = new SimilarNoteCoordinator(
             this.app.vault,
             this.noteRepository,
@@ -288,6 +296,11 @@ export default class MainPlugin extends Plugin {
             new ShowSimilarNotesCommand(this),
             new ToggleInDocumentViewCommand(this.settingsService),
             new ReindexAllNotesCommand(this),
+            new SemanticSearchCommand(
+                this.app,
+                this.textSearchService,
+                this.settingsService
+            ),
         ];
 
         // Register each command
