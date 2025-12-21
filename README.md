@@ -14,7 +14,15 @@ Find semantically similar notes using AI, directly on your device. Works on both
 
 ## How It Works
 
-The plugin understands the meaning behind your content, not just keywords. As you write, it shows the 5 most similar notes at the bottom of your current note, excluding already-linked notes.
+The plugin understands the meaning behind your content, not just keywords.
+
+### Similar Notes View
+
+As you write, the 5 most similar notes appear at the bottom of your current note, excluding already-linked notes.
+
+### Semantic Search
+
+Use the command palette (`Similar Notes: Semantic search`) to search your vault by meaning. Type any text or paste content to find related notes — like Quick Switcher, but semantic.
 
 ## Getting Started
 
