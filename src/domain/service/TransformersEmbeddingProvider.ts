@@ -8,7 +8,7 @@ import { Notice } from "obsidian";
 import { type Observable, Subject } from "rxjs";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 import type { TransformersWorker } from "./transformers.worker";
-// @ts-ignore
+// @ts-expect-error - Worker import handled by bundler
 import InlineWorker from "./transformers.worker";
 
 export interface TransformersConfig {
@@ -103,8 +103,10 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
         // We need the app instance for the modal, but we don't have direct access
         // Let's use a different approach - we'll add this to the global window temporarily
         const modal = new GPUSettingModal(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (window as any).app, // Access global app instance
             async () => {
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 await this.settingsService!.update({ useGPU: false });
             }
         );

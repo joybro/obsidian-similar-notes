@@ -26,7 +26,7 @@ export class NoteBottomView extends Component {
         this.render();
     }
 
-    private render(): void {
+    private render(): null {
         this.root.render(
             React.createElement(NoteBottomViewReact, {
                 workspace: this.workspace,
@@ -35,6 +35,7 @@ export class NoteBottomView extends Component {
                 bottomViewModelSubject$: this.bottomViewModelSubject$,
             })
         );
+        return null;
     }
 
     public getContainerEl(): HTMLElement {

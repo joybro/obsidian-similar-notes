@@ -1,11 +1,10 @@
 import { NoteChunk } from "@/domain/model/NoteChunk";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import { WorkerManager } from "@/infrastructure/WorkerManager";
-import * as Comlink from "comlink";
 import log from "loglevel";
 import type { Vault } from "obsidian";
 import type { OramaWorker } from "./OramaDatabase";
-// @ts-ignore
+// @ts-expect-error - Worker import handled by bundler
 import InlineWorker from "./orama.worker";
 
 export class OramaNoteChunkRepository implements NoteChunkRepository {

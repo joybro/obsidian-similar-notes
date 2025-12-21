@@ -23,7 +23,7 @@ export class WorkerManager<T> {
         await this.dispose();
 
         const WorkerWrapper = Comlink.wrap(new WorkerConstructor());
-        // @ts-ignore - Comlink typing issue
+        // @ts-expect-error - Comlink typing issue with constructor proxy
         this.worker = await new WorkerWrapper();
         
         log.info(`${this.workerName} initialized`, this.worker);
@@ -33,7 +33,7 @@ export class WorkerManager<T> {
         }
 
         // Set log level if the worker supports it
-        const worker = this.worker as any;
+        const worker = this.worker as unknown as { setLogLevel?: (level: log.LogLevelDesc) => Promise<void> };
         if (worker.setLogLevel && typeof worker.setLogLevel === 'function') {
             await worker.setLogLevel(log.getLevel()).catch((err: unknown) =>
                 log.error(`Failed to set log level on ${this.workerName}`, err)
@@ -75,7 +75,7 @@ export class WorkerManager<T> {
      */
     async updateLogLevel(level: log.LogLevelDesc): Promise<void> {
         if (this.worker) {
-            const worker = this.worker as any;
+            const worker = this.worker as unknown as { setLogLevel?: (level: log.LogLevelDesc) => Promise<void> };
             if (worker.setLogLevel && typeof worker.setLogLevel === 'function') {
                 await worker.setLogLevel(level).catch((err: unknown) =>
                     log.error(`Failed to set log level on ${this.workerName}`, err)

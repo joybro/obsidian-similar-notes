@@ -19,6 +19,7 @@ export class LeafViewCoordinator {
             .pipe(
                 // Only emit when showAtBottom actually changes
                 filter(changes => changes.showAtBottom !== undefined),
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 map(changes => changes.showAtBottom!)
             );
 

@@ -120,7 +120,7 @@ export class SimilarNoteCoordinator {
                 }
                 return true;
             })
-            .map(({ path, ...rest }) => rest) as SimilarNoteEntry[];
+            .map(({ path: _path, ...rest }) => rest) as SimilarNoteEntry[];
 
         this.cache.set(file.path, {
             mtime: file.stat.mtime,

@@ -53,5 +53,5 @@ export interface ViewCreationConfig<TView extends Component> {
     /**
      * Called when settings change that might affect view creation
      */
-    onSettingsChange?(changes: Record<string, any>): void;
+    onSettingsChange?(changes: Record<string, unknown>): void;
 }
