@@ -18,16 +18,20 @@ vi.mock("obsidian", () => {
             }
         },
         PluginSettingTab: class PluginSettingTab {
-            app: any;
+            app: unknown;
             containerEl: HTMLElement;
 
-            constructor(app: any, plugin: any) {
+            constructor(app: unknown, _plugin: unknown) {
                 this.app = app;
                 this.containerEl = document.createElement("div");
             }
 
-            display(): void {}
-            hide(): void {}
+            display(): void {
+                // Mock implementation
+            }
+            hide(): void {
+                // Mock implementation
+            }
         },
     };
 });
