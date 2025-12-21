@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2025-12-21
+
+### Added
+
+-   **Semantic Search**: New Quick Switcher-style modal for searching notes by meaning
+    -   Press `Cmd/Ctrl + Shift + O` to open the semantic search modal
+    -   Search across all indexed notes using natural language queries
+    -   Results ranked by semantic similarity, not just keyword matching
+
+### Changed
+
+-   **Clearer Command Names**: Renamed commands for better clarity
+    -   "Show Similar Notes" → "Show in sidebar"
+    -   "Toggle in-document view" → "Toggle footer view"
+
 ## [0.10.5] - 2025-12-20
 
 ### Added
