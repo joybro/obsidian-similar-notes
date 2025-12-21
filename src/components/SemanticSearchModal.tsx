@@ -124,14 +124,13 @@ function useSemanticSearch(textSearchService: TextSearchService) {
 
                 if (searchResult.isOverLimit) {
                     setTokenWarning(
-                        `Text too long: ${searchResult.tokenCount}/${searchResult.maxTokens} tokens`
+                        `Text truncated: ${searchResult.tokenCount}→${searchResult.maxTokens} tokens`
                     );
-                    setResults([]);
                 } else {
                     setTokenWarning(null);
-                    setResults(searchResult.similarNotes);
-                    setSelectedIndex(0);
                 }
+                setResults(searchResult.similarNotes);
+                setSelectedIndex(0);
             } catch (error) {
                 console.error("Search error:", error);
                 setResults([]);
@@ -241,10 +240,11 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                     onChange={(e) => setQuery(e.target.value)}
                 />
                 {isSearching && <div className="semantic-search-spinner" />}
-                {tokenWarning && (
-                    <div className="semantic-search-warning">{tokenWarning}</div>
-                )}
             </div>
+
+            {tokenWarning && (
+                <div className="semantic-search-warning">{tokenWarning}</div>
+            )}
 
             <div className="prompt-results">
                 {query.length > 0 && query.length < MIN_SEARCH_LENGTH && (
@@ -254,8 +254,7 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                 )}
                 {query.length >= MIN_SEARCH_LENGTH &&
                     !isSearching &&
-                    results.length === 0 &&
-                    !tokenWarning && (
+                    results.length === 0 && (
                     <div className="prompt-empty-state">No similar notes found</div>
                 )}
                 {results.map((note, index) => {

@@ -257,13 +257,10 @@
 
 /* Warning message for token limit */
 .semantic-search-modal .semantic-search-warning {
-    position: absolute;
-    right: var(--size-4-3);
-    top: 50%;
-    transform: translateY(-50%);
+    padding: var(--size-4-2) var(--size-4-3);
     font-size: var(--font-ui-smaller);
-    color: var(--text-error);
-    white-space: nowrap;
+    color: var(--text-warning);
+    background-color: var(--background-modifier-message);
 }
 
 /* Empty state message */
