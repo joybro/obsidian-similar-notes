@@ -1,0 +1,66 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Don't worry about filling everything perfectly - any report is better than no report.
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Info
+      description: |
+        Please paste the environment info from the plugin settings.
+        **Settings → Debug & Support → Copy environment info → Copy to Clipboard**
+      placeholder: |
+        ### Environment
+        - **Platform**:
+        - **Obsidian**:
+        - **Plugin**:
+        ### Settings
+        - **Model**:
+        - **WebGPU**:
+        - **Include Frontmatter**:
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and how to reproduce it.
+      placeholder: |
+        What went wrong:
+        - ...
+
+        Steps to reproduce (if known):
+        1. ...
+        2. ...
+
+        What I expected:
+        - ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console Logs (optional)
+      description: |
+        If you see any errors, paste them here.
+        Open console: **Ctrl+Shift+I** (Windows/Linux) or **Cmd+Option+I** (Mac) → Console tab
+      placeholder: Paste console logs here...
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots (optional)
+      description: Add screenshots if helpful.
+    validations:
+      required: false
