@@ -170,7 +170,7 @@ export default class MainPlugin extends Plugin {
     private registerEditorDropEvent() {
         // Register editor-drop event for drag and drop link insertion
         this.registerEvent(
-            this.app.workspace.on("editor-drop", (evt, editor) => {
+            this.app.workspace.on("editor-drop", (evt, editor, info) => {
                 // Get the plain text data
                 const plainText = evt.dataTransfer?.getData("text/plain");
 
@@ -180,7 +180,24 @@ export default class MainPlugin extends Plugin {
                     // Prevent default behavior to avoid double insertion
                     evt.preventDefault();
 
-                    // Insert the link at the cursor position
+                    // Try to insert at drop position using CodeMirror's posAtCoords
+                    // @ts-expect-error - Accessing internal CodeMirror EditorView
+                    const editorView = info?.editor?.cm;
+                    if (editorView?.posAtCoords) {
+                        const pos = editorView.posAtCoords({
+                            x: evt.clientX,
+                            y: evt.clientY,
+                        });
+                        if (pos !== null) {
+                            // Insert at drop position
+                            editorView.dispatch({
+                                changes: { from: pos, insert: plainText },
+                            });
+                            return;
+                        }
+                    }
+
+                    // Fallback: insert at cursor position
                     editor.replaceSelection(plainText);
                 }
             })
