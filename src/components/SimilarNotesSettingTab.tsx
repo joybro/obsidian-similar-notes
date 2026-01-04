@@ -2,11 +2,14 @@ import type { SettingsService } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
+import { collectEnvironmentInfo, formatEnvironmentInfoAsMarkdown } from "@/utils/environmentInfo";
 import log from "loglevel";
-import { PluginSettingTab, Setting } from "obsidian";
+import { apiVersion, Notice, PluginSettingTab, Setting } from "obsidian";
 import type MainPlugin from "../main";
 import { ModelSettingsSection } from "./ModelSettingsSection";
 import { IndexSettingsSection } from "./IndexSettingsSection";
+
+const GITHUB_ISSUES_URL = "https://github.com/joybro/obsidian-similar-notes/issues";
 
 export class SimilarNotesSettingTab extends PluginSettingTab {
     private indexedNoteCount = 0;
@@ -205,10 +208,10 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     });
             });
 
-        // Add spacing between Display and Debug sections
+        // Add spacing between Display and Debug & Support sections
         containerEl.createDiv("setting-item-separator");
 
-        new Setting(containerEl).setName("Debug").setHeading();
+        new Setting(containerEl).setName("Debug & Support").setHeading();
 
         new Setting(containerEl)
             .setName("Log level")
@@ -227,6 +230,31 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             Number(value) as log.LogLevelDesc
                         );
                     });
+            });
+
+        new Setting(containerEl)
+            .setName("Copy environment info")
+            .setDesc("Copy your environment and settings info to clipboard for bug reports")
+            .addButton((button) => {
+                button.setButtonText("Copy to Clipboard").onClick(() => {
+                    const envInfo = collectEnvironmentInfo(
+                        apiVersion,
+                        this.plugin.manifest.version,
+                        settings
+                    );
+                    const markdown = formatEnvironmentInfoAsMarkdown(envInfo);
+                    navigator.clipboard.writeText(markdown);
+                    new Notice("Environment info copied to clipboard");
+                });
+            });
+
+        new Setting(containerEl)
+            .setName("Report a bug")
+            .setDesc("Open GitHub issues page to report bugs or request features")
+            .addButton((button) => {
+                button.setButtonText("Open").onClick(() => {
+                    window.open(GITHUB_ISSUES_URL, "_blank");
+                });
             });
     }
 
