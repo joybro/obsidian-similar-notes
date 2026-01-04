@@ -6,38 +6,25 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a feature! Please describe your idea below.
+        Thanks for your idea! Keep it simple - even a rough idea helps.
 
   - type: textarea
-    id: problem
+    id: feature
     attributes:
-      label: Problem or Motivation
-      description: Is your feature request related to a problem? Describe the use case.
-      placeholder: I'm always frustrated when...
+      label: What would you like?
+      description: Describe the feature or improvement you'd like to see.
+      placeholder: |
+        I'd like to...
+
+        Why:
+        - ...
     validations:
       required: true
-
-  - type: textarea
-    id: solution
-    attributes:
-      label: Proposed Solution
-      description: Describe the solution you'd like.
-      placeholder: I would like to see...
-    validations:
-      required: true
-
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: Alternatives Considered
-      description: Have you considered any alternative solutions or workarounds?
-    validations:
-      required: false
 
   - type: textarea
     id: additional
     attributes:
-      label: Additional Context
-      description: Add any other context, mockups, or screenshots about the feature request.
+      label: Additional Context (optional)
+      description: Screenshots, mockups, or any other details.
     validations:
       required: false
