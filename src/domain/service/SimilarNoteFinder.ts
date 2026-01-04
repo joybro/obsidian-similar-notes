@@ -32,11 +32,15 @@ export class SimilarNoteFinder {
             }
 
             noteChunks = await Promise.all(
-                splitted.map(async (chunk) =>
-                    chunk.withEmbedding(
-                        await this.modelService.embedText(chunk.content)
-                    )
-                )
+                splitted.map(async (chunk) => {
+                    // Include title in first chunk to make it searchable
+                    const textToEmbed = chunk.chunkIndex === 0
+                        ? `${chunk.title}\n\n${chunk.content}`
+                        : chunk.content;
+                    return chunk.withEmbedding(
+                        await this.modelService.embedText(textToEmbed)
+                    );
+                })
             );
         } else {
             log.debug(`[SimilarNoteFinder] Using ${noteChunks.length} pre-indexed chunks for: ${note.path}`);
