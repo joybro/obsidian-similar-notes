@@ -111,3 +111,23 @@ src/
 1. **Worker Loading**: If embedding service fails, check worker bundle generation in build config
 2. **Model Download**: First-time model download can take time; check network connectivity
 3. **Memory Usage**: Large vaults may consume significant memory for embeddings storage
+
+## Version Release Process
+
+When asked to bump version to `x.x.x`:
+
+1. **Update version files**:
+   - `package.json`: Update `version` field
+   - `manifest.json`: Update `version` field
+
+2. **Analyze changes since last release**:
+   - Run `git log --oneline $(git describe --tags --abbrev=0)..HEAD` to see commits since last tag
+   - Categorize changes into Added, Changed, Fixed, Improved, Other sections
+
+3. **Update CHANGELOG.md**:
+   - Follow [Keep a Changelog](https://keepachangelog.com) format
+   - Include issue numbers where applicable: `(#123)`
+
+4. **Commit changes**:
+   - Commit message: `chore: bump version to x.x.x`
+   - Do NOT push (user will review locally first)

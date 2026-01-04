@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.1] - 2026-01-04
+
+### Added
+
+-   Bug reporting button in settings
+-   Clickable status bar menu with stats and actions
+-   Note titles included in embeddings for better search (#26)
+
+### Changed
+
+-   Dragged links now insert at drop position instead of cursor (#23)
+-   Improved status bar icon and tooltip
+-   Added CI workflow, resolved ESLint warnings
+
 ## [0.11.0] - 2025-12-21
 
 ### Added
