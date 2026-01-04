@@ -308,3 +308,8 @@
     font-size: var(--font-ui-smaller);
     color: var(--text-faint);
 }
+
+/* Status bar item */
+.similar-notes-status-bar:hover {
+    background-color: var(--background-modifier-hover);
+}

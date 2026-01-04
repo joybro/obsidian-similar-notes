@@ -257,12 +257,25 @@ export default class MainPlugin extends Plugin {
 
         // noteIndexingService is now initialized
 
-        this.statusBarView = new StatusBarView(
-            this,
-            this.noteIndexingService.getNoteChangeCount$(),
-            this.modelService.getDownloadProgress$(),
-            this.modelService.getModelError$()
-        );
+        this.statusBarView = new StatusBarView({
+            plugin: this,
+            app: this.app,
+            noteChangeCount$: this.noteIndexingService.getNoteChangeCount$(),
+            downloadProgress$: this.modelService.getDownloadProgress$(),
+            modelError$: this.modelService.getModelError$(),
+            indexedNotesMTimeStore: this.indexedNotesMTimeStore,
+            noteChunkRepository: this.noteChunkRepository,
+            modelService: this.modelService,
+            onRetry: () => {
+                this.init(this.settingsService.get().modelId, true, false);
+            },
+            onOpenSettings: () => {
+                // @ts-expect-error - Obsidian's setting API
+                this.app.setting.open();
+                // @ts-expect-error - Obsidian's setting API
+                this.app.setting.openTabById("similar-notes");
+            },
+        });
 
         // Register sidebar view
         this.registerView(
@@ -474,10 +487,9 @@ export default class MainPlugin extends Plugin {
         try {
             // Reload the model with current settings
             await this.modelService.switchProvider(settings);
-            this.statusBarView.setStatus("ready");
         } catch (error) {
             log.error("Failed to reload model:", error);
-            this.statusBarView.setStatus("error");
+            // Error state is handled by modelError$ observable in StatusBarView
         } finally {
             // Restart the indexing service whether the model load succeeded or failed
             // This ensures the service doesn't remain stopped
