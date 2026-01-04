@@ -310,6 +310,27 @@
 }
 
 /* Status bar item */
+.similar-notes-status-bar {
+    padding: 0 4px;
+}
+
 .similar-notes-status-bar:hover {
     background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.similar-notes-status-bar .status-bar-item-icon {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    line-height: 1;
+}
+
+.similar-notes-status-bar .status-bar-item-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.similar-notes-status-bar.has-error .status-bar-item-icon {
+    color: var(--color-red);
 }

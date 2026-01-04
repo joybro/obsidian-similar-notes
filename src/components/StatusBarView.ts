@@ -1,5 +1,5 @@
 import type { App, Plugin } from "obsidian";
-import { Menu, Notice, setIcon } from "obsidian";
+import { Menu, Notice, setIcon, setTooltip } from "obsidian";
 import type { Observable } from "rxjs";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
@@ -32,6 +32,7 @@ export class StatusBarView {
     constructor(private config: StatusBarViewConfig) {
         this.statusBarItem = this.config.plugin.addStatusBarItem();
         this.statusBarItem.addClass("similar-notes-status-bar");
+        setTooltip(this.statusBarItem, "Similar Notes", { placement: "top" });
 
         this.setupClickHandler();
         this.subscribeToObservables();
@@ -100,28 +101,30 @@ export class StatusBarView {
 
     private updateDisplay(): void {
         this.statusBarItem.empty();
+        this.statusBarItem.removeClass("has-error");
 
         const iconEl = this.statusBarItem.createSpan({ cls: "status-bar-item-icon" });
 
         switch (this.currentState) {
             case "error":
                 setIcon(iconEl, "alert-triangle");
+                this.statusBarItem.addClass("has-error");
                 break;
             case "downloading":
-                setIcon(iconEl, "search");
+                setIcon(iconEl, "files");
                 this.statusBarItem.createSpan({
                     text: ` ${Math.floor(this.downloadProgress)}%`,
                 });
                 break;
             case "indexing":
-                setIcon(iconEl, "search");
+                setIcon(iconEl, "files");
                 this.statusBarItem.createSpan({
                     text: ` ${this.noteChangeCount} to index`,
                 });
                 break;
             case "idle":
             default:
-                setIcon(iconEl, "search");
+                setIcon(iconEl, "files");
                 break;
         }
     }
