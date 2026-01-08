@@ -140,21 +140,24 @@ export class StatusBarView {
         menu.addSeparator();
 
         if (this.currentState === "error" && this.lastError) {
-            // Error state menu
+            // Error state menu - keep error message and retry together
             menu.addItem((item) =>
                 item.setTitle(`⚠ ${this.lastError}`).setIsLabel(true)
             );
 
-            menu.addSeparator();
+            // Show Retry only for Ollama connection errors
+            if (this.isOllamaConnectionError(this.lastError)) {
+                menu.addItem((item) =>
+                    item
+                        .setTitle("Retry")
+                        .setIcon("refresh-cw")
+                        .onClick(() => {
+                            this.config.onRetry();
+                        })
+                );
+            }
 
-            menu.addItem((item) =>
-                item
-                    .setTitle("Retry")
-                    .setIcon("refresh-cw")
-                    .onClick(() => {
-                        this.config.onRetry();
-                    })
-            );
+            menu.addSeparator();
         } else {
             // Normal state menu - show stats
             const indexedNoteCount =
@@ -212,6 +215,10 @@ export class StatusBarView {
         );
 
         menu.showAtMouseEvent(evt);
+    }
+
+    private isOllamaConnectionError(error: string): boolean {
+        return error.includes("Ollama") || error.includes("Cannot connect");
     }
 
     dispose(): void {
