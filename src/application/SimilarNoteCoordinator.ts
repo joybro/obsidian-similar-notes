@@ -21,6 +21,8 @@ export class SimilarNoteCoordinator {
         currentFile: null,
         similarNoteEntries: [],
         noteDisplayMode: "title", // Will be properly initialized in constructor
+        sidebarResultCount: 10,   // Will be properly initialized in constructor
+        bottomResultCount: 5,     // Will be properly initialized in constructor
     });
     private cache = new Map<string, SimilarNoteCacheEntry>(); // file path -> entry
 
@@ -31,10 +33,13 @@ export class SimilarNoteCoordinator {
         private readonly settingsService: SettingsService
     ) {
         // Initialize with current settings
+        const settings = this.settingsService.get();
         const currentModel = this.noteBottomViewModel$.value;
         this.noteBottomViewModel$.next({
             ...currentModel,
-            noteDisplayMode: this.settingsService.get().noteDisplayMode,
+            noteDisplayMode: settings.noteDisplayMode,
+            sidebarResultCount: settings.sidebarResultCount,
+            bottomResultCount: settings.bottomResultCount,
         });
 
         this.settingsService
@@ -43,12 +48,20 @@ export class SimilarNoteCoordinator {
                 if (newSettings.includeFrontmatter !== undefined) {
                     this.cache.clear();
                 }
-                
+
+                // Clear cache if result count settings changed (need to fetch more/fewer results)
+                if (newSettings.sidebarResultCount !== undefined || newSettings.bottomResultCount !== undefined) {
+                    this.cache.clear();
+                }
+
                 // Update current model with new settings
+                const settings = this.settingsService.get();
                 const currentModel = this.noteBottomViewModel$.value;
                 this.noteBottomViewModel$.next({
                     ...currentModel,
-                    noteDisplayMode: this.settingsService.get().noteDisplayMode,
+                    noteDisplayMode: settings.noteDisplayMode,
+                    sidebarResultCount: settings.sidebarResultCount,
+                    bottomResultCount: settings.bottomResultCount,
                 });
             });
     }
@@ -76,10 +89,13 @@ export class SimilarNoteCoordinator {
 
     async emitNoteBottomViewModel(file: TFile) {
         const similarNotes = await this.getSimilarNotes(file);
+        const settings = this.settingsService.get();
         this.noteBottomViewModel$.next({
             currentFile: file,
             similarNoteEntries: similarNotes,
-            noteDisplayMode: this.settingsService.get().noteDisplayMode,
+            noteDisplayMode: settings.noteDisplayMode,
+            sidebarResultCount: settings.sidebarResultCount,
+            bottomResultCount: settings.bottomResultCount,
         });
     }
 
@@ -89,15 +105,18 @@ export class SimilarNoteCoordinator {
             return cacheEntry.notes;
         }
 
+        const settings = this.settingsService.get();
         const note = await this.noteRepository.findByFile(
             file,
-            !this.settingsService.get().includeFrontmatter
+            !settings.includeFrontmatter
         );
+        const maxResultCount = Math.max(settings.sidebarResultCount, settings.bottomResultCount);
         const similarNotes = await this.similarNoteFinder.findSimilarNotes(
-            note
+            note,
+            maxResultCount
         );
 
-        const showSourceChunk = this.settingsService.get().showSourceChunk;
+        const showSourceChunk = settings.showSourceChunk;
 
         const similarNoteEntries = similarNotes
             .map((similarNote) => ({

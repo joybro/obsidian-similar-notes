@@ -22,6 +22,8 @@ export interface SimilarNotesSettings {
     regexpTestInputText: string; // Saved test input for RegExp testing
     noteDisplayMode: "title" | "path" | "smart"; // How to display note names in results
     showAtBottom: boolean; // Whether to show similar notes at the bottom of notes
+    sidebarResultCount: number; // Number of similar notes to show in sidebar
+    bottomResultCount: number; // Number of similar notes to show at bottom of notes
     lastPluginVersion?: string; // Last version of the plugin that was run
     cachedModelInfo?: CachedModelInfo; // Cached model information
 }
@@ -37,6 +39,8 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     regexpTestInputText: "", // Default to empty test input
     noteDisplayMode: "title", // Default to showing title only
     showAtBottom: true, // Show similar notes at the bottom by default
+    sidebarResultCount: 10, // Default to 10 results in sidebar
+    bottomResultCount: 5, // Default to 5 results at bottom
 };
 
 export class SettingsService {

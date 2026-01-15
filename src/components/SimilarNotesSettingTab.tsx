@@ -208,6 +208,46 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     });
             });
 
+        new Setting(containerEl)
+            .setName("Number of results in sidebar")
+            .setDesc("Maximum number of similar notes to display in the sidebar (1-50)")
+            .addText((text) => {
+                text
+                    .setValue(String(settings.sidebarResultCount))
+                    .onChange(async (value) => {
+                        const num = parseInt(value, 10);
+                        if (!isNaN(num) && num >= 1 && num <= 50) {
+                            await this.settingsService.update({
+                                sidebarResultCount: num,
+                            });
+                        }
+                    });
+                text.inputEl.type = "number";
+                text.inputEl.min = "1";
+                text.inputEl.max = "50";
+                text.inputEl.style.width = "60px";
+            });
+
+        new Setting(containerEl)
+            .setName("Number of results at bottom")
+            .setDesc("Maximum number of similar notes to display at the bottom of notes (1-20)")
+            .addText((text) => {
+                text
+                    .setValue(String(settings.bottomResultCount))
+                    .onChange(async (value) => {
+                        const num = parseInt(value, 10);
+                        if (!isNaN(num) && num >= 1 && num <= 20) {
+                            await this.settingsService.update({
+                                bottomResultCount: num,
+                            });
+                        }
+                    });
+                text.inputEl.type = "number";
+                text.inputEl.min = "1";
+                text.inputEl.max = "20";
+                text.inputEl.style.width = "60px";
+            });
+
         // Add spacing between Display and Debug & Support sections
         containerEl.createDiv("setting-item-separator");
 

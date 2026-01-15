@@ -13,7 +13,7 @@ export class SimilarNoteFinder {
         private readonly modelService: EmbeddingService
     ) {}
 
-    async findSimilarNotes(note: Note): Promise<SimilarNote[]> {
+    async findSimilarNotes(note: Note, limit = 5): Promise<SimilarNote[]> {
         if (!note.content) {
             return [];
         }
@@ -103,6 +103,6 @@ export class SimilarNoteFinder {
                 )
         );
 
-        return similarNotes.slice(0, 5);
+        return similarNotes.slice(0, limit);
     }
 }

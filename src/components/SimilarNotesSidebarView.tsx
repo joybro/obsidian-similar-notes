@@ -48,6 +48,7 @@ export class SimilarNotesSidebarView extends ItemView {
                 vaultName={this.app.vault.getName()}
                 leaf={mockLeaf}
                 bottomViewModelSubject$={this.bottomViewModelSubject$}
+                viewType="sidebar"
             />
         );
     }
