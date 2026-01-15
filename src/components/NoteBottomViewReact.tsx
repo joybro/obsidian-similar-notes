@@ -16,6 +16,8 @@ export interface NoteBottomViewModel {
     currentFile: TFile | null;
     similarNoteEntries: SimilarNoteEntry[];
     noteDisplayMode: "title" | "path" | "smart";
+    sidebarResultCount: number;
+    bottomResultCount: number;
 }
 
 interface SimilarNotesHeaderProps {
@@ -23,11 +25,14 @@ interface SimilarNotesHeaderProps {
     onToggleCollapse: () => void;
 }
 
+export type ViewType = "sidebar" | "bottom";
+
 interface NoteBottomViewProps {
     workspace: Workspace;
     vaultName: string;
     leaf: MarkdownView;
     bottomViewModelSubject$: Observable<NoteBottomViewModel>;
+    viewType: ViewType;
 }
 
 // Header Component
@@ -270,6 +275,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     vaultName,
     leaf,
     bottomViewModelSubject$,
+    viewType,
 }) => {
     const [collapsed, setCollapsed] = useState(false);
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
@@ -283,11 +289,14 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 return;
             }
 
-            setSimilarNotes(model.similarNoteEntries);
+            const limit = viewType === "sidebar"
+                ? model.sidebarResultCount
+                : model.bottomResultCount;
+            setSimilarNotes(model.similarNoteEntries.slice(0, limit));
             setNoteDisplayMode(model.noteDisplayMode);
         });
         return () => sub.unsubscribe();
-    }, [bottomViewModelSubject$, leaf.file]);
+    }, [bottomViewModelSubject$, leaf.file, viewType]);
 
     const openNote = (file: TFile, newTab = false) => {
         workspace.openLinkText(file.path, "", newTab);

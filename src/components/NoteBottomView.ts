@@ -33,6 +33,7 @@ export class NoteBottomView extends Component {
                 vaultName: this.vaultName,
                 leaf: this.leaf,
                 bottomViewModelSubject$: this.bottomViewModelSubject$,
+                viewType: "bottom",
             })
         );
         return null;
