@@ -131,3 +131,10 @@ When asked to bump version to `x.x.x`:
 4. **Commit changes**:
    - Commit message: `chore: bump version to x.x.x`
    - Do NOT push (user will review locally first)
+
+## Shared Knowledge Base
+
+The `ai-workspace/` directory is a shared knowledge repository across multiple projects (symlinked).
+
+- **Search for existing knowledge**: Before diving into unfamiliar topics (e.g., Capacitor, iOS, mobile development), check `ai-workspace/knowledge/` for relevant documentation and solutions.
+- **Contribute new knowledge**: When you discover reusable insights, patterns, or solutions that could benefit other projects, add them to `ai-workspace/knowledge/` with clear documentation.

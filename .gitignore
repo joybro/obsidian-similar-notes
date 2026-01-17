@@ -22,3 +22,6 @@ design
 
 # local development
 scripts/install-local.sh
+
+# shared AI workspace (symlink)
+ai-workspace
