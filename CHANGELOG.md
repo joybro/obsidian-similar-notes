@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0] - 2026-01-18
+
+### Added
+
+-   **Configurable Result Count**: Control how many similar notes are displayed
+    -   Separate settings for sidebar and bottom panel
+    -   Choose between 3, 5, 10, 15, or 20 results per view
+-   GitHub issue templates for bug reports and feature requests
+
+### Fixed
+
+-   Retry button now only appears for Ollama connection errors
+
 ## [0.11.1] - 2026-01-04
 
 ### Added
