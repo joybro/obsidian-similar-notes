@@ -4,5 +4,6 @@ export type {
     OllamaModelsResponse,
     OllamaEmbeddingRequest,
     OllamaEmbeddingResponse,
-    OllamaModelInfo
+    OllamaModelInfo,
+    OllamaModelWithEmbeddingInfo
 } from './OllamaClient';

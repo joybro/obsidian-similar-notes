@@ -1,4 +1,4 @@
-import { OllamaClient } from "@/adapter/ollama";
+import { OllamaClient, type OllamaModelWithEmbeddingInfo } from "@/adapter/ollama";
 import type { SimilarNotesSettings } from "@/application/SettingsService";
 import { Notice, Setting } from "obsidian";
 import type { DropdownComponent } from "obsidian";
@@ -29,7 +29,7 @@ export function renderOllamaSettings(props: OllamaSettingsSectionProps): void {
     const ollamaClient = new OllamaClient(ollamaUrl);
 
     // State for Ollama models
-    let ollamaModels: string[] = [];
+    let ollamaModels: OllamaModelWithEmbeddingInfo[] = [];
     let modelLoadError: string | null = null;
 
     // Function to fetch Ollama models
@@ -37,7 +37,7 @@ export function renderOllamaSettings(props: OllamaSettingsSectionProps): void {
         modelLoadError = null;
 
         try {
-            ollamaModels = await ollamaClient.getModelNames();
+            ollamaModels = await ollamaClient.getModelsWithEmbeddingInfo();
         } catch (error) {
             modelLoadError =
                 error instanceof Error
@@ -100,11 +100,24 @@ export function renderOllamaSettings(props: OllamaSettingsSectionProps): void {
         } else {
             dropdownComponent.addOption("", "Select a model");
             ollamaModels.forEach((model) => {
-                dropdownComponent.addOption(model, model);
+                const displayText = model.isEmbeddingModel
+                    ? model.name
+                    : `${model.name} (not embed)`;
+                dropdownComponent.addOption(model.name, displayText);
+            });
+
+            // Disable non-embedding model options via DOM
+            const options = dropdownComponent.selectEl.querySelectorAll("option");
+            ollamaModels.forEach((model, index) => {
+                const optionEl = options[index + 1] as HTMLOptionElement; // +1: skip "Select a model"
+                if (optionEl && !model.isEmbeddingModel) {
+                    optionEl.disabled = true;
+                }
             });
 
             // Set current value if it exists in the list
-            if (tempOllamaModel && ollamaModels.includes(tempOllamaModel)) {
+            const modelNames = ollamaModels.map(m => m.name);
+            if (tempOllamaModel && modelNames.includes(tempOllamaModel)) {
                 dropdownComponent.setValue(tempOllamaModel);
             }
         }

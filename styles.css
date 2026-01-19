@@ -334,3 +334,9 @@
 .similar-notes-status-bar.has-error .status-bar-item-icon {
     color: var(--color-red);
 }
+
+/* Ollama model dropdown - disabled options (non-embedding models) */
+select option:disabled {
+    color: var(--text-muted);
+    font-style: italic;
+}
