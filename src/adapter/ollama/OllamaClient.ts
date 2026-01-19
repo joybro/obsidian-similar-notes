@@ -38,6 +38,34 @@ export interface OllamaModelInfo {
     contextLength?: number;     // e.g., 8192
 }
 
+export interface OllamaModelWithEmbeddingInfo {
+    name: string;
+    isEmbeddingModel: boolean;
+}
+
+// Known embedding model families
+const EMBEDDING_MODEL_FAMILIES = ['bert', 'nomic-bert'];
+
+/**
+ * Check if a model is an embedding model based on family or name
+ */
+function isEmbeddingModel(model: OllamaModel): boolean {
+    const family = model.details?.family?.toLowerCase() || '';
+    const name = model.name.toLowerCase();
+
+    // Check by family
+    if (EMBEDDING_MODEL_FAMILIES.some(f => family.includes(f))) {
+        return true;
+    }
+
+    // Check by name (e.g., nomic-embed-text, mxbai-embed-large)
+    if (name.includes('embed')) {
+        return true;
+    }
+
+    return false;
+}
+
 export class OllamaClient {
     private baseUrl: string;
 
@@ -76,6 +104,17 @@ export class OllamaClient {
     async getModelNames(): Promise<string[]> {
         const models = await this.getModels();
         return models.map(model => model.name);
+    }
+
+    /**
+     * Get models with embedding model classification
+     */
+    async getModelsWithEmbeddingInfo(): Promise<OllamaModelWithEmbeddingInfo[]> {
+        const models = await this.getModels();
+        return models.map(model => ({
+            name: model.name,
+            isEmbeddingModel: isEmbeddingModel(model)
+        }));
     }
 
     /**
