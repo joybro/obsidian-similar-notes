@@ -15,6 +15,8 @@ import {
 } from "./BuiltinModelSettingsSection";
 import { LoadModelModal } from "./LoadModelModal";
 import { renderOllamaSettings } from "./OllamaSettingsSection";
+import { renderOpenAISettings } from "./OpenAISettingsSection";
+import { OpenAIClient } from "@/adapter/openai";
 
 interface ModelSettingsSectionProps {
     containerEl: HTMLElement;
@@ -32,10 +34,13 @@ export class ModelSettingsSection {
     private sectionContainer?: HTMLElement;
 
     // Temporary state for model changes (not saved until Apply is clicked)
-    private tempModelProvider?: "builtin" | "ollama";
+    private tempModelProvider?: "builtin" | "ollama" | "openai";
     private tempModelId?: string;
     private tempOllamaUrl?: string;
     private tempOllamaModel?: string;
+    private tempOpenAIUrl?: string;
+    private tempOpenAIModel?: string;
+    private tempOpenAIApiKey?: string;
     private tempUseGPU?: boolean;
 
     // Apply button reference for direct updates
@@ -118,6 +123,9 @@ export class ModelSettingsSection {
         this.tempModelId = this.tempModelId ?? settings.modelId;
         this.tempOllamaUrl = this.tempOllamaUrl ?? settings.ollamaUrl;
         this.tempOllamaModel = this.tempOllamaModel ?? settings.ollamaModel;
+        this.tempOpenAIUrl = this.tempOpenAIUrl ?? settings.openaiUrl;
+        this.tempOpenAIModel = this.tempOpenAIModel ?? settings.openaiModel;
+        this.tempOpenAIApiKey = this.tempOpenAIApiKey ?? settings.openaiApiKey;
         this.tempUseGPU = this.tempUseGPU ?? settings.useGPU;
 
         const sectionContainer = this.sectionContainer;
@@ -154,8 +162,9 @@ export class ModelSettingsSection {
                 dropdown
                     .addOption("builtin", "Built-in Models")
                     .addOption("ollama", "Ollama")
+                    .addOption("openai", "OpenAI Compatible")
                     .setValue(this.tempModelProvider || "builtin")
-                    .onChange((value: "builtin" | "ollama") => {
+                    .onChange((value: "builtin" | "ollama" | "openai") => {
                         this.tempModelProvider = value;
                         // Redraw settings to show/hide provider-specific options
                         this.render();
@@ -167,6 +176,8 @@ export class ModelSettingsSection {
             this.renderBuiltinModelSettings(settings, sectionContainer);
         } else if (this.tempModelProvider === "ollama") {
             this.renderOllamaModelSettings(settings, sectionContainer);
+        } else if (this.tempModelProvider === "openai") {
+            this.renderOpenAIModelSettings(settings, sectionContainer);
         }
 
         // Model Apply Button
@@ -212,6 +223,29 @@ export class ModelSettingsSection {
         });
     }
 
+    private renderOpenAIModelSettings(
+        settings: SimilarNotesSettings,
+        sectionContainer: HTMLElement
+    ): void {
+        renderOpenAISettings({
+            sectionContainer,
+            settings,
+            tempOpenAIUrl: this.tempOpenAIUrl,
+            tempOpenAIModel: this.tempOpenAIModel,
+            tempOpenAIApiKey: this.tempOpenAIApiKey,
+            onOpenAIUrlChange: (value) => {
+                this.tempOpenAIUrl = value;
+            },
+            onOpenAIModelChange: (value) => {
+                this.tempOpenAIModel = value;
+            },
+            onOpenAIApiKeyChange: (value) => {
+                this.tempOpenAIApiKey = value;
+            },
+            onRender: () => this.render(),
+        });
+    }
+
     private renderApplyButton(
         settings: SimilarNotesSettings,
         sectionContainer: HTMLElement
@@ -238,6 +272,10 @@ export class ModelSettingsSection {
             (this.tempModelProvider === "ollama" &&
                 (this.tempOllamaUrl !== settings.ollamaUrl ||
                     this.tempOllamaModel !== settings.ollamaModel)) ||
+            (this.tempModelProvider === "openai" &&
+                (this.tempOpenAIUrl !== settings.openaiUrl ||
+                    this.tempOpenAIModel !== settings.openaiModel || 
+                    this.tempOpenAIApiKey !== settings.openaiApiKey)) ||
             (this.tempModelProvider === "builtin" &&
                 this.tempUseGPU !== settings.useGPU)
         );
@@ -304,6 +342,38 @@ export class ModelSettingsSection {
                     this.clearTempState();
                     this.render();
                 },
+                Function.prototype as () => void
+            ).open();
+        } else if (this.tempModelProvider === "openai") {
+             // OpenAI model - show confirmation modal
+            const openaiMessage =
+                "Your embedding model will be changed and all notes will be reindexed. Do you want to continue?";
+
+            new LoadModelModal(
+                app,
+                openaiMessage,
+                async () => {
+                    // Fetch model info from OpenAI API
+                    const cachedModelInfo = await this.fetchAndCacheModelInfo(
+                        "openai",
+                        this.tempOpenAIModel || "",
+                        this.tempOpenAIUrl,
+                        this.tempOpenAIApiKey
+                    );
+
+                    await settingsService.update({
+                        modelProvider: this.tempModelProvider,
+                        openaiUrl: this.tempOpenAIUrl,
+                        openaiModel: this.tempOpenAIModel,
+                        openaiApiKey: this.tempOpenAIApiKey,
+                        cachedModelInfo,
+                    });
+                    // Trigger model change with new settings
+                    plugin.changeModel(this.tempOpenAIModel || "");
+                    // Clear temporary state after successful apply
+                    this.clearTempState();
+                    this.render();
+                },
                 // Cancel callback - no action needed
                 Function.prototype as () => void
             ).open();
@@ -315,6 +385,9 @@ export class ModelSettingsSection {
         this.tempModelId = undefined;
         this.tempOllamaUrl = undefined;
         this.tempOllamaModel = undefined;
+        this.tempOpenAIUrl = undefined;
+        this.tempOpenAIModel = undefined;
+        this.tempOpenAIApiKey = undefined;
         this.tempUseGPU = undefined;
     }
 
@@ -325,7 +398,9 @@ export class ModelSettingsSection {
         const currentModelId =
             settings.modelProvider === "builtin"
                 ? settings.modelId
-                : settings.ollamaModel;
+                : settings.modelProvider === "ollama"
+                ? settings.ollamaModel
+                : settings.openaiModel;
 
         // Check if cached info matches current model
         const hasValidCache =
@@ -374,13 +449,34 @@ export class ModelSettingsSection {
             return `Ollama: ${settings.ollamaModel}`;
         }
 
+        if (settings.modelProvider === "openai") {
+             if (!settings.openaiModel) {
+                return "Not configured";
+            }
+             const parts: string[] = [];
+
+            if (hasValidCache) {
+                if (cachedInfo.parameterSize) {
+                    parts.push(cachedInfo.parameterSize);
+                }
+                 if (cachedInfo.embeddingLength) {
+                    parts.push(`${cachedInfo.embeddingLength}-dim`);
+                }
+            }
+             if (parts.length > 0) {
+                return `OpenAI: ${settings.openaiModel} (${parts.join(", ")})`;
+            }
+             return `OpenAI: ${settings.openaiModel}`;
+        }
+
         return "Not configured";
     }
 
     private async fetchAndCacheModelInfo(
-        provider: "builtin" | "ollama",
+        provider: "builtin" | "ollama" | "openai",
         modelId: string,
-        ollamaUrl?: string
+        url?: string,
+        apiKey?: string
     ): Promise<CachedModelInfo | undefined> {
         if (provider === "builtin") {
             const client = new HuggingFaceClient();
@@ -394,8 +490,7 @@ export class ModelSettingsSection {
                 };
             }
         } else if (provider === "ollama") {
-            const url = ollamaUrl || "http://localhost:11434";
-            const client = new OllamaClient(url);
+            const client = new OllamaClient(url || "http://localhost:11434");
             const info = await client.getModelInfo(modelId);
 
             if (info) {
@@ -406,6 +501,17 @@ export class ModelSettingsSection {
                     quantizationLevel: info.quantizationLevel,
                 };
             }
+        } else if (provider === "openai") {
+             const client = new OpenAIClient(url || "http://localhost:1234/v1", apiKey);
+             try {
+                const embedding = await client.generateEmbedding(modelId, "test");
+                return {
+                     modelId,
+                     embeddingLength: embedding.length
+                };
+             } catch (e) {
+                 return { modelId };
+             }
         }
 
         return undefined;
