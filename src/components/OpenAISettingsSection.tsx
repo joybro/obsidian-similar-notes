@@ -12,6 +12,8 @@ interface OpenAISettingsSectionProps {
     onOpenaiApiKeyChange: (value: string) => void;
     onOpenaiModelChange: (value: string) => void;
     onRender: () => void;
+    // Getter functions to get latest temp values (to avoid closure issues)
+    getTempValues?: () => { url?: string; apiKey?: string; model?: string };
 }
 
 // Predefined OpenAI embedding models
@@ -34,6 +36,7 @@ export function renderOpenAISettings(props: OpenAISettingsSectionProps): void {
         onOpenaiApiKeyChange,
         onOpenaiModelChange,
         onRender,
+        getTempValues,
     } = props;
 
     const openaiUrl = tempOpenaiUrl ?? settings.openaiUrl ?? DEFAULT_OPENAI_URL;
@@ -115,16 +118,21 @@ export function renderOpenAISettings(props: OpenAISettingsSectionProps): void {
         .setDesc("Test the connection to the server and model")
         .addButton((button) => {
             button.setButtonText("Test").onClick(async () => {
-                const model = openaiModel;
+                // Use getter function to get latest temp values (avoids closure issues)
+                const tempValues = getTempValues?.() ?? {};
+                const url = tempValues.url ?? settings.openaiUrl ?? DEFAULT_OPENAI_URL;
+                const apiKey = tempValues.apiKey ?? settings.openaiApiKey;
+                const model = tempValues.model ?? settings.openaiModel ?? "text-embedding-3-small";
+
                 if (!model) {
                     new Notice("Please select or enter a model first");
                     return;
                 }
 
-                new Notice(`Testing connection to ${openaiUrl} with model ${model}...`);
+                new Notice(`Testing connection to ${url} with model ${model}...`);
 
                 try {
-                    const client = new OpenAIClient(openaiUrl, openaiApiKey || undefined);
+                    const client = new OpenAIClient(url, apiKey || undefined);
                     const success = await client.testConnection(model);
 
                     if (success) {
