@@ -35,7 +35,22 @@ export async function fetchAndCacheModelInfo(
             };
         }
     } else if (provider === "openai") {
-        // OpenAI doesn't provide a model info API
+        // OpenAI doesn't provide a model info API, but we know dimensions for official models
+        const knownModels: Record<string, { embeddingLength: number }> = {
+            "text-embedding-3-small": { embeddingLength: 1536 },
+            "text-embedding-3-large": { embeddingLength: 3072 },
+            "text-embedding-ada-002": { embeddingLength: 1536 },
+        };
+
+        const knownInfo = knownModels[modelId];
+        if (knownInfo) {
+            return {
+                modelId,
+                embeddingLength: knownInfo.embeddingLength,
+            };
+        }
+
+        // For unknown/custom models, just return the model ID
         return { modelId };
     }
 
