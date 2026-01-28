@@ -322,9 +322,9 @@ export class ModelSettingsSection {
                     updateData.ollamaUrl = this.tempOllamaUrl;
                     updateData.ollamaModel = this.tempOllamaModel;
                 } else if (provider === "openai") {
-                    updateData.openaiUrl = this.tempOpenaiUrl;
-                    updateData.openaiApiKey = this.tempOpenaiApiKey;
-                    updateData.openaiModel = this.tempOpenaiModel;
+                    updateData.openaiUrl = this.tempOpenaiUrl ?? settings.openaiUrl;
+                    updateData.openaiApiKey = this.tempOpenaiApiKey ?? settings.openaiApiKey;
+                    updateData.openaiModel = this.tempOpenaiModel ?? "text-embedding-3-small";
                 }
 
                 await settingsService.update(updateData);
