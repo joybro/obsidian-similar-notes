@@ -7,13 +7,17 @@ import {
     type OllamaConfig,
 } from "./OllamaEmbeddingProvider";
 import {
+    OpenAIEmbeddingProvider,
+    type OpenAIConfig,
+} from "./OpenAIEmbeddingProvider";
+import {
     TransformersEmbeddingProvider,
     type TransformersConfig,
 } from "./TransformersEmbeddingProvider";
 
 export class EmbeddingService {
     private provider: EmbeddingProvider | null = null;
-    private currentProviderType: "builtin" | "ollama" | null = null;
+    private currentProviderType: "builtin" | "ollama" | "openai" | null = null;
 
     constructor(private settingsService?: SettingsService) {}
 
@@ -42,7 +46,9 @@ export class EmbeddingService {
             const targetModelId =
                 newProviderType === "builtin"
                     ? settings.modelId
-                    : settings.ollamaModel;
+                    : newProviderType === "ollama"
+                        ? settings.ollamaModel
+                        : settings.openaiModel;
 
             if (currentModelId === targetModelId) {
                 // For builtin provider, GPU settings change requires reload
@@ -90,6 +96,16 @@ export class EmbeddingService {
             this.provider = new OllamaEmbeddingProvider(ollamaConfig);
             this.setupProviderSubscriptions();
             await this.loadModel(settings.ollamaModel || "", ollamaConfig);
+        } else if (newProviderType === "openai") {
+            log.info("Switching to OpenAI embedding provider");
+            const openaiConfig: OpenAIConfig = {
+                url: settings.openaiUrl || "https://api.openai.com/v1",
+                apiKey: settings.openaiApiKey,
+                model: settings.openaiModel || "text-embedding-3-small",
+            };
+            this.provider = new OpenAIEmbeddingProvider(openaiConfig);
+            this.setupProviderSubscriptions();
+            await this.loadModel(settings.openaiModel || "text-embedding-3-small", openaiConfig);
         } else {
             throw new Error(`Unknown provider type: ${newProviderType}`);
         }
@@ -129,7 +145,7 @@ export class EmbeddingService {
      */
     async loadModel(
         modelId: string,
-        config?: TransformersConfig | OllamaConfig
+        config?: TransformersConfig | OllamaConfig | OpenAIConfig
     ): Promise<ModelInfo> {
         if (!this.provider) {
             throw new Error("No embedding provider initialized");
@@ -237,7 +253,7 @@ export class EmbeddingService {
         return this.provider?.getCurrentModelId() ?? null;
     }
 
-    public getCurrentProviderType(): "builtin" | "ollama" | null {
+    public getCurrentProviderType(): "builtin" | "ollama" | "openai" | null {
         return this.currentProviderType;
     }
 

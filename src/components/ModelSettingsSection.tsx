@@ -1,10 +1,5 @@
-import { HuggingFaceClient } from "@/adapter/huggingface";
-import { OllamaClient } from "@/adapter/ollama";
 import type { SettingsService } from "@/application/SettingsService";
-import type {
-    CachedModelInfo,
-    SimilarNotesSettings,
-} from "@/application/SettingsService";
+import type { CachedModelInfo, SimilarNotesSettings } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import { Setting } from "obsidian";
 import type { App, ButtonComponent } from "obsidian";
@@ -14,7 +9,9 @@ import {
     renderBuiltinModelSettings,
 } from "./BuiltinModelSettingsSection";
 import { LoadModelModal } from "./LoadModelModal";
+import { fetchAndCacheModelInfo } from "./modelInfoCache";
 import { renderOllamaSettings } from "./OllamaSettingsSection";
+import { renderOpenAISettings } from "./OpenAISettingsSection";
 
 interface ModelSettingsSectionProps {
     containerEl: HTMLElement;
@@ -32,11 +29,14 @@ export class ModelSettingsSection {
     private sectionContainer?: HTMLElement;
 
     // Temporary state for model changes (not saved until Apply is clicked)
-    private tempModelProvider?: "builtin" | "ollama";
+    private tempModelProvider?: "builtin" | "ollama" | "openai";
     private tempModelId?: string;
     private tempOllamaUrl?: string;
     private tempOllamaModel?: string;
     private tempUseGPU?: boolean;
+    private tempOpenaiUrl?: string;
+    private tempOpenaiApiKey?: string;
+    private tempOpenaiModel?: string;
 
     // Apply button reference for direct updates
     private applyButton?: ButtonComponent;
@@ -119,6 +119,9 @@ export class ModelSettingsSection {
         this.tempOllamaUrl = this.tempOllamaUrl ?? settings.ollamaUrl;
         this.tempOllamaModel = this.tempOllamaModel ?? settings.ollamaModel;
         this.tempUseGPU = this.tempUseGPU ?? settings.useGPU;
+        this.tempOpenaiUrl = this.tempOpenaiUrl ?? settings.openaiUrl;
+        this.tempOpenaiApiKey = this.tempOpenaiApiKey ?? settings.openaiApiKey;
+        this.tempOpenaiModel = this.tempOpenaiModel ?? settings.openaiModel;
 
         const sectionContainer = this.sectionContainer;
         new Setting(sectionContainer).setName("Model").setHeading();
@@ -149,13 +152,14 @@ export class ModelSettingsSection {
         // Model Provider Selection
         new Setting(sectionContainer)
             .setName("Model provider")
-            .setDesc("Choose between built-in models or Ollama")
+            .setDesc("Choose between built-in models, Ollama, or OpenAI API")
             .addDropdown((dropdown) => {
                 dropdown
                     .addOption("builtin", "Built-in Models")
                     .addOption("ollama", "Ollama")
+                    .addOption("openai", "OpenAI")
                     .setValue(this.tempModelProvider || "builtin")
-                    .onChange((value: "builtin" | "ollama") => {
+                    .onChange((value: "builtin" | "ollama" | "openai") => {
                         this.tempModelProvider = value;
                         // Redraw settings to show/hide provider-specific options
                         this.render();
@@ -167,6 +171,8 @@ export class ModelSettingsSection {
             this.renderBuiltinModelSettings(settings, sectionContainer);
         } else if (this.tempModelProvider === "ollama") {
             this.renderOllamaModelSettings(settings, sectionContainer);
+        } else if (this.tempModelProvider === "openai") {
+            this.renderOpenAIModelSettings(settings, sectionContainer);
         }
 
         // Model Apply Button
@@ -212,6 +218,29 @@ export class ModelSettingsSection {
         });
     }
 
+    private renderOpenAIModelSettings(
+        settings: SimilarNotesSettings,
+        sectionContainer: HTMLElement
+    ): void {
+        renderOpenAISettings({
+            sectionContainer,
+            settings,
+            tempOpenaiUrl: this.tempOpenaiUrl,
+            tempOpenaiApiKey: this.tempOpenaiApiKey,
+            tempOpenaiModel: this.tempOpenaiModel,
+            onOpenaiUrlChange: (value) => {
+                this.tempOpenaiUrl = value;
+            },
+            onOpenaiApiKeyChange: (value) => {
+                this.tempOpenaiApiKey = value;
+            },
+            onOpenaiModelChange: (value) => {
+                this.tempOpenaiModel = value;
+            },
+            onRender: () => this.render(),
+        });
+    }
+
     private renderApplyButton(
         settings: SimilarNotesSettings,
         sectionContainer: HTMLElement
@@ -239,75 +268,67 @@ export class ModelSettingsSection {
                 (this.tempOllamaUrl !== settings.ollamaUrl ||
                     this.tempOllamaModel !== settings.ollamaModel)) ||
             (this.tempModelProvider === "builtin" &&
-                this.tempUseGPU !== settings.useGPU)
+                this.tempUseGPU !== settings.useGPU) ||
+            (this.tempModelProvider === "openai" &&
+                (this.tempOpenaiUrl !== settings.openaiUrl ||
+                    this.tempOpenaiApiKey !== settings.openaiApiKey ||
+                    this.tempOpenaiModel !== settings.openaiModel))
         );
     }
 
     private async applyModelChanges(settings: SimilarNotesSettings): Promise<void> {
         const { plugin, settingsService, app } = this.props;
+        const provider = this.tempModelProvider;
 
-        if (this.tempModelProvider === "builtin") {
-            // Built-in model - use LoadModelModal
-            const modelId = this.tempModelId || settings.modelId;
-            const builtinMessage =
-                "The model will be downloaded from Hugging Face (this might take a while) and all your notes will be reindexed. Do you want to continue?";
+        if (!provider) return;
 
-            new LoadModelModal(
-                app,
-                builtinMessage,
-                async () => {
-                    // Fetch model info from Hugging Face API
-                    const cachedModelInfo = await this.fetchAndCacheModelInfo(
-                        "builtin",
-                        modelId
-                    );
+        // Determine message and model ID based on provider
+        const isBuiltin = provider === "builtin";
+        const message = isBuiltin
+            ? "The model will be downloaded from Hugging Face (this might take a while) and all your notes will be reindexed. Do you want to continue?"
+            : "Your embedding model will be changed and all notes will be reindexed. Do you want to continue?";
 
-                    await settingsService.update({
-                        modelProvider: this.tempModelProvider,
-                        modelId: modelId,
-                        useGPU: this.tempUseGPU ?? settings.useGPU,
-                        cachedModelInfo,
-                    });
-                    plugin.changeModel(modelId);
-                    // Clear temporary state after successful apply
-                    this.clearTempState();
-                    this.render();
-                },
-                // Cancel callback - no action needed
-                Function.prototype as () => void
-            ).open();
-        } else if (this.tempModelProvider === "ollama") {
-            // Ollama model - show confirmation modal
-            const ollamaMessage =
-                "Your embedding model will be changed and all notes will be reindexed. Do you want to continue?";
+        const getModelId = () => {
+            if (provider === "builtin") return this.tempModelId || settings.modelId;
+            if (provider === "ollama") return this.tempOllamaModel || "";
+            return this.tempOpenaiModel || "text-embedding-3-small";
+        };
 
-            new LoadModelModal(
-                app,
-                ollamaMessage,
-                async () => {
-                    // Fetch model info from Ollama API
-                    const cachedModelInfo = await this.fetchAndCacheModelInfo(
-                        "ollama",
-                        this.tempOllamaModel || "",
-                        this.tempOllamaUrl
-                    );
+        new LoadModelModal(
+            app,
+            message,
+            async () => {
+                const modelId = getModelId();
+                const cachedModelInfo = await fetchAndCacheModelInfo(
+                    provider,
+                    modelId,
+                    provider === "ollama" ? this.tempOllamaUrl : undefined
+                );
 
-                    await settingsService.update({
-                        modelProvider: this.tempModelProvider,
-                        ollamaUrl: this.tempOllamaUrl,
-                        ollamaModel: this.tempOllamaModel,
-                        cachedModelInfo,
-                    });
-                    // Trigger model change with new settings
-                    plugin.changeModel(this.tempOllamaModel || "");
-                    // Clear temporary state after successful apply
-                    this.clearTempState();
-                    this.render();
-                },
-                // Cancel callback - no action needed
-                Function.prototype as () => void
-            ).open();
-        }
+                const updateData: Partial<SimilarNotesSettings> = {
+                    modelProvider: provider,
+                    cachedModelInfo,
+                };
+
+                if (provider === "builtin") {
+                    updateData.modelId = modelId;
+                    updateData.useGPU = this.tempUseGPU ?? settings.useGPU;
+                } else if (provider === "ollama") {
+                    updateData.ollamaUrl = this.tempOllamaUrl;
+                    updateData.ollamaModel = this.tempOllamaModel;
+                } else if (provider === "openai") {
+                    updateData.openaiUrl = this.tempOpenaiUrl;
+                    updateData.openaiApiKey = this.tempOpenaiApiKey;
+                    updateData.openaiModel = this.tempOpenaiModel;
+                }
+
+                await settingsService.update(updateData);
+                plugin.changeModel(modelId);
+                this.clearTempState();
+                this.render();
+            },
+            Function.prototype as () => void
+        ).open();
     }
 
     private clearTempState(): void {
@@ -316,99 +337,41 @@ export class ModelSettingsSection {
         this.tempOllamaUrl = undefined;
         this.tempOllamaModel = undefined;
         this.tempUseGPU = undefined;
+        this.tempOpenaiUrl = undefined;
+        this.tempOpenaiApiKey = undefined;
+        this.tempOpenaiModel = undefined;
     }
 
     private buildCurrentModelDescription(
         settings: SimilarNotesSettings,
         cachedInfo?: CachedModelInfo
     ): string {
-        const currentModelId =
-            settings.modelProvider === "builtin"
-                ? settings.modelId
-                : settings.ollamaModel;
+        const { modelProvider } = settings;
+        const modelId =
+            modelProvider === "builtin" ? settings.modelId
+                : modelProvider === "ollama" ? settings.ollamaModel
+                    : settings.openaiModel;
 
-        // Check if cached info matches current model
-        const hasValidCache =
-            cachedInfo && cachedInfo.modelId === currentModelId;
+        if (!modelId && modelProvider !== "builtin") {
+            return modelProvider === "openai" ? "OpenAI: Not configured" : "Not configured";
+        }
 
-        if (settings.modelProvider === "builtin") {
-            const parts: string[] = [];
+        const hasValidCache = cachedInfo && cachedInfo.modelId === modelId;
+        const parts: string[] = [];
 
-            if (hasValidCache) {
-                if (cachedInfo.parameterSize) {
-                    parts.push(cachedInfo.parameterSize);
-                }
-                if (cachedInfo.embeddingLength) {
-                    parts.push(`${cachedInfo.embeddingLength}-dim`);
-                }
-            }
+        if (hasValidCache) {
+            if (cachedInfo.parameterSize) parts.push(cachedInfo.parameterSize);
+            if (cachedInfo.quantizationLevel) parts.push(cachedInfo.quantizationLevel);
+            if (cachedInfo.embeddingLength) parts.push(`${cachedInfo.embeddingLength}-dim`);
+        }
 
-            // Add GPU/CPU status
+        if (modelProvider === "builtin") {
             parts.push(settings.useGPU ? "GPU" : "CPU");
-
-            return `Built-in: ${settings.modelId} (${parts.join(", ")})`;
+            return `Built-in: ${modelId} (${parts.join(", ")})`;
         }
 
-        if (settings.modelProvider === "ollama") {
-            if (!settings.ollamaModel) {
-                return "Not configured";
-            }
-
-            const parts: string[] = [];
-
-            if (hasValidCache) {
-                if (cachedInfo.parameterSize) {
-                    parts.push(cachedInfo.parameterSize);
-                }
-                if (cachedInfo.quantizationLevel) {
-                    parts.push(cachedInfo.quantizationLevel);
-                }
-                if (cachedInfo.embeddingLength) {
-                    parts.push(`${cachedInfo.embeddingLength}-dim`);
-                }
-            }
-
-            if (parts.length > 0) {
-                return `Ollama: ${settings.ollamaModel} (${parts.join(", ")})`;
-            }
-            return `Ollama: ${settings.ollamaModel}`;
-        }
-
-        return "Not configured";
-    }
-
-    private async fetchAndCacheModelInfo(
-        provider: "builtin" | "ollama",
-        modelId: string,
-        ollamaUrl?: string
-    ): Promise<CachedModelInfo | undefined> {
-        if (provider === "builtin") {
-            const client = new HuggingFaceClient();
-            const info = await client.getModelInfo(modelId);
-
-            if (info) {
-                return {
-                    modelId,
-                    parameterCount: info.parameterCount,
-                    parameterSize: info.parameterSize,
-                };
-            }
-        } else if (provider === "ollama") {
-            const url = ollamaUrl || "http://localhost:11434";
-            const client = new OllamaClient(url);
-            const info = await client.getModelInfo(modelId);
-
-            if (info) {
-                return {
-                    modelId,
-                    parameterSize: info.parameterSize,
-                    embeddingLength: info.embeddingLength,
-                    quantizationLevel: info.quantizationLevel,
-                };
-            }
-        }
-
-        return undefined;
+        const prefix = modelProvider === "ollama" ? "Ollama" : "OpenAI";
+        return parts.length > 0 ? `${prefix}: ${modelId} (${parts.join(", ")})` : `${prefix}: ${modelId}`;
     }
 
     private updateApplyButtonState(settings: SimilarNotesSettings): void {

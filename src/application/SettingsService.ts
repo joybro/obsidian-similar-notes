@@ -10,10 +10,13 @@ export interface CachedModelInfo {
 }
 
 export interface SimilarNotesSettings {
-    modelProvider: "builtin" | "ollama"; // Model provider type
+    modelProvider: "builtin" | "ollama" | "openai"; // Model provider type
     modelId: string; // The model ID to use for embeddings
     ollamaUrl?: string; // Ollama server URL
     ollamaModel?: string; // Ollama model name
+    openaiUrl?: string; // OpenAI-compatible server URL (default: https://api.openai.com/v1)
+    openaiApiKey?: string; // OpenAI API key
+    openaiModel?: string; // OpenAI model name (default: text-embedding-3-small)
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
     showSourceChunk: boolean; // Whether to show the original chunk in the results
     useGPU: boolean; // Whether to use GPU acceleration for model inference
