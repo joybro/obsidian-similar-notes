@@ -78,7 +78,7 @@ export function renderBuiltinModelSettings(
 interface ApplyButtonProps {
     sectionContainer: HTMLElement;
     hasChanges: boolean;
-    tempModelProvider: "builtin" | "ollama" | undefined;
+    tempModelProvider: "builtin" | "ollama" | "openai" | undefined;
     onApply: () => Promise<void>;
     onButtonCreated: (button: ButtonComponent) => void;
 }
