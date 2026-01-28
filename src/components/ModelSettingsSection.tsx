@@ -238,6 +238,11 @@ export class ModelSettingsSection {
                 this.tempOpenaiModel = value;
             },
             onRender: () => this.render(),
+            getTempValues: () => ({
+                url: this.tempOpenaiUrl,
+                apiKey: this.tempOpenaiApiKey,
+                model: this.tempOpenaiModel,
+            }),
         });
     }
 
