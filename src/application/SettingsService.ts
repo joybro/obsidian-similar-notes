@@ -9,6 +9,22 @@ export interface CachedModelInfo {
     quantizationLevel?: string;   // Quantization level (for Ollama)
 }
 
+export interface DailyUsage {
+    tokens: number;
+    requestCount: number;
+}
+
+export interface TotalUsage {
+    tokens: number;
+    requestCount: number;
+    firstUseDate: string;
+}
+
+export interface UsageStats {
+    daily: Record<string, DailyUsage>; // key: "YYYY-MM-DD"
+    total: TotalUsage;
+}
+
 export interface SimilarNotesSettings {
     modelProvider: "builtin" | "ollama" | "openai"; // Model provider type
     modelId: string; // The model ID to use for embeddings
@@ -17,6 +33,8 @@ export interface SimilarNotesSettings {
     openaiUrl?: string; // OpenAI-compatible server URL (default: https://api.openai.com/v1)
     openaiApiKey?: string; // OpenAI API key
     openaiModel?: string; // OpenAI model name (default: text-embedding-3-small)
+    openaiPricePerMillionTokens?: number; // Price per million tokens for cost estimation
+    usageStats?: UsageStats; // OpenAI API usage statistics
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
     showSourceChunk: boolean; // Whether to show the original chunk in the results
     useGPU: boolean; // Whether to use GPU acceleration for model inference

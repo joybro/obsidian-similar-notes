@@ -1,6 +1,7 @@
 import log from "loglevel";
 import { type Observable, Subject } from "rxjs";
-import { OpenAIClient } from "@/adapter/openai";
+import { OpenAIClient, UsageTracker } from "@/adapter/openai";
+import type { SettingsService } from "@/application/SettingsService";
 import { handleEmbeddingLoadError, handleEmbeddingRuntimeError } from "@/utils/errorHandling";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 
@@ -8,6 +9,7 @@ export interface OpenAIConfig {
     url: string;
     apiKey?: string;
     model: string;
+    settingsService?: SettingsService;
 }
 
 // Default max tokens for OpenAI text-embedding-3 models
@@ -15,6 +17,7 @@ const DEFAULT_MAX_TOKENS = 8191;
 
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     private openaiClient: OpenAIClient;
+    private usageTracker: UsageTracker | null = null;
     private modelId: string | null = null;
     private vectorSize: number | null = null;
     private maxTokens: number = DEFAULT_MAX_TOKENS;
@@ -24,6 +27,9 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
     constructor(private config: OpenAIConfig) {
         this.openaiClient = new OpenAIClient(config.url, config.apiKey);
+        if (config.settingsService) {
+            this.usageTracker = new UsageTracker(config.settingsService);
+        }
     }
 
     async loadModel(modelId: string, config?: OpenAIConfig): Promise<ModelInfo> {
@@ -100,6 +106,15 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
             const result = await this.openaiClient.embedText(this.modelId, text);
             // Clear error state on success
             this.modelError$.next(null);
+
+            // Track usage if available
+            if (result.usage && this.usageTracker) {
+                await this.usageTracker.trackUsage(
+                    result.usage.prompt_tokens,
+                    result.usage.total_tokens
+                );
+            }
+
             return result.embedding;
         } catch (error) {
             log.error("Failed to embed text with OpenAI:", error);
@@ -125,6 +140,15 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
             const result = await this.openaiClient.embedTexts(this.modelId, texts);
             // Clear error state on success
             this.modelError$.next(null);
+
+            // Track usage if available
+            if (result.usage && this.usageTracker) {
+                await this.usageTracker.trackUsage(
+                    result.usage.prompt_tokens,
+                    result.usage.total_tokens
+                );
+            }
+
             return result.embeddings;
         } catch (error) {
             log.error("Failed to embed texts with OpenAI:", error);
