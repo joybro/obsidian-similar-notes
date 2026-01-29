@@ -25,9 +25,11 @@ interface ModelSettingsSectionProps {
 export class ModelSettingsSection {
     private downloadProgressSubscription?: { unsubscribe: () => void };
     private modelErrorSubscription?: { unsubscribe: () => void };
+    private settingsSubscription?: { unsubscribe: () => void };
     private currentDownloadProgress = 100;
     private currentModelError: string | null = null;
     private sectionContainer?: HTMLElement;
+    private usageStatsSectionContainer?: HTMLElement;
 
     // Temporary state for model changes (not saved until Apply is clicked)
     private tempModelProvider?: "builtin" | "ollama" | "openai";
@@ -46,6 +48,41 @@ export class ModelSettingsSection {
         if (props.modelService) {
             this.setupModelService(props.modelService);
         }
+        this.setupSettingsSubscription();
+    }
+
+    /**
+     * Subscribe to settings changes to update usage stats in real-time
+     */
+    private setupSettingsSubscription(): void {
+        const { settingsService } = this.props;
+
+        this.settingsSubscription = settingsService
+            .getNewSettingsObservable()
+            .subscribe((changedSettings: Partial<SimilarNotesSettings>) => {
+                // Only re-render usage stats section when usageStats changes
+                if ("usageStats" in changedSettings && this.usageStatsSectionContainer) {
+                    this.rerenderUsageStatsSection();
+                }
+            });
+    }
+
+    /**
+     * Re-render only the usage stats section without affecting other parts
+     */
+    private rerenderUsageStatsSection(): void {
+        if (!this.usageStatsSectionContainer) return;
+
+        const settings = this.props.settingsService.get();
+        if (settings.modelProvider !== "openai") return;
+
+        this.usageStatsSectionContainer.empty();
+        renderUsageStatsSection({
+            sectionContainer: this.usageStatsSectionContainer,
+            settings,
+            settingsService: this.props.settingsService,
+            onRender: () => this.render(),
+        });
     }
 
     /**
@@ -96,6 +133,10 @@ export class ModelSettingsSection {
         if (this.modelErrorSubscription) {
             this.modelErrorSubscription.unsubscribe();
             this.modelErrorSubscription = undefined;
+        }
+        if (this.settingsSubscription) {
+            this.settingsSubscription.unsubscribe();
+            this.settingsSubscription = undefined;
         }
     }
 
@@ -181,7 +222,11 @@ export class ModelSettingsSection {
 
         // Usage stats section (only for OpenAI provider when currently active)
         if (settings.modelProvider === "openai") {
-            this.renderUsageStatsSection(settings, sectionContainer);
+            // Create a dedicated container for usage stats to enable selective re-rendering
+            this.usageStatsSectionContainer = sectionContainer.createDiv("usage-stats-section");
+            this.renderUsageStatsSection(settings, this.usageStatsSectionContainer);
+        } else {
+            this.usageStatsSectionContainer = undefined;
         }
     }
 
@@ -254,10 +299,10 @@ export class ModelSettingsSection {
 
     private renderUsageStatsSection(
         settings: SimilarNotesSettings,
-        sectionContainer: HTMLElement
+        container: HTMLElement
     ): void {
         renderUsageStatsSection({
-            sectionContainer,
+            sectionContainer: container,
             settings,
             settingsService: this.props.settingsService,
             onRender: () => this.render(),
