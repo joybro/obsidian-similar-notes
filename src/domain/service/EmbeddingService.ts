@@ -102,6 +102,7 @@ export class EmbeddingService {
                 url: settings.openaiUrl || "https://api.openai.com/v1",
                 apiKey: settings.openaiApiKey,
                 model: settings.openaiModel || "text-embedding-3-small",
+                settingsService: this.settingsService,
             };
             this.provider = new OpenAIEmbeddingProvider(openaiConfig);
             this.setupProviderSubscriptions();

@@ -12,6 +12,7 @@ import { LoadModelModal } from "./LoadModelModal";
 import { fetchAndCacheModelInfo } from "./modelInfoCache";
 import { renderOllamaSettings } from "./OllamaSettingsSection";
 import { renderOpenAISettings } from "./OpenAISettingsSection";
+import { renderUsageStatsSection } from "./UsageStatsSection";
 
 interface ModelSettingsSectionProps {
     containerEl: HTMLElement;
@@ -177,6 +178,11 @@ export class ModelSettingsSection {
 
         // Model Apply Button
         this.renderApplyButton(settings, sectionContainer);
+
+        // Usage stats section (only for OpenAI provider when currently active)
+        if (settings.modelProvider === "openai") {
+            this.renderUsageStatsSection(settings, sectionContainer);
+        }
     }
 
     private renderBuiltinModelSettings(
@@ -243,6 +249,18 @@ export class ModelSettingsSection {
                 apiKey: this.tempOpenaiApiKey,
                 model: this.tempOpenaiModel,
             }),
+        });
+    }
+
+    private renderUsageStatsSection(
+        settings: SimilarNotesSettings,
+        sectionContainer: HTMLElement
+    ): void {
+        renderUsageStatsSection({
+            sectionContainer,
+            settings,
+            settingsService: this.props.settingsService,
+            onRender: () => this.render(),
         });
     }
 
