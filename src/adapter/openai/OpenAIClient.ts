@@ -1,4 +1,5 @@
 import log from "loglevel";
+import { requestUrl } from "obsidian";
 
 export interface OpenAIEmbeddingRequest {
     model: string;
@@ -75,24 +76,25 @@ export class OpenAIClient {
             log.debug(`[OpenAI] Generating embedding - text length: ${textLength} chars`);
 
             const startTime = Date.now();
-            const response = await fetch(`${this.baseUrl}/embeddings`, {
+            const response = await requestUrl({
+                url: `${this.baseUrl}/embeddings`,
                 method: "POST",
                 headers: this.buildHeaders(),
                 body: JSON.stringify({
                     model,
                     input: text,
                 } as OpenAIEmbeddingRequest),
+                throw: false,
             });
             const elapsed = Date.now() - startTime;
 
-            if (!response.ok) {
-                const errorText = await response.text();
+            if (response.status >= 400) {
                 log.error(`[OpenAI] Embedding failed after ${elapsed}ms - status: ${response.status}`);
-                throw new Error(`Failed to generate embedding: ${response.status} ${response.statusText}. ${errorText}`);
+                throw new Error(`Failed to generate embedding: ${response.status}. ${response.text}`);
             }
 
             log.debug(`[OpenAI] Embedding successful in ${elapsed}ms`);
-            const data: OpenAIEmbeddingResponse = await response.json();
+            const data: OpenAIEmbeddingResponse = response.json;
 
             if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
                 throw new Error("Invalid embedding response from OpenAI: missing data array");
@@ -125,24 +127,25 @@ export class OpenAIClient {
             log.debug(`[OpenAI] Generating batch embeddings - ${texts.length} texts`);
 
             const startTime = Date.now();
-            const response = await fetch(`${this.baseUrl}/embeddings`, {
+            const response = await requestUrl({
+                url: `${this.baseUrl}/embeddings`,
                 method: "POST",
                 headers: this.buildHeaders(),
                 body: JSON.stringify({
                     model,
                     input: texts,
                 } as OpenAIEmbeddingRequest),
+                throw: false,
             });
             const elapsed = Date.now() - startTime;
 
-            if (!response.ok) {
-                const errorText = await response.text();
+            if (response.status >= 400) {
                 log.error(`[OpenAI] Batch embedding failed after ${elapsed}ms - status: ${response.status}`);
-                throw new Error(`Failed to generate embeddings: ${response.status} ${response.statusText}. ${errorText}`);
+                throw new Error(`Failed to generate embeddings: ${response.status}. ${response.text}`);
             }
 
             log.debug(`[OpenAI] Batch embedding successful in ${elapsed}ms`);
-            const data: OpenAIEmbeddingResponse = await response.json();
+            const data: OpenAIEmbeddingResponse = response.json;
 
             if (!data.data || !Array.isArray(data.data)) {
                 throw new Error("Invalid embedding response from OpenAI: missing data array");
