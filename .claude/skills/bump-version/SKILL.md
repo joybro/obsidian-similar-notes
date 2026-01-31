@@ -38,12 +38,34 @@ LAST_STABLE=$(git tag --list --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]
 git log --oneline ${LAST_STABLE}..HEAD
 ```
 
-Categorize changes into sections:
-- **Added**: New features
-- **Changed**: Changes to existing functionality
-- **Fixed**: Bug fixes
-- **Improved**: Performance or UX improvements
-- **Other**: Miscellaneous changes
+**IMPORTANT: User perspective, not commit history**
+
+CHANGELOG is for end users, not developers. Write from the user's perspective:
+- What new capabilities can they use?
+- What existing behavior changed?
+- What bugs that affected them are fixed?
+
+**Do NOT include:**
+- Internal refactoring (unless it affects users)
+- Bug fixes for features introduced in the same release cycle
+- Intermediate fixes made during development of a new feature
+- Implementation details (API changes, code structure)
+
+**Example - What to exclude:**
+If commits show:
+```
+feat: add OpenAI integration
+fix: OpenAI token limit error
+fix: OpenAI settings UI positioning
+refactor: use requestUrl API for OpenAI
+```
+Only the first commit matters for CHANGELOG. The fixes are for bugs introduced during development of the new feature - users never experienced them.
+
+**Categorize changes into sections:**
+- **Added**: New features users can now use
+- **Changed**: Changes to existing functionality users will notice
+- **Fixed**: Bug fixes for issues that existed in previous releases
+- **Improved**: Performance or UX improvements users will notice
 
 ### 3. Update CHANGELOG.md
 
@@ -76,6 +98,9 @@ git commit -m "chore: bump version to x.x.x"
 
 | Mistake | Solution |
 |---------|----------|
+| Including development-phase bug fixes | Only include fixes for bugs in previous releases |
+| Copying commit messages directly | Summarize from user perspective |
+| Including internal refactoring | Only include if it affects user experience |
 | Pushing without user review | Always stop after commit |
 | Missing manifest.json | Check if project has manifest.json before updating |
 | Wrong changelog format | Use Keep a Changelog format consistently |
