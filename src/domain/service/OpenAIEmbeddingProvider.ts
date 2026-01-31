@@ -172,9 +172,30 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     }
 
     async countTokens(text: string): Promise<number> {
-        // Use conservative estimate (chars/3.5) to avoid exceeding API token limits
-        // This provides ~14% safety margin over the typical chars/4 approximation
-        return Math.ceil(text.length / 3.5);
+        // Token efficiency varies by language with cl100k_base encoding:
+        // - English/ASCII: ~4 chars per token
+        // - Korean/Japanese/Chinese: ~1 char per token (sometimes slightly more)
+        //
+        // Use adaptive ratio based on ASCII content percentage:
+        // - Mostly ASCII (>80%): use /4 for efficiency
+        // - Mixed or non-ASCII: use /1 for safety (Korean can be ~1.1 chars/token)
+        const asciiRatio = this.getAsciiRatio(text);
+        const charsPerToken = asciiRatio > 0.8 ? 4 : 1;
+        return Math.ceil(text.length / charsPerToken);
+    }
+
+    /**
+     * Calculate the ratio of ASCII characters in the text
+     */
+    private getAsciiRatio(text: string): number {
+        if (text.length === 0) return 1;
+        let asciiCount = 0;
+        for (let i = 0; i < text.length; i++) {
+            if (text.charCodeAt(i) < 128) {
+                asciiCount++;
+            }
+        }
+        return asciiCount / text.length;
     }
 
     getVectorSize(): number {
