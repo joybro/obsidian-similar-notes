@@ -6,5 +6,6 @@
     "description": "Find semantically similar notes using AI. Local models (mobile & desktop) or cloud APIs.",
     "author": "Young Lee",
     "authorUrl": "https://github.com/joybro",
+    "fundingUrl": "https://buymeacoffee.com/joybro",
     "isDesktopOnly": false
 }

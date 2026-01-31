@@ -1,5 +1,7 @@
 # Similar Notes for Obsidian
 
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/joybro)
+
 Find semantically similar notes using AI. Choose local models for privacy or cloud APIs for flexibility.
 
 ### Similar Notes View
