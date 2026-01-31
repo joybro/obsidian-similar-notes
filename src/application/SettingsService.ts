@@ -33,6 +33,7 @@ export interface SimilarNotesSettings {
     openaiUrl?: string; // OpenAI-compatible server URL (default: https://api.openai.com/v1)
     openaiApiKey?: string; // OpenAI API key
     openaiModel?: string; // OpenAI model name (default: text-embedding-3-small)
+    openaiMaxTokens?: number; // Max tokens for custom OpenAI-compatible models (default: 8191)
     openaiPricePerMillionTokens?: number; // Price per million tokens for cost estimation
     usageStats?: UsageStats; // OpenAI API usage statistics
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing

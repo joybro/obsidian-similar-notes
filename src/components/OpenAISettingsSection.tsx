@@ -10,12 +10,14 @@ interface OpenAISettingsSectionProps {
     tempOpenaiUrl: string | undefined;
     tempOpenaiApiKey: string | undefined;
     tempOpenaiModel: string | undefined;
+    tempOpenaiMaxTokens: number | undefined;
     onOpenaiUrlChange: (value: string) => void;
     onOpenaiApiKeyChange: (value: string) => void;
     onOpenaiModelChange: (value: string) => void;
+    onOpenaiMaxTokensChange: (value: number | undefined) => void;
     onRender: () => void;
     // Getter functions to get latest temp values (to avoid closure issues)
-    getTempValues?: () => { url?: string; apiKey?: string; model?: string };
+    getTempValues?: () => { url?: string; apiKey?: string; model?: string; maxTokens?: number };
 }
 
 // Predefined OpenAI embedding models
@@ -33,9 +35,11 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
         tempOpenaiUrl,
         tempOpenaiApiKey,
         tempOpenaiModel,
+        tempOpenaiMaxTokens,
         onOpenaiUrlChange,
         onOpenaiApiKeyChange,
         onOpenaiModelChange,
+        onOpenaiMaxTokensChange,
         onRender,
         getTempValues,
     } = props;
@@ -114,6 +118,22 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
                         .setValue(openaiModel)
                         .onChange((value) => {
                             onOpenaiModelChange(value);
+                        });
+                });
+        });
+
+        // Max tokens input for custom models
+        const openaiMaxTokens = tempOpenaiMaxTokens ?? settings.openaiMaxTokens;
+        builders.push((setting) => {
+            setting
+                .setName("Max tokens")
+                .setDesc("Maximum tokens per chunk for this model")
+                .addText((text) => {
+                    text.setPlaceholder("8191")
+                        .setValue(openaiMaxTokens?.toString() ?? "")
+                        .onChange((value) => {
+                            const parsed = parseInt(value, 10);
+                            onOpenaiMaxTokensChange(isNaN(parsed) ? undefined : parsed);
                         });
                 });
         });
