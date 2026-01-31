@@ -3,7 +3,7 @@
     "name": "Similar Notes",
     "version": "0.12.0",
     "minAppVersion": "1.8.9",
-    "description": "Find semantically similar notes using local AI. Works on desktop and mobile without external servers.",
+    "description": "Find semantically similar notes using AI. Local models (mobile & desktop) or cloud APIs.",
     "author": "Young Lee",
     "authorUrl": "https://github.com/joybro",
     "isDesktopOnly": false
