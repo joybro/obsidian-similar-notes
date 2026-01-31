@@ -9,6 +9,7 @@ export interface OpenAIConfig {
     url: string;
     apiKey?: string;
     model: string;
+    maxTokens?: number;
     settingsService?: SettingsService;
 }
 
@@ -27,6 +28,9 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
     constructor(private config: OpenAIConfig) {
         this.openaiClient = new OpenAIClient(config.url, config.apiKey);
+        if (config.maxTokens) {
+            this.maxTokens = config.maxTokens;
+        }
         if (config.settingsService) {
             this.usageTracker = new UsageTracker(config.settingsService);
         }
@@ -47,6 +51,9 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
         if (finalConfig.apiKey !== this.config.apiKey) {
             this.openaiClient.setApiKey(finalConfig.apiKey);
             this.config.apiKey = finalConfig.apiKey;
+        }
+        if (finalConfig.maxTokens) {
+            this.maxTokens = finalConfig.maxTokens;
         }
 
         try {
@@ -165,9 +172,9 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     }
 
     async countTokens(text: string): Promise<number> {
-        // OpenAI uses ~4 characters per token on average
-        // This is a rough approximation without using tiktoken
-        return Math.ceil(text.length / 4);
+        // Use conservative estimate (chars/3.5) to avoid exceeding API token limits
+        // This provides ~14% safety margin over the typical chars/4 approximation
+        return Math.ceil(text.length / 3.5);
     }
 
     getVectorSize(): number {

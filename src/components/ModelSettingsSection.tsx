@@ -40,6 +40,7 @@ export class ModelSettingsSection {
     private tempOpenaiUrl?: string;
     private tempOpenaiApiKey?: string;
     private tempOpenaiModel?: string;
+    private tempOpenaiMaxTokens?: number;
 
     // Apply button reference for direct updates
     private applyButton?: ButtonComponent;
@@ -164,6 +165,7 @@ export class ModelSettingsSection {
         this.tempOpenaiUrl = this.tempOpenaiUrl ?? settings.openaiUrl;
         this.tempOpenaiApiKey = this.tempOpenaiApiKey ?? settings.openaiApiKey;
         this.tempOpenaiModel = this.tempOpenaiModel ?? settings.openaiModel;
+        this.tempOpenaiMaxTokens = this.tempOpenaiMaxTokens ?? settings.openaiMaxTokens;
 
         const sectionContainer = this.sectionContainer;
 
@@ -275,6 +277,7 @@ export class ModelSettingsSection {
                 tempOpenaiUrl: this.tempOpenaiUrl,
                 tempOpenaiApiKey: this.tempOpenaiApiKey,
                 tempOpenaiModel: this.tempOpenaiModel,
+                tempOpenaiMaxTokens: this.tempOpenaiMaxTokens,
                 onOpenaiUrlChange: (value: string) => {
                     this.tempOpenaiUrl = value;
                 },
@@ -284,11 +287,15 @@ export class ModelSettingsSection {
                 onOpenaiModelChange: (value: string) => {
                     this.tempOpenaiModel = value;
                 },
+                onOpenaiMaxTokensChange: (value: number | undefined) => {
+                    this.tempOpenaiMaxTokens = value;
+                },
                 onRender: () => this.render(),
                 getTempValues: () => ({
                     url: this.tempOpenaiUrl,
                     apiKey: this.tempOpenaiApiKey,
                     model: this.tempOpenaiModel,
+                    maxTokens: this.tempOpenaiMaxTokens,
                 }),
             });
         }
@@ -334,7 +341,8 @@ export class ModelSettingsSection {
             (this.tempModelProvider === "openai" &&
                 (this.tempOpenaiUrl !== settings.openaiUrl ||
                     this.tempOpenaiApiKey !== settings.openaiApiKey ||
-                    this.tempOpenaiModel !== settings.openaiModel))
+                    this.tempOpenaiModel !== settings.openaiModel ||
+                    this.tempOpenaiMaxTokens !== settings.openaiMaxTokens))
         );
     }
 
@@ -382,6 +390,7 @@ export class ModelSettingsSection {
                     updateData.openaiUrl = this.tempOpenaiUrl ?? settings.openaiUrl;
                     updateData.openaiApiKey = this.tempOpenaiApiKey ?? settings.openaiApiKey;
                     updateData.openaiModel = this.tempOpenaiModel ?? "text-embedding-3-small";
+                    updateData.openaiMaxTokens = this.tempOpenaiMaxTokens ?? settings.openaiMaxTokens;
                 }
 
                 await settingsService.update(updateData);
@@ -402,6 +411,7 @@ export class ModelSettingsSection {
         this.tempOpenaiUrl = undefined;
         this.tempOpenaiApiKey = undefined;
         this.tempOpenaiModel = undefined;
+        this.tempOpenaiMaxTokens = undefined;
     }
 
     private buildCurrentModelDescription(
