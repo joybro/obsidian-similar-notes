@@ -55,23 +55,24 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
 
         // Update dropdown if it exists
         if (dropdownComponent) {
-            dropdownComponent.selectEl.empty();
+            const dropdown = dropdownComponent;
+            dropdown.selectEl.empty();
 
             if (modelLoadError) {
-                dropdownComponent.addOption("", `Error: ${modelLoadError}`);
+                dropdown.addOption("", `Error: ${modelLoadError}`);
             } else if (ollamaModels.length === 0) {
-                dropdownComponent.addOption("", "No models found");
+                dropdown.addOption("", "No models found");
             } else {
-                dropdownComponent.addOption("", "Select a model");
+                dropdown.addOption("", "Select a model");
                 ollamaModels.forEach((model) => {
                     const displayText = model.isEmbeddingModel
                         ? model.name
                         : `${model.name} (not embed)`;
-                    dropdownComponent!.addOption(model.name, displayText);
+                    dropdown.addOption(model.name, displayText);
                 });
 
                 // Disable non-embedding model options via DOM
-                const options = dropdownComponent.selectEl.querySelectorAll("option");
+                const options = dropdown.selectEl.querySelectorAll("option");
                 ollamaModels.forEach((model, index) => {
                     const optionEl = options[index + 1] as HTMLOptionElement; // +1: skip "Select a model"
                     if (optionEl && !model.isEmbeddingModel) {
@@ -82,7 +83,7 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                 // Set current value if it exists in the list
                 const modelNames = ollamaModels.map(m => m.name);
                 if (tempOllamaModel && modelNames.includes(tempOllamaModel)) {
-                    dropdownComponent.setValue(tempOllamaModel);
+                    dropdown.setValue(tempOllamaModel);
                 }
             }
         }
