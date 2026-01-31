@@ -1,9 +1,11 @@
 import { OpenAIClient } from "@/adapter/openai";
 import type { SimilarNotesSettings } from "@/application/SettingsService";
-import { Notice, Setting } from "obsidian";
+import { Notice } from "obsidian";
+import type { Setting } from "obsidian";
+
+export type SettingBuilder = (setting: Setting) => void;
 
 interface OpenAISettingsSectionProps {
-    sectionContainer: HTMLElement;
     settings: SimilarNotesSettings;
     tempOpenaiUrl: string | undefined;
     tempOpenaiApiKey: string | undefined;
@@ -25,9 +27,8 @@ const OPENAI_MODELS = [
 
 const DEFAULT_OPENAI_URL = "https://api.openai.com/v1";
 
-export function renderOpenAISettings(props: OpenAISettingsSectionProps): void {
+export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): SettingBuilder[] {
     const {
-        sectionContainer,
         settings,
         tempOpenaiUrl,
         tempOpenaiApiKey,
@@ -42,108 +43,118 @@ export function renderOpenAISettings(props: OpenAISettingsSectionProps): void {
     const openaiUrl = tempOpenaiUrl ?? settings.openaiUrl ?? DEFAULT_OPENAI_URL;
     const openaiApiKey = tempOpenaiApiKey ?? settings.openaiApiKey ?? "";
     const openaiModel = tempOpenaiModel ?? settings.openaiModel ?? "text-embedding-3-small";
+    const isCustomModel = !OPENAI_MODELS.some((m) => m.id === openaiModel);
 
-    // Server URL setting
-    new Setting(sectionContainer)
-        .setName("Server URL")
-        .setDesc("URL of your OpenAI-compatible server (default: https://api.openai.com/v1)")
-        .addText((text) => {
-            text.setPlaceholder(DEFAULT_OPENAI_URL)
-                .setValue(openaiUrl)
-                .onChange((value) => {
-                    onOpenaiUrlChange(value);
+    const builders: SettingBuilder[] = [
+        // Server URL
+        (setting) => {
+            setting
+                .setName("Server URL")
+                .setDesc("URL of your OpenAI-compatible server (default: https://api.openai.com/v1)")
+                .addText((text) => {
+                    text.setPlaceholder(DEFAULT_OPENAI_URL)
+                        .setValue(openaiUrl)
+                        .onChange((value) => {
+                            onOpenaiUrlChange(value);
+                        });
                 });
-        });
-
-    // API Key setting
-    new Setting(sectionContainer)
-        .setName("API Key")
-        .setDesc("Your OpenAI API key (required for OpenAI, optional for local servers)")
-        .addText((text) => {
-            text.setPlaceholder("sk-...")
-                .setValue(openaiApiKey)
-                .onChange((value) => {
-                    onOpenaiApiKeyChange(value);
+        },
+        // API Key
+        (setting) => {
+            setting
+                .setName("API Key")
+                .setDesc("Your OpenAI API key (required for OpenAI, optional for local servers)")
+                .addText((text) => {
+                    text.setPlaceholder("sk-...")
+                        .setValue(openaiApiKey)
+                        .onChange((value) => {
+                            onOpenaiApiKeyChange(value);
+                        });
+                    // Make it a password field
+                    text.inputEl.type = "password";
                 });
-            // Make it a password field
-            text.inputEl.type = "password";
-        });
+        },
+        // Model dropdown
+        (setting) => {
+            setting
+                .setName("Model")
+                .setDesc("Select an embedding model")
+                .addDropdown((dropdown) => {
+                    // Add predefined models
+                    OPENAI_MODELS.forEach((model) => {
+                        dropdown.addOption(model.id, model.name);
+                    });
+                    // Add custom option
+                    dropdown.addOption("custom", "Custom model...");
 
-    // Model selection
-    const modelSetting = new Setting(sectionContainer)
-        .setName("OpenAI model")
-        .setDesc("Select an embedding model");
+                    // Set current value
+                    dropdown.setValue(isCustomModel ? "custom" : openaiModel);
 
-    modelSetting.addDropdown((dropdown) => {
-        // Add predefined models
-        OPENAI_MODELS.forEach((model) => {
-            dropdown.addOption(model.id, model.name);
-        });
-        // Add custom option
-        dropdown.addOption("custom", "Custom model...");
-
-        // Set current value
-        const isCustom = !OPENAI_MODELS.some((m) => m.id === openaiModel);
-        dropdown.setValue(isCustom ? "custom" : openaiModel);
-
-        dropdown.onChange((value) => {
-            if (value === "custom") {
-                // Will show custom input
-                onRender();
-            } else {
-                onOpenaiModelChange(value);
-                onRender();
-            }
-        });
-    });
+                    dropdown.onChange((value) => {
+                        if (value === "custom") {
+                            // Will show custom input
+                            onRender();
+                        } else {
+                            onOpenaiModelChange(value);
+                            onRender();
+                        }
+                    });
+                });
+        },
+    ];
 
     // Show custom model input if custom is selected
-    const isCustomModel = !OPENAI_MODELS.some((m) => m.id === openaiModel);
     if (isCustomModel) {
-        new Setting(sectionContainer)
-            .setName("Custom model ID")
-            .setDesc("Enter the model ID for your OpenAI-compatible server")
-            .addText((text) => {
-                text.setPlaceholder("model-name")
-                    .setValue(openaiModel)
-                    .onChange((value) => {
-                        onOpenaiModelChange(value);
-                    });
-            });
+        builders.push((setting) => {
+            setting
+                .setName("Custom model ID")
+                .setDesc("Enter the model ID for your OpenAI-compatible server")
+                .addText((text) => {
+                    text.setPlaceholder("model-name")
+                        .setValue(openaiModel)
+                        .onChange((value) => {
+                            onOpenaiModelChange(value);
+                        });
+                });
+        });
     }
 
-    // Test connection button
-    new Setting(sectionContainer)
-        .setName("Test connection")
-        .setDesc("Test the connection to the server and model")
-        .addButton((button) => {
-            button.setButtonText("Test").onClick(async () => {
-                // Use getter function to get latest temp values (avoids closure issues)
-                const tempValues = getTempValues?.() ?? {};
-                const url = tempValues.url ?? settings.openaiUrl ?? DEFAULT_OPENAI_URL;
-                const apiKey = tempValues.apiKey ?? settings.openaiApiKey;
-                const model = tempValues.model ?? settings.openaiModel ?? "text-embedding-3-small";
+    // Test connection
+    builders.push((setting) => {
+        setting
+            .setName("Test connection")
+            .setDesc("Test the connection to the server and model")
+            .addButton((button) => {
+                button.setButtonText("Test").onClick(async () => {
+                    // Use getter function to get latest temp values (avoids closure issues)
+                    const tempValues = getTempValues?.() ?? {};
+                    const url = tempValues.url ?? settings.openaiUrl ?? DEFAULT_OPENAI_URL;
+                    const apiKey = tempValues.apiKey ?? settings.openaiApiKey;
+                    const model = tempValues.model ?? settings.openaiModel ?? "text-embedding-3-small";
 
-                if (!model) {
-                    new Notice("Please select or enter a model first");
-                    return;
-                }
-
-                new Notice(`Testing connection to ${url} with model ${model}...`);
-
-                try {
-                    const client = new OpenAIClient(url, apiKey || undefined);
-                    const success = await client.testConnection(model);
-
-                    if (success) {
-                        new Notice("Connection successful! Model is ready for embeddings.");
-                    } else {
-                        new Notice("Connection failed: Could not generate test embedding");
+                    if (!model) {
+                        new Notice("Please select or enter a model first");
+                        return;
                     }
-                } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : String(error);
-                    new Notice(`Connection failed: ${errorMessage}`);
-                }
+
+                    new Notice(`Testing connection to ${url} with model ${model}...`);
+
+                    try {
+                        const client = new OpenAIClient(url, apiKey || undefined);
+                        const success = await client.testConnection(model);
+
+                        if (success) {
+                            new Notice("Connection successful! Model is ready for embeddings.");
+                        } else {
+                            new Notice("Connection failed: Could not generate test embedding");
+                        }
+                    } catch (error) {
+                        const errorMessage = error instanceof Error ? error.message : String(error);
+                        new Notice(`Connection failed: ${errorMessage}`);
+                    }
+                });
             });
-        });
+    });
+
+    return builders;
 }

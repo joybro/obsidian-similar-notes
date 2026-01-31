@@ -4,10 +4,11 @@ import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeSto
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import { collectEnvironmentInfo, formatEnvironmentInfoAsMarkdown } from "@/utils/environmentInfo";
 import log from "loglevel";
-import { apiVersion, Notice, PluginSettingTab, Setting } from "obsidian";
+import { apiVersion, Notice, PluginSettingTab, SettingGroup, type Setting } from "obsidian";
 import type MainPlugin from "../main";
 import { ModelSettingsSection } from "./ModelSettingsSection";
 import { IndexSettingsSection } from "./IndexSettingsSection";
+import type { SettingBuilder } from "./OpenAISettingsSection";
 
 const GITHUB_ISSUES_URL = "https://github.com/joybro/obsidian-similar-notes/issues";
 
@@ -131,7 +132,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     }
 
     display(): void {
-        const settings = this.settingsService.get();
         const { containerEl } = this;
         containerEl.empty();
 
@@ -163,139 +163,169 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             indexedChunkCount: this.indexedChunkCount
         });
 
-        // Add spacing between Index and Display sections
-        containerEl.createDiv("setting-item-separator");
+        // Display settings group
+        const displayGroup = new SettingGroup(containerEl).setHeading("Display");
+        const displayBuilders = this.getDisplaySettingBuilders();
+        displayBuilders.forEach(builder => displayGroup.addSetting(builder));
 
-        new Setting(containerEl).setName("Display").setHeading();
+        // Debug & Support settings group
+        const debugGroup = new SettingGroup(containerEl).setHeading("Debug & Support");
+        const debugBuilders = this.getDebugSettingBuilders();
+        debugBuilders.forEach(builder => debugGroup.addSetting(builder));
+    }
 
-        new Setting(containerEl)
-            .setName("Show similar notes at the bottom of notes")
-            .setDesc("Display similar notes section at the bottom of each note")
-            .addToggle((toggle) => {
-                toggle.setValue(settings.showAtBottom).onChange((value) => {
-                    this.settingsService.update({ showAtBottom: value });
-                });
-            });
+    private getDisplaySettingBuilders(): SettingBuilder[] {
+        const settings = this.settingsService.get();
 
-        new Setting(containerEl)
-            .setName("Note display mode")
-            .setDesc("Choose how note names are displayed in the results")
-            .addDropdown((dropdown) => {
-                dropdown
-                    .addOption("title", "Title only")
-                    .addOption("path", "Full path")
-                    .addOption("smart", "Smart (path when duplicates exist)")
-                    .setValue(settings.noteDisplayMode)
-                    .onChange(async (value: "title" | "path" | "smart") => {
-                        await this.settingsService.update({
-                            noteDisplayMode: value,
+        return [
+            // Show at bottom
+            (setting: Setting) => {
+                setting
+                    .setName("Show similar notes at the bottom of notes")
+                    .setDesc("Display similar notes section at the bottom of each note")
+                    .addToggle((toggle) => {
+                        toggle.setValue(settings.showAtBottom).onChange((value) => {
+                            this.settingsService.update({ showAtBottom: value });
                         });
                     });
-            });
+            },
+            // Note display mode
+            (setting: Setting) => {
+                setting
+                    .setName("Note display mode")
+                    .setDesc("Choose how note names are displayed in the results")
+                    .addDropdown((dropdown) => {
+                        dropdown
+                            .addOption("title", "Title only")
+                            .addOption("path", "Full path")
+                            .addOption("smart", "Smart (path when duplicates exist)")
+                            .setValue(settings.noteDisplayMode)
+                            .onChange(async (value: "title" | "path" | "smart") => {
+                                await this.settingsService.update({
+                                    noteDisplayMode: value,
+                                });
+                            });
+                    });
+            },
+            // Show source chunk
+            (setting: Setting) => {
+                setting
+                    .setName("Show source chunk in results")
+                    .setDesc(
+                        "If enabled, the source chunk (the part of your current note used for similarity search) will be shown in the results"
+                    )
+                    .addToggle((toggle) => {
+                        toggle
+                            .setValue(settings.showSourceChunk)
+                            .onChange(async (value) => {
+                                await this.settingsService.update({
+                                    showSourceChunk: value,
+                                });
+                            });
+                    });
+            },
+            // Sidebar result count
+            (setting: Setting) => {
+                setting
+                    .setName("Number of results in sidebar")
+                    .setDesc("Maximum number of similar notes to display in the sidebar (1-50)")
+                    .addText((text) => {
+                        text
+                            .setValue(String(settings.sidebarResultCount))
+                            .onChange(async (value) => {
+                                const num = parseInt(value, 10);
+                                if (!isNaN(num) && num >= 1 && num <= 50) {
+                                    await this.settingsService.update({
+                                        sidebarResultCount: num,
+                                    });
+                                }
+                            });
+                        text.inputEl.type = "number";
+                        text.inputEl.min = "1";
+                        text.inputEl.max = "50";
+                        text.inputEl.style.width = "60px";
+                    });
+            },
+            // Bottom result count
+            (setting: Setting) => {
+                setting
+                    .setName("Number of results at bottom")
+                    .setDesc("Maximum number of similar notes to display at the bottom of notes (1-20)")
+                    .addText((text) => {
+                        text
+                            .setValue(String(settings.bottomResultCount))
+                            .onChange(async (value) => {
+                                const num = parseInt(value, 10);
+                                if (!isNaN(num) && num >= 1 && num <= 20) {
+                                    await this.settingsService.update({
+                                        bottomResultCount: num,
+                                    });
+                                }
+                            });
+                        text.inputEl.type = "number";
+                        text.inputEl.min = "1";
+                        text.inputEl.max = "20";
+                        text.inputEl.style.width = "60px";
+                    });
+            },
+        ];
+    }
 
-        new Setting(containerEl)
-            .setName("Show source chunk in results")
-            .setDesc(
-                "If enabled, the source chunk (the part of your current note used for similarity search) will be shown in the results"
-            )
-            .addToggle((toggle) => {
-                toggle
-                    .setValue(settings.showSourceChunk)
-                    .onChange(async (value) => {
-                        await this.settingsService.update({
-                            showSourceChunk: value,
+    private getDebugSettingBuilders(): SettingBuilder[] {
+        const settings = this.settingsService.get();
+
+        return [
+            // Log level
+            (setting: Setting) => {
+                setting
+                    .setName("Log level")
+                    .setDesc("Set the logging level for debugging purposes")
+                    .addDropdown((dropdown) => {
+                        dropdown
+                            .addOption(log.levels.TRACE.toString(), "TRACE")
+                            .addOption(log.levels.DEBUG.toString(), "DEBUG")
+                            .addOption(log.levels.INFO.toString(), "INFO")
+                            .addOption(log.levels.WARN.toString(), "WARN")
+                            .addOption(log.levels.ERROR.toString(), "ERROR")
+                            .addOption(log.levels.SILENT.toString(), "SILENT")
+                            .setValue(log.getLevel().toString())
+                            .onChange((value) => {
+                                this.plugin.setLogLevel(
+                                    Number(value) as log.LogLevelDesc
+                                );
+                            });
+                    });
+            },
+            // Copy environment info
+            (setting: Setting) => {
+                setting
+                    .setName("Copy environment info")
+                    .setDesc("Copy your environment and settings info to clipboard for bug reports")
+                    .addButton((button) => {
+                        button.setButtonText("Copy to Clipboard").onClick(() => {
+                            const envInfo = collectEnvironmentInfo(
+                                apiVersion,
+                                this.plugin.manifest.version,
+                                settings
+                            );
+                            const markdown = formatEnvironmentInfoAsMarkdown(envInfo);
+                            navigator.clipboard.writeText(markdown);
+                            new Notice("Environment info copied to clipboard");
                         });
                     });
-            });
-
-        new Setting(containerEl)
-            .setName("Number of results in sidebar")
-            .setDesc("Maximum number of similar notes to display in the sidebar (1-50)")
-            .addText((text) => {
-                text
-                    .setValue(String(settings.sidebarResultCount))
-                    .onChange(async (value) => {
-                        const num = parseInt(value, 10);
-                        if (!isNaN(num) && num >= 1 && num <= 50) {
-                            await this.settingsService.update({
-                                sidebarResultCount: num,
-                            });
-                        }
+            },
+            // Report a bug
+            (setting: Setting) => {
+                setting
+                    .setName("Report a bug")
+                    .setDesc("Open GitHub issues page to report bugs or request features")
+                    .addButton((button) => {
+                        button.setButtonText("Open").onClick(() => {
+                            window.open(GITHUB_ISSUES_URL, "_blank");
+                        });
                     });
-                text.inputEl.type = "number";
-                text.inputEl.min = "1";
-                text.inputEl.max = "50";
-                text.inputEl.style.width = "60px";
-            });
-
-        new Setting(containerEl)
-            .setName("Number of results at bottom")
-            .setDesc("Maximum number of similar notes to display at the bottom of notes (1-20)")
-            .addText((text) => {
-                text
-                    .setValue(String(settings.bottomResultCount))
-                    .onChange(async (value) => {
-                        const num = parseInt(value, 10);
-                        if (!isNaN(num) && num >= 1 && num <= 20) {
-                            await this.settingsService.update({
-                                bottomResultCount: num,
-                            });
-                        }
-                    });
-                text.inputEl.type = "number";
-                text.inputEl.min = "1";
-                text.inputEl.max = "20";
-                text.inputEl.style.width = "60px";
-            });
-
-        // Add spacing between Display and Debug & Support sections
-        containerEl.createDiv("setting-item-separator");
-
-        new Setting(containerEl).setName("Debug & Support").setHeading();
-
-        new Setting(containerEl)
-            .setName("Log level")
-            .setDesc("Set the logging level for debugging purposes")
-            .addDropdown((dropdown) => {
-                dropdown
-                    .addOption(log.levels.TRACE.toString(), "TRACE")
-                    .addOption(log.levels.DEBUG.toString(), "DEBUG")
-                    .addOption(log.levels.INFO.toString(), "INFO")
-                    .addOption(log.levels.WARN.toString(), "WARN")
-                    .addOption(log.levels.ERROR.toString(), "ERROR")
-                    .addOption(log.levels.SILENT.toString(), "SILENT")
-                    .setValue(log.getLevel().toString())
-                    .onChange((value) => {
-                        this.plugin.setLogLevel(
-                            Number(value) as log.LogLevelDesc
-                        );
-                    });
-            });
-
-        new Setting(containerEl)
-            .setName("Copy environment info")
-            .setDesc("Copy your environment and settings info to clipboard for bug reports")
-            .addButton((button) => {
-                button.setButtonText("Copy to Clipboard").onClick(() => {
-                    const envInfo = collectEnvironmentInfo(
-                        apiVersion,
-                        this.plugin.manifest.version,
-                        settings
-                    );
-                    const markdown = formatEnvironmentInfoAsMarkdown(envInfo);
-                    navigator.clipboard.writeText(markdown);
-                    new Notice("Environment info copied to clipboard");
-                });
-            });
-
-        new Setting(containerEl)
-            .setName("Report a bug")
-            .setDesc("Open GitHub issues page to report bugs or request features")
-            .addButton((button) => {
-                button.setButtonText("Open").onClick(() => {
-                    window.open(GITHUB_ISSUES_URL, "_blank");
-                });
-            });
+            },
+        ];
     }
 
 }

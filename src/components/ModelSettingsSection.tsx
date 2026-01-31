@@ -1,17 +1,17 @@
 import type { SettingsService } from "@/application/SettingsService";
 import type { CachedModelInfo, SimilarNotesSettings } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
-import { Setting } from "obsidian";
+import { SettingGroup } from "obsidian";
 import type { App, ButtonComponent } from "obsidian";
 import type MainPlugin from "../main";
 import {
-    renderApplyButton,
-    renderBuiltinModelSettings,
+    getApplyButtonBuilder,
+    getBuiltinModelSettingBuilders,
 } from "./BuiltinModelSettingsSection";
 import { LoadModelModal } from "./LoadModelModal";
 import { fetchAndCacheModelInfo } from "./modelInfoCache";
-import { renderOllamaSettings } from "./OllamaSettingsSection";
-import { renderOpenAISettings } from "./OpenAISettingsSection";
+import { getOllamaSettingBuilders } from "./OllamaSettingsSection";
+import { getOpenAISettingBuilders, type SettingBuilder } from "./OpenAISettingsSection";
 import { renderUsageStatsSection } from "./UsageStatsSection";
 
 interface ModelSettingsSectionProps {
@@ -166,7 +166,6 @@ export class ModelSettingsSection {
         this.tempOpenaiModel = this.tempOpenaiModel ?? settings.openaiModel;
 
         const sectionContainer = this.sectionContainer;
-        new Setting(sectionContainer).setName("Model").setHeading();
 
         // Current model display - use cached model info from settings
         const cachedInfo = settings.cachedModelInfo;
@@ -187,113 +186,119 @@ export class ModelSettingsSection {
             currentModelDesc += ` - Error: ${this.currentModelError}`;
         }
 
-        new Setting(sectionContainer)
-            .setName("Current model")
-            .setDesc(currentModelDesc);
-
-        // Model Provider Selection
-        new Setting(sectionContainer)
-            .setName("Model provider")
-            .setDesc("Choose between built-in models, Ollama, or OpenAI API")
-            .addDropdown((dropdown) => {
-                dropdown
-                    .addOption("builtin", "Built-in Models")
-                    .addOption("ollama", "Ollama")
-                    .addOption("openai", "OpenAI")
-                    .setValue(this.tempModelProvider || "builtin")
-                    .onChange((value: "builtin" | "ollama" | "openai") => {
-                        this.tempModelProvider = value;
-                        // Redraw settings to show/hide provider-specific options
-                        this.render();
+        // Build the unified settings group
+        const settingGroup = new SettingGroup(sectionContainer)
+            .setHeading("Model")
+            .addSetting((setting) => {
+                setting.setName("Current model").setDesc(currentModelDesc);
+            })
+            .addSetting((setting) => {
+                setting
+                    .setName("Model provider")
+                    .setDesc("Choose between built-in models, Ollama, or OpenAI API")
+                    .addDropdown((dropdown) => {
+                        dropdown
+                            .addOption("builtin", "Built-in Models")
+                            .addOption("ollama", "Ollama")
+                            .addOption("openai", "OpenAI")
+                            .setValue(this.tempModelProvider || "builtin")
+                            .onChange((value: "builtin" | "ollama" | "openai") => {
+                                this.tempModelProvider = value;
+                                // Redraw settings to show/hide provider-specific options
+                                this.render();
+                            });
                     });
             });
 
-        // Provider-specific settings
-        if (this.tempModelProvider === "builtin") {
-            this.renderBuiltinModelSettings(settings, sectionContainer);
-        } else if (this.tempModelProvider === "ollama") {
-            this.renderOllamaModelSettings(settings, sectionContainer);
-        } else if (this.tempModelProvider === "openai") {
-            this.renderOpenAIModelSettings(settings, sectionContainer);
-        }
+        // Get provider-specific setting builders
+        const providerBuilders = this.getProviderSettingBuilders(settings);
+        providerBuilders.forEach(builder => settingGroup.addSetting(builder));
 
-        // Model Apply Button
-        this.renderApplyButton(settings, sectionContainer);
+        // Get apply button builder
+        const applyButtonBuilder = this.getApplyButtonBuilder(settings);
+        settingGroup.addSetting(applyButtonBuilder);
 
         // Usage stats section (only for OpenAI provider when currently active)
+        // Use containerEl (parent) instead of sectionContainer to maintain proper spacing between groups
         if (settings.modelProvider === "openai") {
             // Create a dedicated container for usage stats to enable selective re-rendering
-            this.usageStatsSectionContainer = sectionContainer.createDiv("usage-stats-section");
+            this.usageStatsSectionContainer = containerEl.createDiv("usage-stats-section");
             this.renderUsageStatsSection(settings, this.usageStatsSectionContainer);
         } else {
             this.usageStatsSectionContainer = undefined;
         }
     }
 
-    private renderBuiltinModelSettings(
-        settings: SimilarNotesSettings,
-        sectionContainer: HTMLElement
-    ): void {
-        renderBuiltinModelSettings({
-            sectionContainer,
-            settings,
-            tempModelId: this.tempModelId,
-            tempUseGPU: this.tempUseGPU,
-            onModelIdChange: (value) => {
-                this.tempModelId = value;
-            },
-            onUseGPUChange: (value) => {
-                this.tempUseGPU = value;
-            },
-            onRender: () => this.render(),
-            updateApplyButtonState: () => this.updateApplyButtonState(settings),
-        });
+    private getProviderSettingBuilders(settings: SimilarNotesSettings): SettingBuilder[] {
+        if (this.tempModelProvider === "builtin") {
+            return getBuiltinModelSettingBuilders({
+                settings,
+                tempModelId: this.tempModelId,
+                tempUseGPU: this.tempUseGPU,
+                onModelIdChange: (value: string) => {
+                    this.tempModelId = value;
+                },
+                onUseGPUChange: (value: boolean) => {
+                    this.tempUseGPU = value;
+                },
+                onRender: () => this.render(),
+                updateApplyButtonState: () => this.updateApplyButtonState(settings),
+            });
+        } else if (this.tempModelProvider === "ollama") {
+            const result = getOllamaSettingBuilders({
+                settings,
+                tempOllamaUrl: this.tempOllamaUrl,
+                tempOllamaModel: this.tempOllamaModel,
+                onOllamaUrlChange: (value: string) => {
+                    this.tempOllamaUrl = value;
+                },
+                onOllamaModelChange: (value: string) => {
+                    this.tempOllamaModel = value;
+                },
+                onRender: () => this.render(),
+                onDropdownCreated: () => {
+                    // Dropdown reference handled internally
+                },
+            });
+            // Fetch models after render
+            setTimeout(() => result.fetchModels(), 0);
+            return result.builders;
+        } else if (this.tempModelProvider === "openai") {
+            return getOpenAISettingBuilders({
+                settings,
+                tempOpenaiUrl: this.tempOpenaiUrl,
+                tempOpenaiApiKey: this.tempOpenaiApiKey,
+                tempOpenaiModel: this.tempOpenaiModel,
+                onOpenaiUrlChange: (value: string) => {
+                    this.tempOpenaiUrl = value;
+                },
+                onOpenaiApiKeyChange: (value: string) => {
+                    this.tempOpenaiApiKey = value;
+                },
+                onOpenaiModelChange: (value: string) => {
+                    this.tempOpenaiModel = value;
+                },
+                onRender: () => this.render(),
+                getTempValues: () => ({
+                    url: this.tempOpenaiUrl,
+                    apiKey: this.tempOpenaiApiKey,
+                    model: this.tempOpenaiModel,
+                }),
+            });
+        }
+        return [];
     }
 
-    private renderOllamaModelSettings(
-        settings: SimilarNotesSettings,
-        sectionContainer: HTMLElement
-    ): void {
-        renderOllamaSettings({
-            sectionContainer,
-            settings,
-            tempOllamaUrl: this.tempOllamaUrl,
-            tempOllamaModel: this.tempOllamaModel,
-            onOllamaUrlChange: (value) => {
-                this.tempOllamaUrl = value;
-            },
-            onOllamaModelChange: (value) => {
-                this.tempOllamaModel = value;
-            },
-            onRender: () => this.render(),
-        });
-    }
+    private getApplyButtonBuilder(settings: SimilarNotesSettings): SettingBuilder {
+        const hasChanges = this.hasModelChanges(settings);
 
-    private renderOpenAIModelSettings(
-        settings: SimilarNotesSettings,
-        sectionContainer: HTMLElement
-    ): void {
-        renderOpenAISettings({
-            sectionContainer,
-            settings,
-            tempOpenaiUrl: this.tempOpenaiUrl,
-            tempOpenaiApiKey: this.tempOpenaiApiKey,
-            tempOpenaiModel: this.tempOpenaiModel,
-            onOpenaiUrlChange: (value) => {
-                this.tempOpenaiUrl = value;
+        return getApplyButtonBuilder({
+            hasChanges,
+            tempModelProvider: this.tempModelProvider,
+            onApply: () => this.applyModelChanges(settings),
+            onButtonCreated: (button: ButtonComponent) => {
+                this.applyButton = button;
             },
-            onOpenaiApiKeyChange: (value) => {
-                this.tempOpenaiApiKey = value;
-            },
-            onOpenaiModelChange: (value) => {
-                this.tempOpenaiModel = value;
-            },
-            onRender: () => this.render(),
-            getTempValues: () => ({
-                url: this.tempOpenaiUrl,
-                apiKey: this.tempOpenaiApiKey,
-                model: this.tempOpenaiModel,
-            }),
         });
     }
 
@@ -306,23 +311,6 @@ export class ModelSettingsSection {
             settings,
             settingsService: this.props.settingsService,
             onRender: () => this.render(),
-        });
-    }
-
-    private renderApplyButton(
-        settings: SimilarNotesSettings,
-        sectionContainer: HTMLElement
-    ): void {
-        const hasChanges = this.hasModelChanges(settings);
-
-        renderApplyButton({
-            sectionContainer,
-            hasChanges,
-            tempModelProvider: this.tempModelProvider,
-            onApply: () => this.applyModelChanges(settings),
-            onButtonCreated: (button) => {
-                this.applyButton = button;
-            },
         });
     }
 

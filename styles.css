@@ -340,3 +340,15 @@ select option:disabled {
     color: var(--text-muted);
     font-style: italic;
 }
+
+/* Settings section wrappers - match Obsidian's setting-group margin (24px) for proper spacing */
+.usage-stats-section:not(:first-child),
+.index-settings-section:not(:first-child) {
+    margin-top: var(--size-4-6);
+}
+
+/* SettingGroup after wrapper divs needs margin since wrapper has no margin */
+.index-settings-section + .setting-group,
+.model-settings-section + .setting-group {
+    margin-top: var(--size-4-6);
+}
