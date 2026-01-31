@@ -202,7 +202,7 @@ export class ModelSettingsSection {
                         dropdown
                             .addOption("builtin", "Built-in Models")
                             .addOption("ollama", "Ollama")
-                            .addOption("openai", "OpenAI")
+                            .addOption("openai", "OpenAI / Compatible")
                             .setValue(this.tempModelProvider || "builtin")
                             .onChange((value: "builtin" | "ollama" | "openai") => {
                                 this.tempModelProvider = value;
