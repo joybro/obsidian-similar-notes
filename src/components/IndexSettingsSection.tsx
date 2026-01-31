@@ -103,6 +103,26 @@ export class IndexSettingsSection {
                     this.excludedStat = this.statsContainer.createDiv("similar-notes-stat-item");
                 }
             },
+            // Indexing delay
+            (setting) => {
+                setting
+                    .setName("Indexing delay")
+                    .setDesc("Wait time (seconds) after file changes before indexing. Higher values reduce API costs for paid providers.")
+                    .addText((text) => {
+                        text.inputEl.type = "number";
+                        text.inputEl.min = "0";
+                        text.inputEl.max = "60";
+                        text.inputEl.step = "1";
+                        text.setValue(String(settings.indexingDelaySeconds ?? 1));
+                        text.setPlaceholder("1");
+                        text.onChange(async (value) => {
+                            const numValue = parseInt(value, 10);
+                            if (!isNaN(numValue) && numValue >= 0 && numValue <= 60) {
+                                await settingsService.update({ indexingDelaySeconds: numValue });
+                            }
+                        });
+                    });
+            },
             // Reindex notes
             (setting) => {
                 setting

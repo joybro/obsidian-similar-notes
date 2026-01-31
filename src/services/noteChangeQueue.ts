@@ -38,6 +38,11 @@ export class NoteChangeQueue {
     private eventRefs: EventRef[] = [];
 
     /**
+     * Pending modification timeouts for debouncing
+     */
+    private pendingModifications: Map<string, NodeJS.Timeout> = new Map();
+
+    /**
      * Creates a new file change queue
      */
     constructor(
@@ -89,24 +94,38 @@ export class NoteChangeQueue {
         });
         this.eventRefs.push(createRef);
 
-        // Register callback for file modification
+        // Register callback for file modification (with debounce)
         const modifyRef = this.vault.on("modify", async (file: TFile) => {
             if (file.extension === "md") {
                 const settings = this.settingsService.get();
                 // Check if file should be excluded
                 const files = filterMarkdownFiles([file], settings.excludeFolderPatterns);
                 if (files.length > 0) {
-                    // Remove the file from the queue if it exists
-                    this.queue = this.queue.filter(
-                        (change) => change.path !== file.path
-                    );
+                    // Clear existing pending timeout for this file
+                    const existingTimeout = this.pendingModifications.get(file.path);
+                    if (existingTimeout) {
+                        clearTimeout(existingTimeout);
+                    }
 
-                    // Add to queue with hash
-                    this.queue.push({
-                        path: file.path,
-                        reason: "modified" as const,
-                        mtime: file.stat.mtime,
-                    });
+                    // Set debounced queue addition
+                    const delayMs = (settings.indexingDelaySeconds ?? 1) * 1000;
+                    const timeout = setTimeout(() => {
+                        this.pendingModifications.delete(file.path);
+
+                        // Remove the file from the queue if it exists
+                        this.queue = this.queue.filter(
+                            (change) => change.path !== file.path
+                        );
+
+                        // Add to queue
+                        this.queue.push({
+                            path: file.path,
+                            reason: "modified" as const,
+                            mtime: file.stat.mtime,
+                        });
+                    }, delayMs);
+
+                    this.pendingModifications.set(file.path, timeout);
                 }
             }
         });
@@ -180,6 +199,12 @@ export class NoteChangeQueue {
      * This should be called when the queue is no longer needed
      */
     cleanup(): void {
+        // Clear all pending modification timeouts
+        for (const timeout of this.pendingModifications.values()) {
+            clearTimeout(timeout);
+        }
+        this.pendingModifications.clear();
+
         this.unregisterFileChangeCallbacks();
     }
 
