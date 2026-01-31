@@ -80,6 +80,7 @@ describe("FileChangeQueue", () => {
         mockSettingsService = {
             get: vi.fn().mockReturnValue({
                 excludeFolderPatterns: [],
+                indexingDelaySeconds: 0, // Disable debounce for tests
             }),
         } as unknown as SettingsService;
         
@@ -226,6 +227,7 @@ describe("FileChangeQueue", () => {
         const unregisterRename = vi.fn();
 
         beforeEach(async () => {
+            vi.useFakeTimers();
             // Capture the callbacks when they're registered
             (mockVault.on as ReturnType<typeof vi.fn>).mockImplementation(
                 (event: string, callback: (file: TFile, oldPath?: string) => void | Promise<void>) => {
@@ -260,6 +262,10 @@ describe("FileChangeQueue", () => {
                 return -1;
             });
             await fileChangeQueue.initialize();
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
         });
 
         test("should handle file creation events", async () => {
@@ -297,6 +303,9 @@ describe("FileChangeQueue", () => {
             // Simulate a file modification event
             await modifyCallback(testFile1);
 
+            // Advance timers to trigger debounced callback
+            vi.runAllTimers();
+
             // Should have added the file to the queue
             expect(fileChangeQueue.getFileChangeCount()).toBe(1);
 
@@ -329,7 +338,10 @@ describe("FileChangeQueue", () => {
             // Simulate a file modification event
             await modifyCallback(testFile1);
 
-            // Should have added the file to the queue
+            // Advance timers to trigger debounced callback
+            vi.runAllTimers();
+
+            // Should have added the file to the queue (only once due to debounce)
             expect(fileChangeQueue.getFileChangeCount()).toBe(1);
 
             const changes = fileChangeQueue.pollFileChanges(1);
