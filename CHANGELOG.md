@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-02-01
+
+### Added
+
+-   **OpenAI Embeddings API Integration**: Use OpenAI's embedding models or any OpenAI-compatible API
+    -   Support for text-embedding-3-small, text-embedding-3-large, and text-embedding-ada-002
+    -   Compatible with any OpenAI-compatible API endpoints (e.g., Azure OpenAI, local servers)
+    -   Custom model support for OpenAI-compatible APIs
+    -   Real-time usage statistics tracking during indexing
+    -   API usage stats display in settings (total tokens used)
+-   **Configurable Indexing Delay**: New setting to control delay between indexing notes
+    -   Helps prevent rate limiting when using cloud APIs
+    -   Configurable from 0ms to 5000ms
+
+### Changed
+
+-   Default to OpenAI provider on mobile for new installations
+
+### Fixed
+
+-   Filter non-embedding models in Ollama model dropdown
+
+### Improved
+
+-   Consistent settings UI using Obsidian's SettingGroup API
+
 ## [0.12.0] - 2026-01-18
 
 ### Added
