@@ -1,7 +1,7 @@
 {
     "id": "similar-notes",
     "name": "Similar Notes",
-    "version": "0.12.0",
+    "version": "1.0.0",
     "minAppVersion": "1.8.9",
     "description": "Find semantically similar notes using AI. Local models (mobile & desktop) or cloud APIs.",
     "author": "Young Lee",
