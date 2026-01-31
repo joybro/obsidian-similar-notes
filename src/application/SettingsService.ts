@@ -1,4 +1,4 @@
-import type { Plugin } from "obsidian";
+import { Platform, type Plugin } from "obsidian";
 import { type Observable, Subject } from "rxjs";
 
 export interface CachedModelInfo {
@@ -78,6 +78,12 @@ export class SettingsService {
     async load(): Promise<void> {
         const data = await this.plugin.loadData();
         this.settings = { ...DEFAULT_SETTINGS, ...data };
+
+        // For new mobile installations, default to OpenAI provider
+        // Built-in models can cause crashes on mobile devices
+        if (!data && Platform.isMobileApp) {
+            this.settings.modelProvider = "openai";
+        }
     }
 
     async save(): Promise<void> {
