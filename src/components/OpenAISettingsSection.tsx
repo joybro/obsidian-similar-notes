@@ -92,12 +92,12 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
 
                     dropdown.onChange((value) => {
                         if (value === "custom") {
-                            // Will show custom input
-                            onRender();
+                            // Set to "custom" to trigger custom input display
+                            onOpenaiModelChange("custom");
                         } else {
                             onOpenaiModelChange(value);
-                            onRender();
                         }
+                        onRender();
                     });
                 });
         },

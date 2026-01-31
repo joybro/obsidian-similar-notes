@@ -219,13 +219,19 @@ export class ModelSettingsSection {
         settingGroup.addSetting(applyButtonBuilder);
 
         // Usage stats section (only for OpenAI provider when currently active)
-        // Use containerEl (parent) instead of sectionContainer to maintain proper spacing between groups
-        if (settings.modelProvider === "openai") {
-            // Create a dedicated container for usage stats to enable selective re-rendering
-            this.usageStatsSectionContainer = containerEl.createDiv("usage-stats-section");
-            this.renderUsageStatsSection(settings, this.usageStatsSectionContainer);
-        } else {
+        // First, remove existing usage stats container if it exists
+        if (this.usageStatsSectionContainer) {
+            this.usageStatsSectionContainer.remove();
             this.usageStatsSectionContainer = undefined;
+        }
+
+        if (settings.modelProvider === "openai") {
+            // Create and insert usage stats container right after model section
+            // Using insertAdjacentElement to ensure proper positioning
+            this.usageStatsSectionContainer = document.createElement("div");
+            this.usageStatsSectionContainer.addClass("usage-stats-section");
+            sectionContainer.insertAdjacentElement("afterend", this.usageStatsSectionContainer);
+            this.renderUsageStatsSection(settings, this.usageStatsSectionContainer);
         }
     }
 
