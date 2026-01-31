@@ -1,28 +1,26 @@
 # Similar Notes for Obsidian
 
-Find semantically similar notes using AI, directly on your device. Works on both desktop and mobile without external servers.
-
-![Demo](images/demo.gif)
-
-## Features
-
--   **Mobile & Desktop**: Works on iOS, Android, and all desktop platforms
--   **100% Private**: All processing happens locally on your device
--   **Built-in Models**: Uses Hugging Face models, no setup required
--   **Ollama Support**: Connect to custom models via Ollama (desktop only)
--   **No API Keys**: No ChatGPT, Claude, or cloud services needed
-
-## How It Works
-
-The plugin understands the meaning behind your content, not just keywords.
+Find semantically similar notes using AI. Choose local models for privacy or cloud APIs for flexibility.
 
 ### Similar Notes View
 
-As you write, the 5 most similar notes appear at the bottom of your current note, excluding already-linked notes.
+As you write, similar notes appear at the bottom of your current note.
+
+![Similar Notes Demo](images/demo.gif)
 
 ### Semantic Search
 
-Use the command palette (`Similar Notes: Semantic search`) to search your vault by meaning. Type any text or paste content to find related notes — like Quick Switcher, but semantic.
+Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not just keywords.
+
+![Semantic Search Demo](images/semantic-search-demo.gif)
+
+## Features
+
+- **Flexible Options**: Run locally (100% private) or use cloud APIs like OpenAI
+- **Mobile & Desktop**: Built-in models work on iOS, Android, and all desktop platforms
+- **OpenAI Support**: Use OpenAI embedding models or any OpenAI-compatible API
+- **Ollama Support**: Connect to custom models via Ollama (desktop only)
+- **No Setup Required**: Built-in models work out of the box, no API keys needed
 
 ## Getting Started
 
@@ -37,39 +35,40 @@ Progress appears in the status bar.
 
 ### Built-in Models (Mobile & Desktop)
 
--   **Default**: `all-MiniLM-L6-v2` (English)
--   **Multilingual**: `paraphrase-multilingual-MiniLM-L12-v2`
--   **Custom**: Any Sentence Transformer model from Hugging Face
+Supports any Sentence Transformer model from Hugging Face. Local processing, no API keys required.
+
+**Recommended:**
+
+- `all-MiniLM-L6-v2` (English, default)
+- `paraphrase-multilingual-MiniLM-L12-v2` (multilingual)
+
+> **Mobile note**: Large models may cause crashes due to memory limits. Consider using the default model or OpenAI API on mobile.
+
+### OpenAI / Compatible API
+
+Supports any OpenAI-compatible embedding API.
+
+**Recommended:**
+
+- `text-embedding-3-small`
+
+> **Note for CJK users**: For Chinese, Japanese, and Korean text, multilingual models like `bge-m3` (via Ollama) often outperform OpenAI models in both quality and token efficiency.
 
 ### Ollama (Desktop Only)
 
-Connect to any Ollama embedding model on `localhost:11434`
+Supports any Ollama embedding model.
 
-> Changing models triggers re-indexing.
+**Recommended:**
 
-#### Known Issues with Ollama
-
-**Ollama v0.12.5+ has known stability issues** that may cause embedding failures with error messages like:
-
-- `500 Internal Server Error`
-- `EOF` errors in Ollama logs
-- Random failures even with small payloads
-
-This is a [known bug in Ollama](https://github.com/ollama/ollama/issues/12585) affecting the llama.cpp backend. The plugin automatically detects safe payload sizes, but failures may still occur randomly.
-
-**Workaround**: If you experience frequent failures, consider:
-- Using the built-in Transformers.js models instead (more stable)
-- Waiting for an Ollama update that fixes this issue
-- Using an older Ollama version (< v0.12.5) if possible
-
-The plugin will automatically use larger chunk sizes once Ollama releases a fix.
+- `nomic-embed-text` (English)
+- `bge-m3` (multilingual)
 
 ## Technical Details
 
--   **Transformers.js**: Runs Hugging Face models directly in Obsidian
--   **WebGPU**: GPU acceleration on desktop, automatic CPU fallback
--   **Orama**: Built-in vector database for fast search
--   **Web Workers**: All processing runs in background threads
+- **Transformers.js**: Runs Hugging Face models directly in Obsidian
+- **WebGPU**: GPU acceleration on desktop, automatic CPU fallback
+- **Orama**: Built-in vector database for fast search
+- **Web Workers**: All processing runs in background threads
 
 ## Multi-Device Usage
 
@@ -77,9 +76,9 @@ This plugin stores all data locally in IndexedDB, which is device-specific stora
 
 **What this means:**
 
--   Each device maintains its own independent index
--   Obsidian Sync, iCloud, Syncthing, or any other file sync tool will **not sync the plugin's data**
--   When you open your vault on a new device, the plugin will automatically index your notes from scratch
+- Each device maintains its own independent index
+- Obsidian Sync, iCloud, Syncthing, or any other file sync tool will **not sync the plugin's data**
+- When you open your vault on a new device, the plugin will automatically index your notes from scratch
 
 This is by design - IndexedDB provides fast, reliable local storage that doesn't interfere with vault syncing.
 
