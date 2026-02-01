@@ -9,16 +9,19 @@ Similar Notes is an Obsidian plugin that provides semantic note recommendations 
 ## Common Development Commands
 
 ### Build Commands
+
 - `npm run dev` - Start development build with watch mode
 - `npm run build` - Production build with TypeScript checking
 - `npm install` - Install dependencies
 
 ### Testing
+
 - `npm run test` - Run all tests
 - `npm run test:watch` - Run tests in watch mode
 - `npm run test -- path/to/test` - Run specific test file
 
 ### Development Workflow
+
 1. Run `npm run dev` to start the development build
 2. The plugin will be built to `main.js`, `styles.css`, and `manifest.json`
 3. Copy these files to your Obsidian vault's `.obsidian/plugins/similar-notes/` directory
@@ -47,10 +50,3 @@ Similar Notes is an Obsidian plugin that provides semantic note recommendations 
 1. **Worker Loading**: If embedding service fails, check worker bundle generation in build config
 2. **Model Download**: First-time model download can take time; check network connectivity
 3. **Memory Usage**: Large vaults may consume significant memory for embeddings storage
-
-## Shared Knowledge Base
-
-The `ai-workspace/` directory is a shared knowledge repository across multiple projects (symlinked).
-
-- **Search for existing knowledge**: Before diving into unfamiliar topics (e.g., Capacitor, iOS, mobile development), check `ai-workspace/knowledge/` for relevant documentation and solutions.
-- **Contribute new knowledge**: When you discover reusable insights, patterns, or solutions that could benefit other projects, add them to `ai-workspace/knowledge/` with clear documentation.
