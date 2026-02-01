@@ -1,3 +1,4 @@
+import { showNoteErrorNotice } from "@/utils/errorHandling";
 import log from "loglevel";
 import type { Note } from "../model/Note";
 import type { NoteChunk } from "../model/NoteChunk";
@@ -31,17 +32,23 @@ export class SimilarNoteFinder {
                 return [];
             }
 
-            noteChunks = await Promise.all(
-                splitted.map(async (chunk) => {
-                    // Include title in first chunk to make it searchable
-                    const textToEmbed = chunk.chunkIndex === 0
-                        ? `${chunk.title}\n\n${chunk.content}`
-                        : chunk.content;
-                    return chunk.withEmbedding(
-                        await this.modelService.embedText(textToEmbed)
-                    );
-                })
-            );
+            try {
+                noteChunks = await Promise.all(
+                    splitted.map(async (chunk) => {
+                        // Include title in first chunk to make it searchable
+                        const textToEmbed = chunk.chunkIndex === 0
+                            ? `${chunk.title}\n\n${chunk.content}`
+                            : chunk.content;
+                        return chunk.withEmbedding(
+                            await this.modelService.embedText(textToEmbed)
+                        );
+                    })
+                );
+            } catch (error) {
+                log.error("Failed to generate embeddings for note:", note.path, error);
+                showNoteErrorNotice(note.path, error);
+                return [];
+            }
         } else {
             log.debug(`[SimilarNoteFinder] Using ${noteChunks.length} pre-indexed chunks for: ${note.path}`);
         }

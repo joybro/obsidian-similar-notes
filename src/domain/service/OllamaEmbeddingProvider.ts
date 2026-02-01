@@ -1,7 +1,7 @@
 import log from "loglevel";
 import { type Observable, Subject } from "rxjs";
 import { OllamaClient } from "@/adapter/ollama";
-import { handleEmbeddingLoadError, handleEmbeddingRuntimeError } from "@/utils/errorHandling";
+import { handleEmbeddingLoadError } from "@/utils/errorHandling";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 
 export interface OllamaConfig {
@@ -113,13 +113,6 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
             return result;
         } catch (error) {
             log.error("Failed to embed text with Ollama:", error);
-
-            // Handle runtime errors with throttled notifications
-            handleEmbeddingRuntimeError(error, {
-                providerName: "Ollama",
-                errorSubject: this.modelError$
-            });
-
             throw error;
         } finally {
             this.modelBusy$.next(false);
@@ -146,13 +139,6 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
             return results;
         } catch (error) {
             log.error("Failed to embed texts with Ollama:", error);
-
-            // Handle runtime errors with throttled notifications
-            handleEmbeddingRuntimeError(error, {
-                providerName: "Ollama",
-                errorSubject: this.modelError$
-            });
-
             throw error;
         } finally {
             this.modelBusy$.next(false);

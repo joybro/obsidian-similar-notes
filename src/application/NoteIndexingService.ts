@@ -4,6 +4,7 @@ import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { NoteChangeQueue } from "@/services/noteChangeQueue";
+import { showNoteErrorNotice } from "@/utils/errorHandling";
 import log from "loglevel";
 import type { App } from "obsidian";
 import { type Observable, BehaviorSubject } from "rxjs";
@@ -117,7 +118,7 @@ export class NoteIndexingService {
             );
         } catch (error) {
             log.error("Failed to generate embeddings for note:", path, error);
-            // Error notice is already shown by the provider, just skip this note
+            showNoteErrorNotice(path, error);
             return;
         }
 
