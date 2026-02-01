@@ -177,3 +177,28 @@ export function handleEmbeddingRuntimeError(
     // Emit error state
     config.errorSubject.next(userFriendlyMessage);
 }
+
+/**
+ * Extract note name from path
+ */
+function extractNoteName(notePath: string): string {
+    const parts = notePath.split("/");
+    return parts[parts.length - 1];
+}
+
+/**
+ * Show a throttled error notice for note processing failures
+ * Includes the note name for easy identification
+ */
+export function showNoteErrorNotice(notePath: string, error: unknown): void {
+    const noteName = extractNoteName(notePath);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const userFriendlyMessage = extractUserFriendlyMessage(errorMessage);
+
+    // Use note path as throttle key to avoid spam for same note
+    throttledNoticeManager.showThrottled(
+        `note-error:${notePath}`,
+        `${PLUGIN_NAME}: Failed to process '${noteName}': ${userFriendlyMessage}`,
+        8000
+    );
+}

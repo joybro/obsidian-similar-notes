@@ -1,8 +1,8 @@
-import log from "loglevel";
-import { type Observable, Subject } from "rxjs";
 import { OpenAIClient, UsageTracker } from "@/adapter/openai";
 import type { SettingsService } from "@/application/SettingsService";
-import { handleEmbeddingLoadError, handleEmbeddingRuntimeError } from "@/utils/errorHandling";
+import { handleEmbeddingLoadError } from "@/utils/errorHandling";
+import log from "loglevel";
+import { type Observable, Subject } from "rxjs";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 
 export interface OpenAIConfig {
@@ -125,12 +125,6 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
             return result.embedding;
         } catch (error) {
             log.error("Failed to embed text with OpenAI:", error);
-
-            handleEmbeddingRuntimeError(error, {
-                providerName: "OpenAI",
-                errorSubject: this.modelError$,
-            });
-
             throw error;
         } finally {
             this.modelBusy$.next(false);
@@ -159,12 +153,6 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
             return result.embeddings;
         } catch (error) {
             log.error("Failed to embed texts with OpenAI:", error);
-
-            handleEmbeddingRuntimeError(error, {
-                providerName: "OpenAI",
-                errorSubject: this.modelError$,
-            });
-
             throw error;
         } finally {
             this.modelBusy$.next(false);
