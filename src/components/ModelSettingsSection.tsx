@@ -78,7 +78,7 @@ export class ModelSettingsSection {
         if (!this.usageStatsSectionContainer) return;
 
         const settings = this.props.settingsService.get();
-        if (settings.modelProvider !== "openai") return;
+        if (settings.modelProvider !== "openai" && settings.modelProvider !== "gemini") return;
 
         this.usageStatsSectionContainer.empty();
         renderUsageStatsSection({

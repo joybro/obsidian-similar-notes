@@ -131,11 +131,16 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 
             // Track usage with estimated tokens (Gemini API doesn't return usage info)
             if (this.usageTracker) {
-                let totalTokens = 0;
-                for (const text of texts) {
-                    totalTokens += await this.countTokens(text);
+                try {
+                    let totalTokens = 0;
+                    for (const text of texts) {
+                        totalTokens += await this.countTokens(text);
+                    }
+                    log.debug(`[Gemini] Tracking usage: ${totalTokens} tokens for ${texts.length} texts`);
+                    await this.usageTracker.trackUsage(totalTokens, totalTokens);
+                } catch (error) {
+                    log.error("[Gemini] Failed to track usage:", error);
                 }
-                await this.usageTracker.trackUsage(totalTokens, totalTokens);
             }
 
             return result.embeddings;
