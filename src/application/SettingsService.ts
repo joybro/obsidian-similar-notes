@@ -26,7 +26,7 @@ export interface UsageStats {
 }
 
 export interface SimilarNotesSettings {
-    modelProvider: "builtin" | "ollama" | "openai"; // Model provider type
+    modelProvider: "builtin" | "ollama" | "openai" | "gemini"; // Model provider type
     modelId: string; // The model ID to use for embeddings
     ollamaUrl?: string; // Ollama server URL
     ollamaModel?: string; // Ollama model name
@@ -35,7 +35,9 @@ export interface SimilarNotesSettings {
     openaiModel?: string; // OpenAI model name (default: text-embedding-3-small)
     openaiMaxTokens?: number; // Max tokens for custom OpenAI-compatible models (default: 8191)
     openaiPricePerMillionTokens?: number; // Price per million tokens for cost estimation
-    usageStats?: UsageStats; // OpenAI API usage statistics
+    geminiApiKey?: string; // Google Gemini API key
+    geminiModel?: string; // Gemini model name (default: text-embedding-004)
+    usageStats?: UsageStats; // API usage statistics
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
     showSourceChunk: boolean; // Whether to show the original chunk in the results
     useGPU: boolean; // Whether to use GPU acceleration for model inference
