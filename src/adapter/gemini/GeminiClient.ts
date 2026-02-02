@@ -38,6 +38,16 @@ export interface GeminiBatchEmbeddingResult {
     embeddings: number[][];
 }
 
+export interface GeminiCountTokensRequest {
+    contents: Array<{
+        parts: Array<{ text: string }>;
+    }>;
+}
+
+export interface GeminiCountTokensResponse {
+    totalTokens: number;
+}
+
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 export class GeminiClient {
@@ -165,6 +175,59 @@ export class GeminiClient {
             log.error("Failed to generate batch embeddings with Gemini:", error);
             throw error;
         }
+    }
+
+    /**
+     * Count tokens in a text using Gemini API
+     * Uses gemini-2.0-flash-lite model for token counting (fast and cheap)
+     */
+    async countTokens(text: string): Promise<number> {
+        try {
+            const response = await requestUrl({
+                url: `${this.baseUrl}/models/gemini-2.0-flash-lite:countTokens`,
+                method: "POST",
+                headers: this.buildHeaders(),
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text }] }],
+                } as GeminiCountTokensRequest),
+                throw: false,
+            });
+
+            if (response.status >= 400) {
+                log.warn(`[Gemini] countTokens failed - status: ${response.status}, falling back to estimation`);
+                return this.estimateTokens(text);
+            }
+
+            const data: GeminiCountTokensResponse = response.json;
+            return data.totalTokens;
+        } catch (error) {
+            log.warn("[Gemini] countTokens failed, falling back to estimation:", error);
+            return this.estimateTokens(text);
+        }
+    }
+
+    /**
+     * Estimate token count (fallback when API is unavailable)
+     */
+    private estimateTokens(text: string): number {
+        // ASCII-heavy text: ~4 chars per token, CJK-heavy: ~1 char per token
+        const asciiRatio = this.getAsciiRatio(text);
+        const charsPerToken = asciiRatio > 0.8 ? 4 : 1;
+        return Math.ceil(text.length / charsPerToken);
+    }
+
+    /**
+     * Calculate the ratio of ASCII characters in the text
+     */
+    private getAsciiRatio(text: string): number {
+        if (text.length === 0) return 1;
+        let asciiCount = 0;
+        for (let i = 0; i < text.length; i++) {
+            if (text.charCodeAt(i) < 128) {
+                asciiCount++;
+            }
+        }
+        return asciiCount / text.length;
     }
 
     /**
