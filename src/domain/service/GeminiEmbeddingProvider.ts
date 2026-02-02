@@ -197,4 +197,11 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
     getConfig(): GeminiConfig {
         return { ...this.config };
     }
+
+    /**
+     * Gemini supports parallel file processing for better throughput
+     */
+    supportsParallelProcessing(): boolean {
+        return true;
+    }
 }

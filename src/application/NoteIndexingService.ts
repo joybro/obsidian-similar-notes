@@ -30,22 +30,37 @@ export class NoteIndexingService {
             const count = this.noteChangeQueue.getFileChangeCount();
             this.noteChangeCount$.next(count);
 
-            const changes = await this.noteChangeQueue.pollFileChanges(1);
+            // Determine concurrency based on provider capability
+            const supportsParallel = this.embeddingService.supportsParallelProcessing();
+            const concurrency = supportsParallel ? 5 : 1;
+
+            const changes = await this.noteChangeQueue.pollFileChanges(concurrency);
             if (changes.length === 0) {
                 this.fileChangeLoopTimer = setTimeout(fileChangeLoop, 1000);
                 return;
             }
 
-            const change = changes[0];
-            log.info(`[NoteIndexingService] ===== Processing change: ${change.path} (${change.reason}) =====`);
+            // Process files in parallel (or sequentially if concurrency=1)
+            await Promise.allSettled(
+                changes.map(async (change) => {
+                    log.info(`[NoteIndexingService] ===== Processing change: ${change.path} (${change.reason}) =====`);
 
-            if (change.reason === "deleted") {
-                await this.processDeletedNote(change.path);
-            } else {
-                await this.processUpdatedNote(change.path);
-            }
+                    try {
+                        if (change.reason === "deleted") {
+                            await this.processDeletedNote(change.path);
+                        } else {
+                            await this.processUpdatedNote(change.path);
+                        }
 
-            await this.noteChangeQueue.markNoteChangeProcessed(change);
+                        // Only mark as processed on success
+                        await this.noteChangeQueue.markNoteChangeProcessed(change);
+                    } catch (error) {
+                        log.error(`[NoteIndexingService] Failed to process ${change.path}:`, error);
+                        // File not marked as processed, will retry
+                        // Error notification already shown in processUpdatedNote
+                    }
+                })
+            );
 
             fileChangeLoop();
         };
@@ -105,16 +120,20 @@ export class NoteIndexingService {
         log.info(`[NoteIndexingService] Generating embeddings for ${splitted.length} chunks (for indexing)`);
         let noteChunks;
         try {
-            noteChunks = await Promise.all(
-                splitted.map(async (chunk) => {
-                    // Include title in first chunk to make it searchable
-                    const textToEmbed = chunk.chunkIndex === 0
-                        ? `${chunk.title}\n\n${chunk.content}`
-                        : chunk.content;
-                    return chunk.withEmbedding(
-                        await this.embeddingService.embedText(textToEmbed)
-                    );
-                })
+            // Prepare all texts for batch embedding
+            const textsToEmbed = splitted.map((chunk) =>
+                // Include title in first chunk to make it searchable
+                chunk.chunkIndex === 0
+                    ? `${chunk.title}\n\n${chunk.content}`
+                    : chunk.content
+            );
+
+            // Single batch API call for all chunks
+            const embeddings = await this.embeddingService.embedTexts(textsToEmbed);
+
+            // Map embeddings back to chunks by index
+            noteChunks = splitted.map((chunk, index) =>
+                chunk.withEmbedding(embeddings[index])
             );
         } catch (error) {
             log.error("Failed to generate embeddings for note:", path, error);

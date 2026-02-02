@@ -266,4 +266,12 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     getConfig(): OllamaConfig {
         return { ...this.config };
     }
+
+    /**
+     * Ollama processes requests in a queue internally on the server side
+     * Parallel file processing would not improve performance and adds network overhead
+     */
+    supportsParallelProcessing(): boolean {
+        return false;
+    }
 }

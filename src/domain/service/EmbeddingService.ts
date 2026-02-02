@@ -294,4 +294,13 @@ export class EmbeddingService {
             this.provider.setLogLevel(level);
         }
     }
+
+    /**
+     * Check if the current provider supports parallel file processing
+     * Cloud providers (OpenAI, Gemini) return true for better throughput
+     * Local providers (Transformers, Ollama) return false to avoid resource contention
+     */
+    public supportsParallelProcessing(): boolean {
+        return this.provider?.supportsParallelProcessing() ?? false;
+    }
 }
