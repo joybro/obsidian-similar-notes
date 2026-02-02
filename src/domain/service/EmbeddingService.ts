@@ -3,6 +3,10 @@ import log from "loglevel";
 import { Subject, type Observable, type Subscription } from "rxjs";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 import {
+    GeminiEmbeddingProvider,
+    type GeminiConfig,
+} from "./GeminiEmbeddingProvider";
+import {
     OllamaEmbeddingProvider,
     type OllamaConfig,
 } from "./OllamaEmbeddingProvider";
@@ -17,7 +21,7 @@ import {
 
 export class EmbeddingService {
     private provider: EmbeddingProvider | null = null;
-    private currentProviderType: "builtin" | "ollama" | "openai" | null = null;
+    private currentProviderType: "builtin" | "ollama" | "openai" | "gemini" | null = null;
 
     constructor(private settingsService?: SettingsService) {}
 
@@ -48,7 +52,9 @@ export class EmbeddingService {
                     ? settings.modelId
                     : newProviderType === "ollama"
                         ? settings.ollamaModel
-                        : settings.openaiModel;
+                        : newProviderType === "openai"
+                            ? settings.openaiModel
+                            : settings.geminiModel;
 
             if (currentModelId === targetModelId) {
                 // For builtin provider, GPU settings change requires reload
@@ -108,6 +114,16 @@ export class EmbeddingService {
             this.provider = new OpenAIEmbeddingProvider(openaiConfig);
             this.setupProviderSubscriptions();
             await this.loadModel(settings.openaiModel || "text-embedding-3-small", openaiConfig);
+        } else if (newProviderType === "gemini") {
+            log.info("Switching to Gemini embedding provider");
+            const geminiConfig: GeminiConfig = {
+                apiKey: settings.geminiApiKey,
+                model: settings.geminiModel || "gemini-embedding-001",
+                settingsService: this.settingsService,
+            };
+            this.provider = new GeminiEmbeddingProvider(geminiConfig);
+            this.setupProviderSubscriptions();
+            await this.loadModel(settings.geminiModel || "gemini-embedding-001", geminiConfig);
         } else {
             throw new Error(`Unknown provider type: ${newProviderType}`);
         }
@@ -147,7 +163,7 @@ export class EmbeddingService {
      */
     async loadModel(
         modelId: string,
-        config?: TransformersConfig | OllamaConfig | OpenAIConfig
+        config?: TransformersConfig | OllamaConfig | OpenAIConfig | GeminiConfig
     ): Promise<ModelInfo> {
         if (!this.provider) {
             throw new Error("No embedding provider initialized");
@@ -255,7 +271,7 @@ export class EmbeddingService {
         return this.provider?.getCurrentModelId() ?? null;
     }
 
-    public getCurrentProviderType(): "builtin" | "ollama" | "openai" | null {
+    public getCurrentProviderType(): "builtin" | "ollama" | "openai" | "gemini" | null {
         return this.currentProviderType;
     }
 

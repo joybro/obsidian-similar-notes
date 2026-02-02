@@ -6,7 +6,7 @@ import type { CachedModelInfo } from "@/application/SettingsService";
  * Fetch and cache model info from the appropriate API based on provider
  */
 export async function fetchAndCacheModelInfo(
-    provider: "builtin" | "ollama" | "openai",
+    provider: "builtin" | "ollama" | "openai" | "gemini",
     modelId: string,
     ollamaUrl?: string
 ): Promise<CachedModelInfo | undefined> {
@@ -40,6 +40,22 @@ export async function fetchAndCacheModelInfo(
             "text-embedding-3-small": { embeddingLength: 1536 },
             "text-embedding-3-large": { embeddingLength: 3072 },
             "text-embedding-ada-002": { embeddingLength: 1536 },
+        };
+
+        const knownInfo = knownModels[modelId];
+        if (knownInfo) {
+            return {
+                modelId,
+                embeddingLength: knownInfo.embeddingLength,
+            };
+        }
+
+        // For unknown/custom models, just return the model ID
+        return { modelId };
+    } else if (provider === "gemini") {
+        // Gemini embedding models have known dimensions
+        const knownModels: Record<string, { embeddingLength: number }> = {
+            "gemini-embedding-001": { embeddingLength: 3072 },
         };
 
         const knownInfo = knownModels[modelId];

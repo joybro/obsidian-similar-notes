@@ -84,7 +84,7 @@ export function getBuiltinModelSettingBuilders(
 
 interface ApplyButtonProps {
     hasChanges: boolean;
-    tempModelProvider: "builtin" | "ollama" | "openai" | undefined;
+    tempModelProvider: "builtin" | "ollama" | "openai" | "gemini" | undefined;
     onApply: () => Promise<void>;
     onButtonCreated: (button: ButtonComponent) => void;
 }

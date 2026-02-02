@@ -46,6 +46,25 @@ export const OLLAMA_ERROR_PATTERNS: ErrorPattern[] = [
     }
 ];
 
+export const GEMINI_ERROR_PATTERNS: ErrorPattern[] = [
+    {
+        patterns: ["API key not valid", "INVALID_API_KEY", "API_KEY_INVALID"],
+        message: "Invalid API key - check your Google AI Studio API key"
+    },
+    {
+        patterns: ["quota exceeded", "RESOURCE_EXHAUSTED"],
+        message: "API quota exceeded - check your Google AI Studio usage limits"
+    },
+    {
+        patterns: ["model not found", "MODEL_NOT_FOUND", "models/"],
+        message: "Model not found - check if the model ID is correct"
+    },
+    {
+        patterns: ["PERMISSION_DENIED"],
+        message: "Permission denied - check your API key permissions"
+    }
+];
+
 /**
  * Extract a user-friendly error message from the original error
  */
@@ -57,7 +76,8 @@ export function extractUserFriendlyMessage(
         ...customPatterns,
         ...GPU_ERROR_PATTERNS,
         ...NETWORK_ERROR_PATTERNS,
-        ...OLLAMA_ERROR_PATTERNS
+        ...OLLAMA_ERROR_PATTERNS,
+        ...GEMINI_ERROR_PATTERNS
     ];
 
     // Check against known patterns

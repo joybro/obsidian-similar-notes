@@ -8,6 +8,7 @@ import {
     getApplyButtonBuilder,
     getBuiltinModelSettingBuilders,
 } from "./BuiltinModelSettingsSection";
+import { getGeminiSettingBuilders } from "./GeminiSettingsSection";
 import { LoadModelModal } from "./LoadModelModal";
 import { fetchAndCacheModelInfo } from "./modelInfoCache";
 import { getOllamaSettingBuilders } from "./OllamaSettingsSection";
@@ -32,7 +33,7 @@ export class ModelSettingsSection {
     private usageStatsSectionContainer?: HTMLElement;
 
     // Temporary state for model changes (not saved until Apply is clicked)
-    private tempModelProvider?: "builtin" | "ollama" | "openai";
+    private tempModelProvider?: "builtin" | "ollama" | "openai" | "gemini";
     private tempModelId?: string;
     private tempOllamaUrl?: string;
     private tempOllamaModel?: string;
@@ -41,6 +42,8 @@ export class ModelSettingsSection {
     private tempOpenaiApiKey?: string;
     private tempOpenaiModel?: string;
     private tempOpenaiMaxTokens?: number;
+    private tempGeminiApiKey?: string;
+    private tempGeminiModel?: string;
 
     // Apply button reference for direct updates
     private applyButton?: ButtonComponent;
@@ -166,6 +169,8 @@ export class ModelSettingsSection {
         this.tempOpenaiApiKey = this.tempOpenaiApiKey ?? settings.openaiApiKey;
         this.tempOpenaiModel = this.tempOpenaiModel ?? settings.openaiModel;
         this.tempOpenaiMaxTokens = this.tempOpenaiMaxTokens ?? settings.openaiMaxTokens;
+        this.tempGeminiApiKey = this.tempGeminiApiKey ?? settings.geminiApiKey;
+        this.tempGeminiModel = this.tempGeminiModel ?? settings.geminiModel;
 
         const sectionContainer = this.sectionContainer;
 
@@ -197,14 +202,15 @@ export class ModelSettingsSection {
             .addSetting((setting) => {
                 setting
                     .setName("Model provider")
-                    .setDesc("Choose between built-in models, Ollama, or OpenAI API")
+                    .setDesc("Choose between built-in models, Ollama, OpenAI API, or Google Gemini")
                     .addDropdown((dropdown) => {
                         dropdown
                             .addOption("builtin", "Built-in Models")
                             .addOption("ollama", "Ollama")
                             .addOption("openai", "OpenAI / Compatible")
+                            .addOption("gemini", "Google Gemini")
                             .setValue(this.tempModelProvider || "builtin")
-                            .onChange((value: "builtin" | "ollama" | "openai") => {
+                            .onChange((value: "builtin" | "ollama" | "openai" | "gemini") => {
                                 this.tempModelProvider = value;
                                 // Redraw settings to show/hide provider-specific options
                                 this.render();
@@ -298,6 +304,23 @@ export class ModelSettingsSection {
                     maxTokens: this.tempOpenaiMaxTokens,
                 }),
             });
+        } else if (this.tempModelProvider === "gemini") {
+            return getGeminiSettingBuilders({
+                settings,
+                tempGeminiApiKey: this.tempGeminiApiKey,
+                tempGeminiModel: this.tempGeminiModel,
+                onGeminiApiKeyChange: (value: string) => {
+                    this.tempGeminiApiKey = value;
+                },
+                onGeminiModelChange: (value: string) => {
+                    this.tempGeminiModel = value;
+                },
+                onRender: () => this.render(),
+                getTempValues: () => ({
+                    apiKey: this.tempGeminiApiKey,
+                    model: this.tempGeminiModel,
+                }),
+            });
         }
         return [];
     }
@@ -342,7 +365,10 @@ export class ModelSettingsSection {
                 (this.tempOpenaiUrl !== settings.openaiUrl ||
                     this.tempOpenaiApiKey !== settings.openaiApiKey ||
                     this.tempOpenaiModel !== settings.openaiModel ||
-                    this.tempOpenaiMaxTokens !== settings.openaiMaxTokens))
+                    this.tempOpenaiMaxTokens !== settings.openaiMaxTokens)) ||
+            (this.tempModelProvider === "gemini" &&
+                (this.tempGeminiApiKey !== settings.geminiApiKey ||
+                    this.tempGeminiModel !== settings.geminiModel))
         );
     }
 
@@ -361,7 +387,8 @@ export class ModelSettingsSection {
         const getModelId = () => {
             if (provider === "builtin") return this.tempModelId || settings.modelId;
             if (provider === "ollama") return this.tempOllamaModel || "";
-            return this.tempOpenaiModel || "text-embedding-3-small";
+            if (provider === "openai") return this.tempOpenaiModel || "text-embedding-3-small";
+            return this.tempGeminiModel || "gemini-embedding-001";
         };
 
         new LoadModelModal(
@@ -391,6 +418,9 @@ export class ModelSettingsSection {
                     updateData.openaiApiKey = this.tempOpenaiApiKey ?? settings.openaiApiKey;
                     updateData.openaiModel = this.tempOpenaiModel ?? "text-embedding-3-small";
                     updateData.openaiMaxTokens = this.tempOpenaiMaxTokens ?? settings.openaiMaxTokens;
+                } else if (provider === "gemini") {
+                    updateData.geminiApiKey = this.tempGeminiApiKey ?? settings.geminiApiKey;
+                    updateData.geminiModel = this.tempGeminiModel ?? "gemini-embedding-001";
                 }
 
                 await settingsService.update(updateData);
@@ -412,6 +442,8 @@ export class ModelSettingsSection {
         this.tempOpenaiApiKey = undefined;
         this.tempOpenaiModel = undefined;
         this.tempOpenaiMaxTokens = undefined;
+        this.tempGeminiApiKey = undefined;
+        this.tempGeminiModel = undefined;
     }
 
     private buildCurrentModelDescription(
@@ -422,10 +454,13 @@ export class ModelSettingsSection {
         const modelId =
             modelProvider === "builtin" ? settings.modelId
                 : modelProvider === "ollama" ? settings.ollamaModel
-                    : settings.openaiModel;
+                    : modelProvider === "openai" ? settings.openaiModel
+                        : settings.geminiModel;
 
         if (!modelId && modelProvider !== "builtin") {
-            return modelProvider === "openai" ? "OpenAI: Not configured" : "Not configured";
+            if (modelProvider === "openai") return "OpenAI: Not configured";
+            if (modelProvider === "gemini") return "Gemini: Not configured";
+            return "Not configured";
         }
 
         const hasValidCache = cachedInfo && cachedInfo.modelId === modelId;
@@ -442,7 +477,12 @@ export class ModelSettingsSection {
             return `Built-in: ${modelId} (${parts.join(", ")})`;
         }
 
-        const prefix = modelProvider === "ollama" ? "Ollama" : "OpenAI";
+        const prefixMap: Record<string, string> = {
+            ollama: "Ollama",
+            openai: "OpenAI",
+            gemini: "Gemini",
+        };
+        const prefix = prefixMap[modelProvider] || modelProvider;
         return parts.length > 0 ? `${prefix}: ${modelId} (${parts.join(", ")})` : `${prefix}: ${modelId}`;
     }
 
