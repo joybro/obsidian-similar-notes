@@ -234,4 +234,11 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     supportsParallelProcessing(): boolean {
         return false;
     }
+
+    /**
+     * Transformers is a local model and doesn't need usage tracking
+     */
+    supportsUsageTracking(): boolean {
+        return false;
+    }
 }

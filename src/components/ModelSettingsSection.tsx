@@ -78,7 +78,8 @@ export class ModelSettingsSection {
         if (!this.usageStatsSectionContainer) return;
 
         const settings = this.props.settingsService.get();
-        if (settings.modelProvider !== "openai" && settings.modelProvider !== "gemini") return;
+        // Check if current provider supports usage tracking
+        if (!this.props.modelService?.supportsUsageTracking()) return;
 
         this.usageStatsSectionContainer.empty();
         renderUsageStatsSection({
@@ -226,14 +227,14 @@ export class ModelSettingsSection {
         const applyButtonBuilder = this.getApplyButtonBuilder(settings);
         settingGroup.addSetting(applyButtonBuilder);
 
-        // Usage stats section (only for OpenAI provider when currently active)
+        // Usage stats section (only for providers that support usage tracking)
         // First, remove existing usage stats container if it exists
         if (this.usageStatsSectionContainer) {
             this.usageStatsSectionContainer.remove();
             this.usageStatsSectionContainer = undefined;
         }
 
-        if (settings.modelProvider === "openai" || settings.modelProvider === "gemini") {
+        if (this.props.modelService?.supportsUsageTracking()) {
             // Create and insert usage stats container right after model section
             // Using insertAdjacentElement to ensure proper positioning
             this.usageStatsSectionContainer = document.createElement("div");

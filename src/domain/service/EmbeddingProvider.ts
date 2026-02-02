@@ -77,4 +77,11 @@ export interface EmbeddingProvider {
      * Local providers (Transformers, Ollama) should process sequentially to avoid resource contention
      */
     supportsParallelProcessing(): boolean;
+
+    /**
+     * Check if this provider supports usage tracking
+     * Cloud providers (OpenAI, Gemini) track API usage for cost estimation
+     * Local providers (Transformers, Ollama) don't need usage tracking
+     */
+    supportsUsageTracking(): boolean;
 }

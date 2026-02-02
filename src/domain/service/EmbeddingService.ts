@@ -303,4 +303,13 @@ export class EmbeddingService {
     public supportsParallelProcessing(): boolean {
         return this.provider?.supportsParallelProcessing() ?? false;
     }
+
+    /**
+     * Check if the current provider supports usage tracking
+     * Cloud providers (OpenAI, Gemini) return true for cost estimation
+     * Local providers (Transformers, Ollama) return false
+     */
+    public supportsUsageTracking(): boolean {
+        return this.provider?.supportsUsageTracking() ?? false;
+    }
 }

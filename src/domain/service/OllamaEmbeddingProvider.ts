@@ -274,4 +274,11 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     supportsParallelProcessing(): boolean {
         return false;
     }
+
+    /**
+     * Ollama is a self-hosted model and doesn't need usage tracking
+     */
+    supportsUsageTracking(): boolean {
+        return false;
+    }
 }
