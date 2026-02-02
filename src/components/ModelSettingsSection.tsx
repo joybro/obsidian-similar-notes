@@ -1,5 +1,5 @@
 import type { SettingsService } from "@/application/SettingsService";
-import type { CachedModelInfo, SimilarNotesSettings } from "@/application/SettingsService";
+import type { SimilarNotesSettings } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import { SettingGroup } from "obsidian";
 import type { App, ButtonComponent } from "obsidian";
@@ -9,8 +9,8 @@ import {
     getBuiltinModelSettingBuilders,
 } from "./BuiltinModelSettingsSection";
 import { getGeminiSettingBuilders } from "./GeminiSettingsSection";
-import { LoadModelModal } from "./LoadModelModal";
-import { fetchAndCacheModelInfo } from "./modelInfoCache";
+import { applyModelChanges } from "./modelChangesApplier";
+import { buildCurrentModelDescription } from "./modelDescriptionBuilder";
 import { getOllamaSettingBuilders } from "./OllamaSettingsSection";
 import { getOpenAISettingBuilders, type SettingBuilder } from "./OpenAISettingsSection";
 import { renderUsageStatsSection } from "./UsageStatsSection";
@@ -176,7 +176,7 @@ export class ModelSettingsSection {
 
         // Current model display - use cached model info from settings
         const cachedInfo = settings.cachedModelInfo;
-        let currentModelDesc = this.buildCurrentModelDescription(settings, cachedInfo);
+        let currentModelDesc = buildCurrentModelDescription(settings, cachedInfo);
 
         // Add download progress if downloading
         if (
@@ -233,7 +233,7 @@ export class ModelSettingsSection {
             this.usageStatsSectionContainer = undefined;
         }
 
-        if (settings.modelProvider === "openai") {
+        if (settings.modelProvider === "openai" || settings.modelProvider === "gemini") {
             // Create and insert usage stats container right after model section
             // Using insertAdjacentElement to ensure proper positioning
             this.usageStatsSectionContainer = document.createElement("div");
@@ -331,7 +331,29 @@ export class ModelSettingsSection {
         return getApplyButtonBuilder({
             hasChanges,
             tempModelProvider: this.tempModelProvider,
-            onApply: () => this.applyModelChanges(settings),
+            onApply: async () => {
+                await applyModelChanges({
+                    plugin: this.props.plugin,
+                    settingsService: this.props.settingsService,
+                    app: this.props.app,
+                    settings,
+                    tempModelProvider: this.tempModelProvider,
+                    tempModelId: this.tempModelId,
+                    tempOllamaUrl: this.tempOllamaUrl,
+                    tempOllamaModel: this.tempOllamaModel,
+                    tempUseGPU: this.tempUseGPU,
+                    tempOpenaiUrl: this.tempOpenaiUrl,
+                    tempOpenaiApiKey: this.tempOpenaiApiKey,
+                    tempOpenaiModel: this.tempOpenaiModel,
+                    tempOpenaiMaxTokens: this.tempOpenaiMaxTokens,
+                    tempGeminiApiKey: this.tempGeminiApiKey,
+                    tempGeminiModel: this.tempGeminiModel,
+                    onComplete: () => {
+                        this.clearTempState();
+                        this.render();
+                    },
+                });
+            },
             onButtonCreated: (button: ButtonComponent) => {
                 this.applyButton = button;
             },
@@ -372,65 +394,6 @@ export class ModelSettingsSection {
         );
     }
 
-    private async applyModelChanges(settings: SimilarNotesSettings): Promise<void> {
-        const { plugin, settingsService, app } = this.props;
-        const provider = this.tempModelProvider;
-
-        if (!provider) return;
-
-        // Determine message and model ID based on provider
-        const isBuiltin = provider === "builtin";
-        const message = isBuiltin
-            ? "The model will be downloaded from Hugging Face (this might take a while) and all your notes will be reindexed. Do you want to continue?"
-            : "Your embedding model will be changed and all notes will be reindexed. Do you want to continue?";
-
-        const getModelId = () => {
-            if (provider === "builtin") return this.tempModelId || settings.modelId;
-            if (provider === "ollama") return this.tempOllamaModel || "";
-            if (provider === "openai") return this.tempOpenaiModel || "text-embedding-3-small";
-            return this.tempGeminiModel || "gemini-embedding-001";
-        };
-
-        new LoadModelModal(
-            app,
-            message,
-            async () => {
-                const modelId = getModelId();
-                const cachedModelInfo = await fetchAndCacheModelInfo(
-                    provider,
-                    modelId,
-                    provider === "ollama" ? this.tempOllamaUrl : undefined
-                );
-
-                const updateData: Partial<SimilarNotesSettings> = {
-                    modelProvider: provider,
-                    cachedModelInfo,
-                };
-
-                if (provider === "builtin") {
-                    updateData.modelId = modelId;
-                    updateData.useGPU = this.tempUseGPU ?? settings.useGPU;
-                } else if (provider === "ollama") {
-                    updateData.ollamaUrl = this.tempOllamaUrl;
-                    updateData.ollamaModel = this.tempOllamaModel;
-                } else if (provider === "openai") {
-                    updateData.openaiUrl = this.tempOpenaiUrl ?? settings.openaiUrl;
-                    updateData.openaiApiKey = this.tempOpenaiApiKey ?? settings.openaiApiKey;
-                    updateData.openaiModel = this.tempOpenaiModel ?? "text-embedding-3-small";
-                    updateData.openaiMaxTokens = this.tempOpenaiMaxTokens ?? settings.openaiMaxTokens;
-                } else if (provider === "gemini") {
-                    updateData.geminiApiKey = this.tempGeminiApiKey ?? settings.geminiApiKey;
-                    updateData.geminiModel = this.tempGeminiModel ?? "gemini-embedding-001";
-                }
-
-                await settingsService.update(updateData);
-                plugin.changeModel(modelId);
-                this.clearTempState();
-                this.render();
-            },
-            Function.prototype as () => void
-        ).open();
-    }
 
     private clearTempState(): void {
         this.tempModelProvider = undefined;
@@ -446,45 +409,6 @@ export class ModelSettingsSection {
         this.tempGeminiModel = undefined;
     }
 
-    private buildCurrentModelDescription(
-        settings: SimilarNotesSettings,
-        cachedInfo?: CachedModelInfo
-    ): string {
-        const { modelProvider } = settings;
-        const modelId =
-            modelProvider === "builtin" ? settings.modelId
-                : modelProvider === "ollama" ? settings.ollamaModel
-                    : modelProvider === "openai" ? settings.openaiModel
-                        : settings.geminiModel;
-
-        if (!modelId && modelProvider !== "builtin") {
-            if (modelProvider === "openai") return "OpenAI: Not configured";
-            if (modelProvider === "gemini") return "Gemini: Not configured";
-            return "Not configured";
-        }
-
-        const hasValidCache = cachedInfo && cachedInfo.modelId === modelId;
-        const parts: string[] = [];
-
-        if (hasValidCache) {
-            if (cachedInfo.parameterSize) parts.push(cachedInfo.parameterSize);
-            if (cachedInfo.quantizationLevel) parts.push(cachedInfo.quantizationLevel);
-            if (cachedInfo.embeddingLength) parts.push(`${cachedInfo.embeddingLength}-dim`);
-        }
-
-        if (modelProvider === "builtin") {
-            parts.push(settings.useGPU ? "GPU" : "CPU");
-            return `Built-in: ${modelId} (${parts.join(", ")})`;
-        }
-
-        const prefixMap: Record<string, string> = {
-            ollama: "Ollama",
-            openai: "OpenAI",
-            gemini: "Gemini",
-        };
-        const prefix = prefixMap[modelProvider] || modelProvider;
-        return parts.length > 0 ? `${prefix}: ${modelId} (${parts.join(", ")})` : `${prefix}: ${modelId}`;
-    }
 
     private updateApplyButtonState(settings: SimilarNotesSettings): void {
         if (!this.applyButton) return;
