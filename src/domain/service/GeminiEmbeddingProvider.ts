@@ -148,28 +148,9 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
     }
 
     async countTokens(text: string): Promise<number> {
-        // Token efficiency varies by language:
-        // - English/ASCII: ~4 chars per token
-        // - Korean/Japanese/Chinese: ~1 char per token
-        //
-        // Use adaptive ratio based on ASCII content percentage
-        const asciiRatio = this.getAsciiRatio(text);
-        const charsPerToken = asciiRatio > 0.8 ? 4 : 1;
-        return Math.ceil(text.length / charsPerToken);
-    }
-
-    /**
-     * Calculate the ratio of ASCII characters in the text
-     */
-    private getAsciiRatio(text: string): number {
-        if (text.length === 0) return 1;
-        let asciiCount = 0;
-        for (let i = 0; i < text.length; i++) {
-            if (text.charCodeAt(i) < 128) {
-                asciiCount++;
-            }
-        }
-        return asciiCount / text.length;
+        // Use Gemini's countTokens API for accurate token counting
+        // Falls back to estimation if API is unavailable
+        return this.geminiClient.countTokens(text);
     }
 
     getVectorSize(): number {
