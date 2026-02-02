@@ -13,7 +13,7 @@ import { applyModelChanges } from "./modelChangesApplier";
 import { buildCurrentModelDescription } from "./modelDescriptionBuilder";
 import { getOllamaSettingBuilders } from "./OllamaSettingsSection";
 import { getOpenAISettingBuilders, type SettingBuilder } from "./OpenAISettingsSection";
-import { renderUsageStatsSection } from "./UsageStatsSection";
+import { UsageStatsSection } from "./UsageStatsSection";
 
 interface ModelSettingsSectionProps {
     containerEl: HTMLElement;
@@ -31,6 +31,7 @@ export class ModelSettingsSection {
     private currentModelError: string | null = null;
     private sectionContainer?: HTMLElement;
     private usageStatsSectionContainer?: HTMLElement;
+    private usageStatsSection?: UsageStatsSection;
 
     // Temporary state for model changes (not saved until Apply is clicked)
     private tempModelProvider?: "builtin" | "ollama" | "openai" | "gemini";
@@ -72,22 +73,19 @@ export class ModelSettingsSection {
     }
 
     /**
-     * Re-render only the usage stats section without affecting other parts
+     * Update only the usage stats without re-rendering the entire section
      */
     private rerenderUsageStatsSection(): void {
-        if (!this.usageStatsSectionContainer) return;
+        if (!this.usageStatsSection) return;
 
         const settings = this.props.settingsService.get();
         // Check if current provider supports usage tracking
         if (!this.props.modelService?.supportsUsageTracking()) return;
 
-        this.usageStatsSectionContainer.empty();
-        renderUsageStatsSection({
-            sectionContainer: this.usageStatsSectionContainer,
-            settings,
-            settingsService: this.props.settingsService,
-            onRender: () => this.render(),
-        });
+        const stats = settings.usageStats;
+        if (stats) {
+            this.usageStatsSection.updateStats(stats, settings.openaiPricePerMillionTokens);
+        }
     }
 
     /**
@@ -228,19 +226,30 @@ export class ModelSettingsSection {
         settingGroup.addSetting(applyButtonBuilder);
 
         // Usage stats section (only for providers that support usage tracking)
-        // First, remove existing usage stats container if it exists
-        if (this.usageStatsSectionContainer) {
-            this.usageStatsSectionContainer.remove();
-            this.usageStatsSectionContainer = undefined;
-        }
-
         if (this.props.modelService?.supportsUsageTracking()) {
-            // Create and insert usage stats container right after model section
-            // Using insertAdjacentElement to ensure proper positioning
-            this.usageStatsSectionContainer = document.createElement("div");
-            this.usageStatsSectionContainer.addClass("usage-stats-section");
-            sectionContainer.insertAdjacentElement("afterend", this.usageStatsSectionContainer);
-            this.renderUsageStatsSection(settings, this.usageStatsSectionContainer);
+            // Only create if it doesn't exist or was removed
+            if (!this.usageStatsSectionContainer || !this.usageStatsSectionContainer.parentElement) {
+                // Create and insert usage stats container right after model section
+                this.usageStatsSectionContainer = document.createElement("div");
+                this.usageStatsSectionContainer.addClass("usage-stats-section");
+                sectionContainer.insertAdjacentElement("afterend", this.usageStatsSectionContainer);
+
+                // Create new UsageStatsSection instance
+                this.usageStatsSection = new UsageStatsSection({
+                    sectionContainer: this.usageStatsSectionContainer,
+                    settings,
+                    settingsService: this.props.settingsService,
+                    onRender: () => this.render(),
+                });
+                this.usageStatsSection.render();
+            }
+        } else {
+            // Remove usage stats section if provider doesn't support it
+            if (this.usageStatsSectionContainer) {
+                this.usageStatsSectionContainer.remove();
+                this.usageStatsSectionContainer = undefined;
+                this.usageStatsSection = undefined;
+            }
         }
     }
 
@@ -361,17 +370,6 @@ export class ModelSettingsSection {
         });
     }
 
-    private renderUsageStatsSection(
-        settings: SimilarNotesSettings,
-        container: HTMLElement
-    ): void {
-        renderUsageStatsSection({
-            sectionContainer: container,
-            settings,
-            settingsService: this.props.settingsService,
-            onRender: () => this.render(),
-        });
-    }
 
     private hasModelChanges(settings: SimilarNotesSettings): boolean {
         return (
