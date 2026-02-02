@@ -241,4 +241,11 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     supportsParallelProcessing(): boolean {
         return true;
     }
+
+    /**
+     * OpenAI supports usage tracking for cost estimation
+     */
+    supportsUsageTracking(): boolean {
+        return true;
+    }
 }

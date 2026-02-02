@@ -209,4 +209,11 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
     supportsParallelProcessing(): boolean {
         return true;
     }
+
+    /**
+     * Gemini supports usage tracking for cost estimation
+     */
+    supportsUsageTracking(): boolean {
+        return true;
+    }
 }
