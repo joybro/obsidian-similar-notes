@@ -234,4 +234,11 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     getConfig(): OpenAIConfig {
         return { ...this.config };
     }
+
+    /**
+     * OpenAI supports parallel file processing for better throughput
+     */
+    supportsParallelProcessing(): boolean {
+        return true;
+    }
 }

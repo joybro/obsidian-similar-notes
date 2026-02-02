@@ -70,4 +70,11 @@ export interface EmbeddingProvider {
      * Dispose and clean up all resources
      */
     dispose(): void;
+
+    /**
+     * Check if this provider supports parallel file processing
+     * Cloud providers (OpenAI, Gemini) support parallelism for better throughput
+     * Local providers (Transformers, Ollama) should process sequentially to avoid resource contention
+     */
+    supportsParallelProcessing(): boolean;
 }

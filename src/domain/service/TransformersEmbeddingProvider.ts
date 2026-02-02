@@ -226,4 +226,12 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     setLogLevel(level: log.LogLevelDesc): void {
         this.workerManager.updateLogLevel(level);
     }
+
+    /**
+     * Transformers runs in a single Web Worker with sequential queue
+     * Parallel file processing would not improve performance
+     */
+    supportsParallelProcessing(): boolean {
+        return false;
+    }
 }
