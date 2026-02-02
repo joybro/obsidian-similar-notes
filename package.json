@@ -1,6 +1,6 @@
 {
     "name": "obsidian-similar-notes",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Recommends similar notes to the currently viewed note using semantic embeddings",
     "main": "main.js",
     "scripts": {
