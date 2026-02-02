@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-02-02
+
+### Added
+
+-   **Google Gemini Embedding Support**: Use Google's Gemini API for embeddings
+    -   Support for gemini-embedding-001 model
+    -   Real-time usage statistics with accurate token counting via Gemini's countTokens API
+
+### Improved
+
+-   **Embedding Performance**: Parallel processing and batching optimization
+    -   Faster indexing of large vaults through optimized embedding generation
+    -   More efficient API usage with batched requests
+-   **Settings UI Stability**: Prevents input focus loss during real-time stats updates
+    -   API usage statistics now update without disrupting user input
+    -   Smoother experience when configuring settings while indexing is in progress
+-   **Error Notifications**: Error messages now include the note name that caused the issue
+    -   Makes it easier to identify and troubleshoot problematic notes
+    -   Better context for debugging indexing failures
+
 ## [1.0.0] - 2026-02-01
 
 ### Added
