@@ -62,7 +62,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     excludeFolderPatterns: ["Templates/", "Archive/", ".trash/"], // Default exclusion patterns
     excludeRegexPatterns: [], // Default to no exclusion patterns
     regexpTestInputText: "", // Default to empty test input
-    noteDisplayMode: "title", // Default to showing title only
+    noteDisplayMode: "smart", // Default to smart mode (show path when duplicates exist)
     showAtBottom: true, // Show similar notes at the bottom by default
     sidebarResultCount: 10, // Default to 10 results in sidebar
     bottomResultCount: 5, // Default to 5 results at bottom
