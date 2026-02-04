@@ -19,7 +19,7 @@ export function getNoteDisplayText(
                     (f) => f !== file && f.basename === file.basename
                 );
                 if (duplicateTitles.length > 0) {
-                    return file.path;
+                    return file.path.replace(/\.md$/, "");
                 }
             }
             return title;
