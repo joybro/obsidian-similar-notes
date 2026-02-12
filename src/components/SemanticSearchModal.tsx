@@ -1,6 +1,6 @@
 import { getNoteDisplayText } from "@/utils/displayUtils";
 import type { App, TFile } from "obsidian";
-import { Modal } from "obsidian";
+import { MarkdownView, Modal } from "obsidian";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { SimilarNote } from "@/domain/model/SimilarNote";
@@ -12,7 +12,7 @@ const DEBOUNCE_MS = 300;
 // Platform-specific modifier keys
 const isMac = typeof navigator !== "undefined" && navigator.platform.includes("Mac");
 const MOD_KEY = isMac ? "\u2318" : "Ctrl";
-const ALT_KEY = isMac ? "\u2325" : "Alt";
+const SHIFT_KEY = isMac ? "\u21E7" : "Shift";
 
 const SearchInstructions: React.FC = () => (
     <div className="prompt-instructions">
@@ -29,8 +29,8 @@ const SearchInstructions: React.FC = () => (
             <span>to open in new tab</span>
         </div>
         <div className="prompt-instruction">
-            <span className="prompt-instruction-command">{MOD_KEY} {ALT_KEY} ↵</span>
-            <span>to open to the right</span>
+            <span className="prompt-instruction-command">{SHIFT_KEY} ↵</span>
+            <span>to insert as link</span>
         </div>
         <div className="prompt-instruction">
             <span className="prompt-instruction-command">esc</span>
@@ -46,7 +46,8 @@ interface SearchResultItemProps {
     noteDisplayMode: "title" | "path" | "smart";
     allFiles: TFile[];
     onSelect: () => void;
-    onOpen: (newTab: boolean, split: boolean) => void;
+    onOpen: (newTab: boolean) => void;
+    onInsertLink: () => void;
 }
 
 const SearchResultItem: React.FC<SearchResultItemProps> = ({
@@ -57,6 +58,7 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
     allFiles,
     onSelect,
     onOpen,
+    onInsertLink,
 }) => {
     const itemRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +70,11 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
 
     const handleClick = (e: React.MouseEvent) => {
         e.preventDefault();
-        onOpen(e.metaKey || e.ctrlKey, false);
+        if (e.shiftKey) {
+            onInsertLink();
+        } else {
+            onOpen(e.metaKey || e.ctrlKey);
+        }
     };
 
     const displayText = file
@@ -180,22 +186,28 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
     }, [resultFiles]);
 
     const openNote = useCallback(
-        (index: number, newTab: boolean, split: boolean) => {
+        (index: number, newTab: boolean) => {
             const note = results[index];
             if (!note) return;
 
-            const file = app.vault.getAbstractFileByPath(note.path);
-            if (!file) return;
-
-            if (split) {
-                const leaf = app.workspace.getLeaf("split", "vertical");
-                leaf.openFile(file as TFile);
-            } else {
-                app.workspace.openLinkText(note.path, "", newTab);
-            }
+            app.workspace.openLinkText(note.path, "", newTab);
             onClose();
         },
-        [results, app.vault, app.workspace, onClose]
+        [results, app.workspace, onClose]
+    );
+
+    const insertLink = useCallback(
+        (index: number) => {
+            const note = results[index];
+            if (!note) return;
+
+            const view = app.workspace.getActiveViewOfType(MarkdownView);
+            if (!view?.editor) return;
+
+            view.editor.replaceSelection(`[[${note.path}]]`);
+            onClose();
+        },
+        [results, app.workspace, onClose]
     );
 
     const handleKeyDown = useCallback(
@@ -214,9 +226,11 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                 case "Enter":
                     e.preventDefault();
                     if (results.length > 0) {
-                        const newTab = e.metaKey || e.ctrlKey;
-                        const split = e.altKey && (e.metaKey || e.ctrlKey);
-                        openNote(selectedIndex, newTab && !split, split);
+                        if (e.shiftKey) {
+                            insertLink(selectedIndex);
+                        } else {
+                            openNote(selectedIndex, e.metaKey || e.ctrlKey);
+                        }
                     }
                     break;
                 case "Escape":
@@ -225,7 +239,7 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                     break;
             }
         },
-        [setSelectedIndex, results, selectedIndex, openNote, onClose]
+        [setSelectedIndex, results, selectedIndex, openNote, insertLink, onClose]
     );
 
     return (
@@ -268,7 +282,8 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                             noteDisplayMode={noteDisplayMode}
                             allFiles={allFiles}
                             onSelect={() => setSelectedIndex(index)}
-                            onOpen={(newTab, split) => openNote(index, newTab, split)}
+                            onOpen={(newTab) => openNote(index, newTab)}
+                            onInsertLink={() => insertLink(index)}
                         />
                     );
                 })}
