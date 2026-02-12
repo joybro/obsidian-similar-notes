@@ -151,16 +151,12 @@ const SearchResult = ({
     };
 
     const handleDragStart = (e: React.DragEvent) => {
-        // Create wiki-style link using full path without extension
-        // This ensures the correct file is linked even with duplicate basenames
-        const pathWithoutExtension = note.file.path.replace(/\.md$/, "");
-        const linkText = `[[${pathWithoutExtension}]]`;
-
-        // Set multiple data types for maximum compatibility
+        // Set full path (with .md) so the drop handler can resolve the file
+        // and compute the proper link text via fileToLinktext
+        const linkText = `[[${note.file.path}]]`;
         e.dataTransfer.setData("text/plain", linkText);
         e.dataTransfer.setData("text/html", `<a href="${note.file.path}">${linkText}</a>`);
 
-        // Set effectAllowed to "all" to ensure Obsidian accepts the drop
         e.dataTransfer.effectAllowed = "all";
     };
 

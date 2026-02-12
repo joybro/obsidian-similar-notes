@@ -1,5 +1,5 @@
 import log from "loglevel";
-import { Plugin } from "obsidian";
+import { Plugin, type TFile } from "obsidian";
 import { OramaNoteChunkRepository } from "./adapter/orama/OramaNoteChunkRepository";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
 import { NoteIndexingService } from "./application/NoteIndexingService";
@@ -171,35 +171,44 @@ export default class MainPlugin extends Plugin {
         // Register editor-drop event for drag and drop link insertion
         this.registerEvent(
             this.app.workspace.on("editor-drop", (evt, editor, info) => {
-                // Get the plain text data
                 const plainText = evt.dataTransfer?.getData("text/plain");
 
                 // Check if this looks like a wiki-style link from Similar Notes
-                // We identify it by the pattern: [[...]]
-                if (plainText && /^\[\[.+\]\]$/.test(plainText)) {
-                    // Prevent default behavior to avoid double insertion
-                    evt.preventDefault();
+                if (!plainText || !/^\[\[.+\]\]$/.test(plainText)) return;
 
-                    // Try to insert at drop position using CodeMirror's posAtCoords
-                    // @ts-expect-error - Accessing internal CodeMirror EditorView
-                    const editorView = info?.editor?.cm;
-                    if (editorView?.posAtCoords) {
-                        const pos = editorView.posAtCoords({
-                            x: evt.clientX,
-                            y: evt.clientY,
+                // Extract path from [[path]] and resolve the file
+                const notePath = plainText.slice(2, -2);
+                const file = this.app.vault.getAbstractFileByPath(notePath);
+                if (!file) return;
+
+                evt.preventDefault();
+
+                // Compute link text respecting Obsidian's "New link format" setting
+                const sourcePath = info?.file?.path ?? "";
+                const linktext = this.app.metadataCache.fileToLinktext(
+                    file as TFile,
+                    sourcePath,
+                );
+                const linkMarkup = `[[${linktext}]]`;
+
+                // Try to insert at drop position using CodeMirror's posAtCoords
+                // @ts-expect-error - Accessing internal CodeMirror EditorView
+                const editorView = info?.editor?.cm;
+                if (editorView?.posAtCoords) {
+                    const pos = editorView.posAtCoords({
+                        x: evt.clientX,
+                        y: evt.clientY,
+                    });
+                    if (pos !== null) {
+                        editorView.dispatch({
+                            changes: { from: pos, insert: linkMarkup },
                         });
-                        if (pos !== null) {
-                            // Insert at drop position
-                            editorView.dispatch({
-                                changes: { from: pos, insert: plainText },
-                            });
-                            return;
-                        }
+                        return;
                     }
-
-                    // Fallback: insert at cursor position
-                    editor.replaceSelection(plainText);
                 }
+
+                // Fallback: insert at cursor position
+                editor.replaceSelection(linkMarkup);
             })
         );
     }

@@ -204,10 +204,15 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
             const view = app.workspace.getActiveViewOfType(MarkdownView);
             if (!view?.editor) return;
 
-            view.editor.replaceSelection(`[[${note.path}]]`);
+            const file = app.vault.getAbstractFileByPath(note.path) as TFile | null;
+            if (!file) return;
+
+            const sourcePath = view.file?.path ?? "";
+            const linktext = app.metadataCache.fileToLinktext(file, sourcePath);
+            view.editor.replaceSelection(`[[${linktext}]]`);
             onClose();
         },
-        [results, app.workspace, onClose]
+        [results, app, onClose]
     );
 
     const handleKeyDown = useCallback(
