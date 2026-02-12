@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-02-09
+
+### Added
+
+-   **Insert as Link from Semantic Search**: Insert a `[[link]]` directly from the semantic search popup (Ctrl+Shift+O)
+    -   Press Shift+Enter or Shift+Click to insert the selected note as a wiki link at your cursor position
+    -   No need to remember exact note names — search semantically, then link directly
+
+### Improved
+
+-   **Smarter Link Format**: Inserted links now respect Obsidian's "New link format" setting
+    -   Applies to both drag-and-drop and the new insert-as-link feature
+    -   Uses shortest path when possible, or includes folder path only when needed to disambiguate duplicate names
+-   **Default Note Display**: Note display mode now defaults to "smart" for better readability
+
 ## [1.1.0] - 2026-02-02
 
 ### Added
