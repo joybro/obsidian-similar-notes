@@ -51,7 +51,9 @@ export function getBuiltinModelSettingBuilders(
         (setting) => {
             setting
                 .setName("Custom model")
-                .setDesc("Enter a custom model ID from Hugging Face")
+                .setDesc(
+                    "Enter a custom model ID from Hugging Face. The repo must include ONNX weights — most sentence-transformer repos only ship PyTorch / safetensors. Try the `onnx-community/...` mirror if a model fails to load."
+                )
                 .addText((text) => {
                     text.setValue(tempModelId || "").onChange((value) => {
                         onModelIdChange(value);
