@@ -37,12 +37,14 @@ Progress appears in the status bar.
 
 ### Built-in Models (Mobile & Desktop)
 
-Supports any Sentence Transformer model from Hugging Face. Local processing, no API keys required.
+Supports any Sentence Transformer model from Hugging Face that ships ONNX weights. Local processing, no API keys required.
 
 **Recommended:**
 
 - `all-MiniLM-L6-v2` (English, default)
 - `paraphrase-multilingual-MiniLM-L12-v2` (multilingual)
+
+> **Custom models**: The plugin uses Transformers.js, which requires ONNX weights. Many Hugging Face repos only ship PyTorch / safetensors and will fail to load. For other models, look for an ONNX-converted version under the [`onnx-community`](https://huggingface.co/onnx-community) organization, or use the Ollama / OpenAI providers instead.
 
 > **Mobile note**: Large models may cause crashes due to memory limits. Consider using the default model or OpenAI API on mobile.
 

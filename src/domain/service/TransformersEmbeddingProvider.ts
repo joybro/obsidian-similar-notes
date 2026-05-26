@@ -1,7 +1,11 @@
 import type { SettingsService } from "@/application/SettingsService";
 import { GPUSettingModal } from "@/components/GPUSettingModal";
 import { WorkerManager } from "@/infrastructure/WorkerManager";
-import { handleEmbeddingLoadError, isGPUError } from "@/utils/errorHandling";
+import {
+    handleEmbeddingLoadError,
+    isGPUError,
+    TRANSFORMERS_ERROR_PATTERNS,
+} from "@/utils/errorHandling";
 import * as Comlink from "comlink";
 import log from "loglevel";
 import { Notice } from "obsidian";
@@ -62,14 +66,16 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
                     log.error("CPU fallback also failed:", cpuError);
                     handleEmbeddingLoadError(cpuError, {
                         providerName: "Transformers",
-                        errorSubject: this.modelError$
+                        errorSubject: this.modelError$,
+                        customPatterns: TRANSFORMERS_ERROR_PATTERNS,
                     });
                 }
             } else {
                 log.error("Failed to load Transformers model:", error);
                 handleEmbeddingLoadError(error, {
                     providerName: "Transformers",
-                    errorSubject: this.modelError$
+                    errorSubject: this.modelError$,
+                    customPatterns: TRANSFORMERS_ERROR_PATTERNS,
                 });
             }
         }

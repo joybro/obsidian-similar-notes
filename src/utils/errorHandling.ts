@@ -46,6 +46,19 @@ export const OLLAMA_ERROR_PATTERNS: ErrorPattern[] = [
     }
 ];
 
+export const TRANSFORMERS_ERROR_PATTERNS: ErrorPattern[] = [
+    {
+        // transformers.js loads model files at paths like `onnx/model.onnx`.
+        // If the repo has no ONNX weights (e.g. safetensors-only), the
+        // underlying fetch 404s and the error message embeds that URL.
+        // Match the `onnx/` path prefix so we catch both the canonical
+        // "Could not locate file: ..." and wrapped "Failed to fetch ..." forms.
+        patterns: ["onnx/"],
+        message:
+            "No ONNX weights found for this model. Try the `onnx-community/...` version on Hugging Face, or switch to a different provider in settings.",
+    },
+];
+
 export const GEMINI_ERROR_PATTERNS: ErrorPattern[] = [
     {
         patterns: ["API key not valid", "INVALID_API_KEY", "API_KEY_INVALID"],
