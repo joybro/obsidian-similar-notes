@@ -72,6 +72,16 @@ export class SimilarNoteCoordinator {
 
     async onFileOpen(file: TFile | null) {
         if (!file || file.extension !== "md") {
+            // No active markdown file — clear the sidebar so it doesn't keep
+            // showing similar notes for a file the user has navigated away from.
+            const settings = this.settingsService.get();
+            this.noteBottomViewModel$.next({
+                currentFile: null,
+                similarNoteEntries: [],
+                noteDisplayMode: settings.noteDisplayMode,
+                sidebarResultCount: settings.sidebarResultCount,
+                bottomResultCount: settings.bottomResultCount,
+            });
             return;
         }
 
