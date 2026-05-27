@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 -   **Minimum Similarity Threshold** (#39): Filter out low-relevance recommendations
     -   New "Minimum similarity" slider under Display settings (default 0, no filtering)
-    -   Suggestions scoring below the threshold are hidden from the sidebar
+    -   Suggestions scoring below the threshold are hidden from both the sidebar and the in-document panel
 
 ### Changed
 
