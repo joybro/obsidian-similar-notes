@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-05-27
+
+### Added
+
+-   **Minimum Similarity Threshold** (#39): Filter out low-relevance recommendations
+    -   New "Minimum similarity" slider under Display settings (default 0, no filtering)
+    -   Suggestions scoring below the threshold are hidden from the sidebar
+
+### Changed
+
+-   **New Plugin Icon** (#39): Ribbon, sidebar tab, and status bar now use a telescope icon
+    -   Replaces the previous "files" icon, which visually collided with Obsidian's copy and insert-template buttons
+
+### Improved
+
+-   **Faster File Renames** (#39): Moving a file between folders no longer triggers full re-embedding
+    -   Embeddings are now preserved on pure renames; only the indexed path is updated
+
+### Fixed
+
+-   **Sidebar Now Clears on Note Close** (#39): Stale recommendations no longer linger after closing the active note or switching to a non-markdown file
+-   **Clear Error for Missing Local Models** (#38): Model loads that fail because ONNX files are missing now show an actionable error instead of a generic "Network error"
+
 ## [1.2.0] - 2026-02-09
 
 ### Added
