@@ -1,20 +1,24 @@
 ---
 name: bump-version
-description: Use when asked to bump version, release a new version, or prepare a release
+description: Use when bumping to a stable X.Y.Z release (e.g., "release 1.3.0", "bump to 0.13.0", "prepare 2.0.0"). For beta/prerelease (X.Y.Z-beta.N), use the beta-release skill instead.
 ---
 
 # Bump Version
 
 ## Overview
 
-Standardized process for bumping versions in projects with package.json and manifest.json (e.g., Obsidian plugins).
+Standardized process for bumping to a stable release in projects with package.json and manifest.json (e.g., Obsidian plugins).
+
+Pair skill: `beta-release` handles the prerelease cycle that may precede a stable bump.
 
 ## When to Use
 
-- User asks to "bump version to x.x.x"
-- User asks to "prepare release x.x.x"
-- User asks to "release version x.x.x"
-- User runs `/bump-version` or `/bump-version x.x.x`
+- User asks to "bump version to X.Y.Z"
+- User asks to "prepare release X.Y.Z"
+- User asks to "release version X.Y.Z"
+- User runs `/bump-version` or `/bump-version X.Y.Z`
+
+If the target is a `X.Y.Z-beta.N` prerelease, use the `beta-release` skill instead — its manifest/release/issue handling is different.
 
 ## Process
 
@@ -23,6 +27,8 @@ Standardized process for bumping versions in projects with package.json and mani
 - If version is provided as argument (e.g., `/bump-version 0.13.0`), use it
 - If version is mentioned in user's message (e.g., "bump version to 0.13.0"), use it
 - Otherwise, ask user: "What version should I bump to?"
+
+**Check for a preceding beta cycle.** Read `package.json`'s current version: if it's `X.Y.Z-beta.N`, this stable bump is the close-out of a beta cycle and the CHANGELOG entry for `X.Y.Z` should already exist (drafted during the beta-release run). In that case **reuse and amend** the existing entry — add any follow-up fixes that landed during the beta — rather than writing it from scratch. Also remember `manifest.json` was held at the previous stable during the beta; this is the bump where it finally moves to `X.Y.Z`.
 
 ### 1. Update Version Files
 
@@ -89,10 +95,21 @@ Include issue/PR numbers where applicable: `(#123)`
 ### 4. Commit Changes
 
 ```bash
-git commit -m "chore: bump version to x.x.x"
+git commit -m "chore: bump version to X.Y.Z"
 ```
 
 **Do NOT push** - let user review locally first.
+
+### 5. After publish: announce on tracked issues
+
+Once the maintainer has tagged + published the release (external-visible — they do this step, not you), close the loop on any issues this release addressed:
+
+- `gh issue comment <N> -b "<short fix announcement with release link>"` for each tracked issue
+- `gh issue close <N>` after the comment lands
+
+If a beta cycle preceded this release, the same issues likely already have a BRAT-invite comment from the beta-release run — match that tone for the stable announcement (short, friendly, "@reporter, shipped in X.Y.Z, please update; thanks for the report").
+
+These actions are external-visible — **require explicit user approval** before invoking `gh issue comment` / `gh issue close`. Read prior maintainer comments on the same thread (or in nearby issues) to match voice before posting.
 
 ## Common Mistakes
 
