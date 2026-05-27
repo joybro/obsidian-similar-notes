@@ -268,6 +268,31 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         text.inputEl.style.width = "60px";
                     });
             },
+            // Minimum similarity threshold
+            (setting: Setting) => {
+                setting
+                    .setName("Minimum similarity")
+                    .setDesc(
+                        "Hide results below this cosine similarity (0.00 – 1.00). 0 keeps every result."
+                    )
+                    .addText((text) => {
+                        text
+                            .setValue(settings.minSimilarityThreshold.toFixed(2))
+                            .onChange(async (value) => {
+                                const num = parseFloat(value);
+                                if (!isNaN(num) && num >= 0 && num <= 1) {
+                                    await this.settingsService.update({
+                                        minSimilarityThreshold: num,
+                                    });
+                                }
+                            });
+                        text.inputEl.type = "number";
+                        text.inputEl.min = "0";
+                        text.inputEl.max = "1";
+                        text.inputEl.step = "0.05";
+                        text.inputEl.style.width = "70px";
+                    });
+            },
         ];
     }
 

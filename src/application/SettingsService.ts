@@ -48,6 +48,7 @@ export interface SimilarNotesSettings {
     showAtBottom: boolean; // Whether to show similar notes at the bottom of notes
     sidebarResultCount: number; // Number of similar notes to show in sidebar
     bottomResultCount: number; // Number of similar notes to show at bottom of notes
+    minSimilarityThreshold: number; // Hide results below this cosine similarity (0..1, 0 = no filtering)
     lastPluginVersion?: string; // Last version of the plugin that was run
     cachedModelInfo?: CachedModelInfo; // Cached model information
     indexingDelaySeconds: number; // Wait time after file changes before indexing
@@ -66,6 +67,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     showAtBottom: true, // Show similar notes at the bottom by default
     sidebarResultCount: 10, // Default to 10 results in sidebar
     bottomResultCount: 5, // Default to 5 results at bottom
+    minSimilarityThreshold: 0, // No filtering by default
     indexingDelaySeconds: 1, // Default to 1 second delay
 };
 
