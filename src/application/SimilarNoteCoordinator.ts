@@ -54,6 +54,17 @@ export class SimilarNoteCoordinator {
                     this.cache.clear();
                 }
 
+                // Threshold is a display-time filter, not part of the cached
+                // raw results — re-emit the current file's view so the new
+                // threshold is applied without re-running the search.
+                if (newSettings.minSimilarityThreshold !== undefined) {
+                    const file = this.noteBottomViewModel$.value.currentFile;
+                    if (file) {
+                        this.emitNoteBottomViewModel(file);
+                        return;
+                    }
+                }
+
                 // Update current model with new settings
                 const settings = this.settingsService.get();
                 const currentModel = this.noteBottomViewModel$.value;
@@ -85,7 +96,7 @@ export class SimilarNoteCoordinator {
             return;
         }
 
-        this.emitNoteBottomViewModel(file);
+        await this.emitNoteBottomViewModel(file);
     }
 
     async emitNoteBottomViewModelFromPath(path: string) {
@@ -94,15 +105,18 @@ export class SimilarNoteCoordinator {
             return;
         }
 
-        this.emitNoteBottomViewModel(file);
+        await this.emitNoteBottomViewModel(file);
     }
 
     async emitNoteBottomViewModel(file: TFile) {
         const similarNotes = await this.getSimilarNotes(file);
         const settings = this.settingsService.get();
+        const filtered = similarNotes.filter(
+            (entry) => entry.similarity >= settings.minSimilarityThreshold
+        );
         this.noteBottomViewModel$.next({
             currentFile: file,
-            similarNoteEntries: similarNotes,
+            similarNoteEntries: filtered,
             noteDisplayMode: settings.noteDisplayMode,
             sidebarResultCount: settings.sidebarResultCount,
             bottomResultCount: settings.bottomResultCount,

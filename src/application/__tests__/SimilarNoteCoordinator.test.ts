@@ -34,6 +34,7 @@ function makeSettings(
         showAtBottom: true,
         sidebarResultCount: 10,
         bottomResultCount: 5,
+        minSimilarityThreshold: 0,
         indexingDelaySeconds: 1,
         ...overrides,
     };
@@ -47,11 +48,14 @@ describe("SimilarNoteCoordinator", () => {
     let settingsService: SettingsService;
     let settings: SimilarNotesSettings;
 
+    let settingsChange$: Subject<Partial<SimilarNotesSettings>>;
+
     beforeEach(() => {
         settings = makeSettings();
+        settingsChange$ = new Subject<Partial<SimilarNotesSettings>>();
 
         vault = {
-            getFileByPath: vi.fn().mockReturnValue(null),
+            getFileByPath: vi.fn((path: string) => makeFile(path)),
         } as unknown as Vault;
 
         noteRepository = {
@@ -70,9 +74,7 @@ describe("SimilarNoteCoordinator", () => {
 
         settingsService = {
             get: vi.fn(() => settings),
-            getNewSettingsObservable: vi.fn(
-                () => new Subject<Partial<SimilarNotesSettings>>()
-            ),
+            getNewSettingsObservable: vi.fn(() => settingsChange$),
         } as unknown as SettingsService;
     });
 
@@ -160,6 +162,114 @@ describe("SimilarNoteCoordinator", () => {
             expect(seen).toHaveLength(1);
             expect(seen[0].currentFile).toBeNull();
             expect(seen[0].count).toBe(0);
+        });
+    });
+
+    describe("#39.2: minimum similarity threshold filter", () => {
+        const neighbors = [
+            {
+                path: "high.md",
+                title: "high",
+                similarity: 0.9,
+                similarChunk: "h-chunk",
+                sourceChunk: "h-src",
+            },
+            {
+                path: "mid.md",
+                title: "mid",
+                similarity: 0.55,
+                similarChunk: "m-chunk",
+                sourceChunk: "m-src",
+            },
+            {
+                path: "low.md",
+                title: "low",
+                similarity: 0.2,
+                similarChunk: "l-chunk",
+                sourceChunk: "l-src",
+            },
+        ];
+
+        function primeFinder(): void {
+            (
+                similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>
+            ).mockResolvedValue(neighbors);
+        }
+
+        test("entries with similarity below the threshold are dropped from the emission", async () => {
+            settings = makeSettings({ minSimilarityThreshold: 0.6 });
+            (settingsService.get as ReturnType<typeof vi.fn>).mockImplementation(
+                () => settings
+            );
+            primeFinder();
+
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService
+            );
+
+            await coord.onFileOpen(makeFile("open.md"));
+
+            const latest = coord["noteBottomViewModel$"].value;
+            const titles = latest.similarNoteEntries.map((e) => e.title);
+
+            expect(titles).toEqual(["high"]);
+        });
+
+        test("default threshold of 0 keeps every entry (backward compat)", async () => {
+            primeFinder();
+
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService
+            );
+
+            await coord.onFileOpen(makeFile("open.md"));
+
+            const latest = coord["noteBottomViewModel$"].value;
+            expect(latest.similarNoteEntries.map((e) => e.title)).toEqual([
+                "high",
+                "mid",
+                "low",
+            ]);
+        });
+
+        test("raising the threshold via settings observable re-emits with the new filter applied", async () => {
+            primeFinder();
+
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService
+            );
+
+            await coord.onFileOpen(makeFile("open.md"));
+            expect(
+                coord["noteBottomViewModel$"].value.similarNoteEntries
+            ).toHaveLength(3);
+
+            // Capture subsequent emissions.
+            const seen: number[] = [];
+            const sub = coord
+                .getNoteBottomViewModelObservable()
+                .subscribe((m) => seen.push(m.similarNoteEntries.length));
+            seen.length = 0;
+
+            // User raises the threshold in settings.
+            settings = makeSettings({ minSimilarityThreshold: 0.5 });
+            settingsChange$.next({ minSimilarityThreshold: 0.5 });
+
+            // Let any pending promises resolve (emitNoteBottomViewModel is async).
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            sub.unsubscribe();
+
+            expect(seen.at(-1)).toBe(2); // high + mid pass; low is dropped
         });
     });
 });
