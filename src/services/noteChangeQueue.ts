@@ -7,8 +7,11 @@ import type { EventRef, TAbstractFile, Vault } from "obsidian";
 
 export type NoteChange = {
     path: string;
-    reason: "new" | "modified" | "deleted";
+    reason: "new" | "modified" | "deleted" | "renamed";
     mtime?: number;
+    // Only set when reason === "renamed". Lets the indexing service carry
+    // the existing embedding from oldPath to path without re-embedding.
+    oldPath?: string;
 };
 
 interface FileInfo {
@@ -153,30 +156,47 @@ export class NoteChangeQueue {
             if (file instanceof TFile && file.extension === "md") {
                 const settings = this.settingsService.get();
 
-                // Remove old path from queue if it exists
+                // Drop any pending changes for either path — they're stale now.
                 this.queue = this.queue.filter(
                     (change) => change.path !== oldPath && change.path !== file.path
                 );
 
-                // Add deletion change for old path to clean up old data
-                this.queue.push({
-                    path: oldPath,
-                    reason: "deleted" as const,
-                });
+                const isNewPathIncluded =
+                    filterMarkdownFiles([file], settings.excludeFolderPatterns)
+                        .length > 0;
 
-                // Check if new path should be indexed (not excluded by patterns)
-                const files = filterMarkdownFiles([file], settings.excludeFolderPatterns);
-                if (files.length > 0) {
-                    // Add new path to queue for indexing
+                if (!isNewPathIncluded) {
+                    // New location is excluded — drop the old index entry and stop.
+                    this.queue.push({ path: oldPath, reason: "deleted" });
+                    log.info(`File renamed/moved to excluded location: ${oldPath} -> ${file.path}`);
+                    return;
+                }
+
+                // Obsidian's rename doesn't touch file content, so the mtime
+                // we previously indexed should still match. If it does, the
+                // embedding is still valid — carry it over to the new path
+                // instead of re-embedding (issue #39, sub-issue 5).
+                const indexedMtime = this.mTimeStore.getMTime(oldPath);
+                if (indexedMtime !== undefined && indexedMtime === file.stat.mtime) {
                     this.queue.push({
                         path: file.path,
-                        reason: "new" as const,
+                        reason: "renamed",
+                        oldPath,
                         mtime: file.stat.mtime,
                     });
-                    log.info(`File renamed/moved: ${oldPath} -> ${file.path}`);
-                } else {
-                    log.info(`File renamed/moved to excluded location: ${oldPath} -> ${file.path}`);
+                    log.info(`File renamed/moved (embedding preserved): ${oldPath} -> ${file.path}`);
+                    return;
                 }
+
+                // Mtime changed, or the old path was never indexed — fall back
+                // to full re-embed.
+                this.queue.push({ path: oldPath, reason: "deleted" });
+                this.queue.push({
+                    path: file.path,
+                    reason: "new",
+                    mtime: file.stat.mtime,
+                });
+                log.info(`File renamed/moved (content changed, re-embedding): ${oldPath} -> ${file.path}`);
             }
         });
         this.eventRefs.push(renameRef);
@@ -353,6 +373,13 @@ export class NoteChangeQueue {
     async markNoteChangeProcessed(change: NoteChange): Promise<void> {
         if (change.reason === "deleted") {
             await this.mTimeStore.deleteMTime(change.path);
+        } else if (change.reason === "renamed") {
+            if (change.oldPath) {
+                await this.mTimeStore.deleteMTime(change.oldPath);
+            }
+            if (change.mtime) {
+                await this.mTimeStore.setMTime(change.path, change.mtime);
+            }
         } else if (change.mtime) {
             // Update the hash store with the processed hash
             await this.mTimeStore.setMTime(change.path, change.mtime);

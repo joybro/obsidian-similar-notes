@@ -223,6 +223,39 @@ export class OramaWorker {
         return removedCount > 0;
     }
 
+    async renamePath(oldPath: string, newPath: string): Promise<boolean> {
+        if (!this.db) {
+            throw new Error("Database not loaded");
+        }
+
+        // Pull chunks from IndexedDB — Orama's vector search results don't
+        // return the full embedding, but storage has it intact.
+        const existing = await this.storage.getByPath(oldPath);
+        if (existing.length === 0) {
+            return false;
+        }
+
+        const newPathHash = await this.calculatePathHash(newPath);
+        const renamed: NoteChunkInternal[] = existing.map((chunk) => {
+            const { id: _id, ...rest } = chunk;
+            return {
+                ...rest,
+                path: newPath,
+                pathHash: newPathHash,
+                lastUpdated: Date.now(),
+            };
+        });
+
+        // Remove the old entries from both Orama and IndexedDB, then write
+        // the renamed copies back. Embeddings are preserved as-is, so the
+        // search results for the moved note are unchanged.
+        await this.removeByPath(oldPath);
+        await insertMultiple(this.db, renamed as Doc[]);
+        await this.storage.putMulti(renamed);
+
+        return true;
+    }
+
     async getByPath(path: string): Promise<NoteChunkDTO[]> {
         if (!this.db) {
             throw new Error("Database not loaded");

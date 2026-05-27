@@ -26,6 +26,16 @@ export interface NoteChunkRepository {
     removeByPath(path: string): Promise<boolean>;
 
     /**
+     * Transfers all chunks indexed under `oldPath` to `newPath`, preserving
+     * their embeddings. Used when a file is renamed/moved without content
+     * changes, so we don't re-embed.
+     * @returns true if chunks existed and were transferred; false if there
+     *          were no chunks for `oldPath` (caller should fall back to a
+     *          full embed of `newPath`).
+     */
+    renamePath(oldPath: string, newPath: string): Promise<boolean>;
+
+    /**
      * Gets all NoteChunks associated with a specific file path.
      * @returns An array of NoteChunks for the given path
      */
