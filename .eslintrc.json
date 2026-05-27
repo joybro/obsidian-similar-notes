@@ -44,6 +44,15 @@
         "react/react-in-jsx-scope": "off",
         "react/prop-types": "off"
     },
+    "overrides": [
+        {
+            "files": ["**/__tests__/**/*.ts", "**/__tests__/**/*.tsx", "**/*.test.ts", "**/*.test.tsx"],
+            "rules": {
+                "max-lines": "off",
+                "max-lines-per-function": "off"
+            }
+        }
+    ],
     "settings": {
         "react": {
             "version": "detect"
