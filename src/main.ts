@@ -314,7 +314,7 @@ export default class MainPlugin extends Plugin {
         );
 
         // Add ribbon icon
-        this.addRibbonIcon("files", "Open Similar Notes", () => {
+        this.addRibbonIcon("telescope", "Open Similar Notes", () => {
             this.activateSimilarNotesView();
         });
 
