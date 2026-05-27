@@ -92,6 +92,8 @@ Follow [Keep a Changelog](https://keepachangelog.com) format:
 
 Include issue/PR numbers where applicable: `(#123)`
 
+**Verify each entry against the user-facing surface.** Commit descriptions tell *why* and *how* a change was made; CHANGELOG entries tell *what the user sees*. These diverge in small but visible ways — e.g. a UI control described as a "slider" that's actually `addText` (number input); a fix said to affect "the sidebar" that also affects the in-document panel; a setting whose label in code differs from the working name in the commit. Before finalizing each entry, open the component that implements the change and confirm: control type, exact label, and which views are affected. A 30-second read prevents a user-caught inaccuracy at review time.
+
 ### 4. Commit Changes
 
 ```bash
