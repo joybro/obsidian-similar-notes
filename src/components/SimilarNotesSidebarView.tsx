@@ -29,7 +29,7 @@ export class SimilarNotesSidebarView extends ItemView {
     }
 
     getIcon(): string {
-        return "files";
+        return "telescope";
     }
 
     async onOpen() {

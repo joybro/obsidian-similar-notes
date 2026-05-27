@@ -111,20 +111,20 @@ export class StatusBarView {
                 this.statusBarItem.addClass("has-error");
                 break;
             case "downloading":
-                setIcon(iconEl, "files");
+                setIcon(iconEl, "telescope");
                 this.statusBarItem.createSpan({
                     text: ` ${Math.floor(this.downloadProgress)}%`,
                 });
                 break;
             case "indexing":
-                setIcon(iconEl, "files");
+                setIcon(iconEl, "telescope");
                 this.statusBarItem.createSpan({
                     text: ` ${this.noteChangeCount} to index`,
                 });
                 break;
             case "idle":
             default:
-                setIcon(iconEl, "files");
+                setIcon(iconEl, "telescope");
                 break;
         }
     }
