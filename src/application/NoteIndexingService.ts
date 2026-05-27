@@ -3,7 +3,7 @@ import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepositor
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
-import type { NoteChangeQueue } from "@/services/noteChangeQueue";
+import type { NoteChange, NoteChangeQueue } from "@/services/noteChangeQueue";
 import { showNoteErrorNotice } from "@/utils/errorHandling";
 import log from "loglevel";
 import type { App } from "obsidian";
@@ -48,6 +48,8 @@ export class NoteIndexingService {
                     try {
                         if (change.reason === "deleted") {
                             await this.processDeletedNote(change.path);
+                        } else if (change.reason === "renamed") {
+                            await this.processRenamedNote(change);
                         } else {
                             await this.processUpdatedNote(change.path);
                         }
@@ -80,6 +82,45 @@ export class NoteIndexingService {
 
     private async processDeletedNote(path: string) {
         await this.noteChunkRepository.removeByPath(path);
+    }
+
+    private async processRenamedNote(change: NoteChange) {
+        const { oldPath, path: newPath } = change;
+        if (!oldPath) {
+            // Defensive: a "renamed" change without oldPath is malformed.
+            // Treat it as a fresh embed of newPath rather than dropping it.
+            log.warn(
+                `[NoteIndexingService] Renamed change missing oldPath, falling back to full embed: ${newPath}`
+            );
+            await this.processUpdatedNote(newPath);
+            return;
+        }
+
+        const carried = await this.noteChunkRepository.renamePath(
+            oldPath,
+            newPath
+        );
+        if (!carried) {
+            // Old path had no chunks in the index (e.g. renamed before the
+            // initial embed completed). Embed the new path from scratch.
+            log.info(
+                `[NoteIndexingService] No prior chunks for ${oldPath}, embedding ${newPath} fresh`
+            );
+            await this.processUpdatedNote(newPath);
+            return;
+        }
+
+        log.info(
+            `[NoteIndexingService] Carried embedding ${oldPath} -> ${newPath} without re-embedding`
+        );
+
+        // If the renamed file is the currently active one, refresh the sidebar.
+        const activeFile = this.app.workspace.getActiveFile();
+        if (activeFile && activeFile.path === newPath) {
+            this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(
+                newPath
+            );
+        }
     }
 
     private async processUpdatedNote(path: string) {

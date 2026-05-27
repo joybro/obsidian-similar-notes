@@ -372,27 +372,40 @@ describe("FileChangeQueue", () => {
             expect(fileChangeQueue.getFileChangeCount()).toBe(0);
         });
 
-        test("should handle file rename events", () => {
+        test("#39.5: pure rename (mtime unchanged) produces a single 'renamed' change, preserving the existing embedding", () => {
             expect(fileChangeQueue.getFileChangeCount()).toBe(0);
 
-            // Create a renamed file (file1.md -> renamed.md)
+            // file1.md was indexed with mtime=1000 (see beforeEach mockMTimeStore).
+            // Obsidian rename keeps content (and therefore mtime) intact, so
+            // there's no reason to re-embed. The queue should mark this as a
+            // path-only "renamed" change rather than delete + re-embed.
             const renamedFile = createMockTFile("renamed.md", 1000);
-
-            // Ensure callback is defined
-            expect(renameCallback).toBeDefined();
-
-            // Simulate a file rename event
             renameCallback(renamedFile, "file1.md");
 
-            // Should have added 2 changes to the queue: delete old path, add new path
-            expect(fileChangeQueue.getFileChangeCount()).toBe(2);
+            expect(fileChangeQueue.getFileChangeCount()).toBe(1);
+            const [change] = fileChangeQueue.pollFileChanges(1);
+            expect(change.reason).toBe("renamed");
+            expect(change.path).toBe("renamed.md");
+            expect(change.oldPath).toBe("file1.md");
+            expect(change.mtime).toBe(1000);
+        });
 
+        test("#39.5: rename combined with a content change (mtime differs) still falls back to delete + re-embed", () => {
+            expect(fileChangeQueue.getFileChangeCount()).toBe(0);
+
+            // Same path swap, but the file's mtime is now newer than what we
+            // had indexed (1000) — content really did change, so we must
+            // re-embed rather than carry the old embedding to the new path.
+            const renamedFile = createMockTFile("renamed.md", 1500);
+            renameCallback(renamedFile, "file1.md");
+
+            expect(fileChangeQueue.getFileChangeCount()).toBe(2);
             const changes = fileChangeQueue.pollFileChanges(2);
             expect(changes[0].path).toBe("file1.md");
             expect(changes[0].reason).toBe("deleted");
             expect(changes[1].path).toBe("renamed.md");
             expect(changes[1].reason).toBe("new");
-            expect(changes[1].mtime).toBe(1000);
+            expect(changes[1].mtime).toBe(1500);
         });
 
         test("should handle file rename to excluded folder", () => {
@@ -463,6 +476,21 @@ describe("FileChangeQueue", () => {
             // Mark the change as processed
             await fileChangeQueue.markNoteChangeProcessed(change);
             expect(mockMTimeStore.deleteMTime).toHaveBeenCalledWith("file1.md");
+        });
+
+        test("#39.5: renamed change transfers mtime from oldPath to newPath in one step", async () => {
+            const change = {
+                path: "renamed.md",
+                reason: "renamed" as const,
+                oldPath: "file1.md",
+                mtime: 1000,
+            };
+            await fileChangeQueue.markNoteChangeProcessed(change);
+            expect(mockMTimeStore.deleteMTime).toHaveBeenCalledWith("file1.md");
+            expect(mockMTimeStore.setMTime).toHaveBeenCalledWith(
+                "renamed.md",
+                1000
+            );
         });
     });
 

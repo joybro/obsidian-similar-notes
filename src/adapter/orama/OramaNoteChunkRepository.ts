@@ -46,6 +46,12 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         return await worker.removeByPath(path);
     }
 
+    async renamePath(oldPath: string, newPath: string): Promise<boolean> {
+        this.workerManager.ensureInitialized();
+        const worker = this.workerManager.getWorker();
+        return await worker.renamePath(oldPath, newPath);
+    }
+
     async getByPath(path: string): Promise<NoteChunk[]> {
         this.workerManager.ensureInitialized();
         const worker = this.workerManager.getWorker();
