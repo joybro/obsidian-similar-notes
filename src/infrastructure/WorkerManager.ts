@@ -7,6 +7,10 @@ import log from "loglevel";
  */
 export class WorkerManager<T> {
     private worker: Comlink.Remote<T> | null = null;
+    // The raw Worker instance must be retained so we can terminate() it.
+    // Releasing only the Comlink proxy leaves the worker thread (and the
+    // multi-GB ML model / WASM heap it holds) alive — the root cause of #8.
+    private rawWorker: Worker | null = null;
     private workerName: string;
 
     constructor(workerName: string) {
@@ -22,7 +26,9 @@ export class WorkerManager<T> {
         // Clean up existing worker if any
         await this.dispose();
 
-        const WorkerWrapper = Comlink.wrap(new WorkerConstructor());
+        const rawWorker = new WorkerConstructor();
+        this.rawWorker = rawWorker;
+        const WorkerWrapper = Comlink.wrap(rawWorker);
         // @ts-expect-error - Comlink typing issue with constructor proxy
         this.worker = await new WorkerWrapper();
         
@@ -88,20 +94,28 @@ export class WorkerManager<T> {
      * Dispose the worker and clean up resources
      */
     async dispose(): Promise<void> {
-        if (!this.worker) {
+        if (!this.worker && !this.rawWorker) {
             return;
         }
 
         try {
-            // Release the Comlink proxy
-            if (this.worker[Comlink.releaseProxy]) {
+            // Release the Comlink proxy (cleans up message listeners)
+            if (this.worker && this.worker[Comlink.releaseProxy]) {
                 this.worker[Comlink.releaseProxy]();
             }
-            
-            this.worker = null;
-            log.info(`${this.workerName} disposed`);
         } catch (error) {
-            log.error(`Error disposing ${this.workerName}:`, error);
+            log.error(`Error releasing ${this.workerName} proxy:`, error);
         }
+
+        // Terminate the worker thread itself. This is what actually reclaims
+        // the model / WASM / WebGPU memory held inside the worker realm —
+        // releasing the proxy alone does not (issue #8).
+        if (this.rawWorker) {
+            this.rawWorker.terminate();
+            this.rawWorker = null;
+        }
+
+        this.worker = null;
+        log.info(`${this.workerName} disposed`);
     }
 }
