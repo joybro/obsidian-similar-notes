@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-05-30
+
+### Added
+
+-   **Create Note from Semantic Search** (#37): Press Shift+Enter in the semantic search popup (Ctrl+Shift+O) to create a new note named after your query
+    -   Mirrors Obsidian's Quick Switcher — type a rough title, create the note, refine the title later
+    -   If a note with that name already exists, it opens the existing note instead of creating a duplicate
+
+### Changed
+
+-   **Semantic Search Shortcuts Reworked** (#37): Aligned with Obsidian's Quick Switcher
+    -   "Insert as link" moved from Shift+Enter / Shift+Click to **Alt+Enter / Alt+Click** (Shift+Enter now creates a note)
+    -   Inserting a link no longer closes the popup, so you can insert several links in a row (Alt+Enter, navigate, Alt+Enter, …) and press Esc when done
+
+### Fixed
+
+-   **Major Memory Leak on Reload** (#8): The embedding model's Web Worker was never terminated when the plugin unloaded or reloaded, leaving the loaded model in memory (potentially several GB) and accumulating across reloads. The worker is now terminated on unload, reclaiming that memory
+-   **Ollama Server URL Input** (#43): The server URL field no longer loses focus after each typed character — you can now type the full URL normally
+
 ## [1.3.0] - 2026-05-30
 
 ### Added
