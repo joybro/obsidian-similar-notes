@@ -17,7 +17,6 @@ const DEBOUNCE_MS = 300;
 // Platform-specific modifier keys
 const isMac = typeof navigator !== "undefined" && navigator.platform.includes("Mac");
 const MOD_KEY = isMac ? "\u2318" : "Ctrl";
-const SHIFT_KEY = isMac ? "\u21E7" : "Shift";
 const ALT_KEY = isMac ? "\u2325" : "Alt";
 
 const SearchInstructions: React.FC = () => (
@@ -35,7 +34,7 @@ const SearchInstructions: React.FC = () => (
             <span>to open in new tab</span>
         </div>
         <div className="prompt-instruction">
-            <span className="prompt-instruction-command">{SHIFT_KEY} ↵</span>
+            <span className="prompt-instruction-command">shift ↵</span>
             <span>to create note</span>
         </div>
         <div className="prompt-instruction">
