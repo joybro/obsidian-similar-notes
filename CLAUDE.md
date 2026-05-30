@@ -27,6 +27,22 @@ Similar Notes is an Obsidian plugin that provides semantic note recommendations 
 3. Copy these files to your Obsidian vault's `.obsidian/plugins/similar-notes/` directory
 4. Reload Obsidian or disable/enable the plugin to see changes
 
+### Manual Verification (in-app testing)
+
+When a change needs to be verified by hand in real Obsidian (e.g. memory/leak
+behavior, focus handling, anything not coverable by Vitest):
+
+1. `npm run install-local` — rebuilds and copies `main.js` / `manifest.json` /
+   `styles.css` into the **Test_local** vault
+   (`~/Obsidian/Test_local/.obsidian/plugins/similar-notes/`). This vault holds a
+   plain **copy**, so a bare `npm run build` does NOT update it — always go through
+   `install-local` (or `./scripts/install-local.sh` if already built).
+2. In Obsidian, disable → re-enable the plugin (or restart) to load the new build.
+
+This is the canonical manual-verification path. (The `Young_Old` vault instead
+symlinks its plugin folder to this repo root, so a `npm run build` + reload there
+picks up changes without copying — but Test_local is the one to use by default.)
+
 ## Architecture
 
 **IMPORTANT**: Before designing or implementing features, read `docs/architecture.md` to understand the codebase structure, domain flow, and key services.
