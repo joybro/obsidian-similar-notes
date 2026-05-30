@@ -95,13 +95,18 @@ First beta of the X.Y.Z release — <one-line summary of the headline changes> (
 <list anything unfixed, e.g. cannot-reproduce reports>
 ```
 
-Hand the maintainer the draft URL and these steps:
-1. Open the draft release
-2. Paste the body
-3. **Check "Set as a pre-release"** (folder-notes pattern — extra safety even with stable manifest)
-4. Publish
+**Set the body on the draft yourself** — do not make the maintainer paste it. `gh release edit` modifies the draft's body only; it does NOT publish (the release stays `draft: true`):
 
-Do **not** call `gh release edit --draft=false` yourself unless the user explicitly asks; this is the publication step and surfaces an external-visible artifact.
+```bash
+gh release edit X.Y.Z-beta.N --notes-file <path-to-body.md>
+```
+
+Then hand the maintainer the draft URL and these steps:
+1. Open the draft release and review the pre-filled body + assets
+2. **Check "Set as a pre-release"** (folder-notes pattern — extra safety even with stable manifest)
+3. Publish
+
+The maintainer still publishes via the UI so they visually confirm assets + the prerelease checkbox. Do **not** call `gh release edit --draft=false` yourself unless the user explicitly asks; that is the publication step and surfaces an external-visible artifact.
 
 ### 6. Reopen auto-closed issues (if any)
 
