@@ -26,3 +26,6 @@ scripts/install-local.sh
 
 # shared AI workspace (symlink)
 ai-workspace
+
+# superpowers artifacts (specs/plans) — local only
+.superpowers/
