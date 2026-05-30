@@ -44,7 +44,9 @@ vi.mock("../transformers.worker", async () => {
         // A real Worker exposes terminate(); the mock must too, since
         // WorkerManager.dispose() now terminates the worker thread (issue #8).
         default: class {
-            terminate() {}
+            terminate() {
+                /* no-op: real Worker.terminate() */
+            }
         },
         TransformersWorker: class {},
     };
