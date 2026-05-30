@@ -1,6 +1,6 @@
 import type { App, Plugin } from "obsidian";
 import { Menu, Notice, setIcon, setTooltip } from "obsidian";
-import type { Observable } from "rxjs";
+import { Subscription, type Observable } from "rxjs";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
@@ -29,6 +29,9 @@ export class StatusBarView {
     private downloadProgress = 100;
     private noteChangeCount = 0;
 
+    private readonly subscriptions = new Subscription();
+    private clickHandler?: (evt: MouseEvent) => void;
+
     constructor(private config: StatusBarViewConfig) {
         this.statusBarItem = this.config.plugin.addStatusBarItem();
         this.statusBarItem.addClass("similar-notes-status-bar");
@@ -40,44 +43,51 @@ export class StatusBarView {
     }
 
     private setupClickHandler(): void {
-        this.statusBarItem.addEventListener("click", (evt) => {
+        this.clickHandler = (evt) => {
             this.showMenu(evt);
-        });
+        };
+        this.statusBarItem.addEventListener("click", this.clickHandler);
     }
 
     private subscribeToObservables(): void {
-        this.config.downloadProgress$.subscribe((progress) => {
-            this.downloadProgress = progress;
-            this.updateState();
-        });
+        this.subscriptions.add(
+            this.config.downloadProgress$.subscribe((progress) => {
+                this.downloadProgress = progress;
+                this.updateState();
+            })
+        );
 
-        this.config.noteChangeCount$.subscribe((count) => {
-            this.noteChangeCount = count;
+        this.subscriptions.add(
+            this.config.noteChangeCount$.subscribe((count) => {
+                this.noteChangeCount = count;
 
-            // Show notice when crossing 100-note thresholds
-            if (count > 10) {
-                const currentThreshold =
-                    Math.floor((count - 1) / 100) * 100 + 100;
-                if (
-                    this.lastNotifiedThreshold !== null &&
-                    currentThreshold < this.lastNotifiedThreshold
-                ) {
-                    new Notice(
-                        `Similar Notes: ${count} notes remaining to index`
-                    );
+                // Show notice when crossing 100-note thresholds
+                if (count > 10) {
+                    const currentThreshold =
+                        Math.floor((count - 1) / 100) * 100 + 100;
+                    if (
+                        this.lastNotifiedThreshold !== null &&
+                        currentThreshold < this.lastNotifiedThreshold
+                    ) {
+                        new Notice(
+                            `Similar Notes: ${count} notes remaining to index`
+                        );
+                    }
+                    this.lastNotifiedThreshold = currentThreshold;
+                } else {
+                    this.lastNotifiedThreshold = null;
                 }
-                this.lastNotifiedThreshold = currentThreshold;
-            } else {
-                this.lastNotifiedThreshold = null;
-            }
 
-            this.updateState();
-        });
+                this.updateState();
+            })
+        );
 
-        this.config.modelError$.subscribe((error) => {
-            this.lastError = error;
-            this.updateState();
-        });
+        this.subscriptions.add(
+            this.config.modelError$.subscribe((error) => {
+                this.lastError = error;
+                this.updateState();
+            })
+        );
     }
 
     private updateState(): void {
@@ -222,6 +232,11 @@ export class StatusBarView {
     }
 
     dispose(): void {
+        this.subscriptions.unsubscribe();
+        if (this.clickHandler) {
+            this.statusBarItem.removeEventListener("click", this.clickHandler);
+            this.clickHandler = undefined;
+        }
         this.statusBarItem.remove();
     }
 }

@@ -41,7 +41,11 @@ vi.mock("comlink", async () => {
 // Mock InlineWorker import
 vi.mock("../transformers.worker", async () => {
     return {
-        default: class {},
+        // A real Worker exposes terminate(); the mock must too, since
+        // WorkerManager.dispose() now terminates the worker thread (issue #8).
+        default: class {
+            terminate() {}
+        },
         TransformersWorker: class {},
     };
 });
