@@ -1,10 +1,15 @@
 import { getNoteDisplayText } from "@/utils/displayUtils";
 import type { App, TFile } from "obsidian";
-import { MarkdownView, Modal } from "obsidian";
+import { Modal, Notice } from "obsidian";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { SimilarNote } from "@/domain/model/SimilarNote";
 import type { TextSearchService } from "@/domain/service/TextSearchService";
+import {
+    createNoteFromQuery,
+    handleSemanticSearchKey,
+    insertLinkForNote,
+} from "./semanticSearchActions";
 
 const MIN_SEARCH_LENGTH = 3;
 const DEBOUNCE_MS = 300;
@@ -13,6 +18,7 @@ const DEBOUNCE_MS = 300;
 const isMac = typeof navigator !== "undefined" && navigator.platform.includes("Mac");
 const MOD_KEY = isMac ? "\u2318" : "Ctrl";
 const SHIFT_KEY = isMac ? "\u21E7" : "Shift";
+const ALT_KEY = isMac ? "\u2325" : "Alt";
 
 const SearchInstructions: React.FC = () => (
     <div className="prompt-instructions">
@@ -30,6 +36,10 @@ const SearchInstructions: React.FC = () => (
         </div>
         <div className="prompt-instruction">
             <span className="prompt-instruction-command">{SHIFT_KEY} ↵</span>
+            <span>to create note</span>
+        </div>
+        <div className="prompt-instruction">
+            <span className="prompt-instruction-command">{ALT_KEY} ↵</span>
             <span>to insert as link</span>
         </div>
         <div className="prompt-instruction">
@@ -70,7 +80,7 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
 
     const handleClick = (e: React.MouseEvent) => {
         e.preventDefault();
-        if (e.shiftKey) {
+        if (e.altKey) {
             onInsertLink();
         } else {
             onOpen(e.metaKey || e.ctrlKey);
@@ -200,51 +210,42 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
         (index: number) => {
             const note = results[index];
             if (!note) return;
-
-            const view = app.workspace.getActiveViewOfType(MarkdownView);
-            if (!view?.editor) return;
-
-            const file = app.vault.getAbstractFileByPath(note.path) as TFile | null;
-            if (!file) return;
-
-            const sourcePath = view.file?.path ?? "";
-            const linktext = app.metadataCache.fileToLinktext(file, sourcePath);
-            view.editor.replaceSelection(`[[${linktext}]]`);
-            onClose();
+            const inserted = insertLinkForNote(app, note.path);
+            if (!inserted) {
+                new Notice(
+                    "Similar Notes: open a note in edit mode to insert a link"
+                );
+            }
+            // Intentionally do NOT close the modal — allow inserting several links.
         },
-        [results, app, onClose]
+        [results, app]
     );
+
+    const createNote = useCallback(async () => {
+        const created = await createNoteFromQuery(app, query);
+        if (created) onClose();
+    }, [app, query, onClose]);
 
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
-            switch (e.key) {
-                case "ArrowDown":
-                    e.preventDefault();
-                    setSelectedIndex((prev) =>
-                        prev < results.length - 1 ? prev + 1 : prev
-                    );
-                    break;
-                case "ArrowUp":
-                    e.preventDefault();
-                    setSelectedIndex((prev) => (prev > 0 ? prev - 1 : prev));
-                    break;
-                case "Enter":
-                    e.preventDefault();
-                    if (results.length > 0) {
-                        if (e.shiftKey) {
-                            insertLink(selectedIndex);
-                        } else {
-                            openNote(selectedIndex, e.metaKey || e.ctrlKey);
-                        }
-                    }
-                    break;
-                case "Escape":
-                    e.preventDefault();
-                    onClose();
-                    break;
-            }
+            handleSemanticSearchKey(e, {
+                resultCount: results.length,
+                moveSelection: (delta) =>
+                    setSelectedIndex((prev) => {
+                        const next = prev + delta;
+                        if (next < 0) return 0;
+                        if (next > results.length - 1) return results.length - 1;
+                        return next;
+                    }),
+                open: (newTab) => openNote(selectedIndex, newTab),
+                insertLink: () => insertLink(selectedIndex),
+                createNote: () => {
+                    void createNote();
+                },
+                close: onClose,
+            });
         },
-        [setSelectedIndex, results, selectedIndex, openNote, insertLink, onClose]
+        [results, selectedIndex, setSelectedIndex, openNote, insertLink, createNote, onClose]
     );
 
     return (
