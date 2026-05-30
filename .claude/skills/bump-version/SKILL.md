@@ -100,11 +100,40 @@ Include issue/PR numbers where applicable: `(#123)`
 git commit -m "chore: bump version to X.Y.Z"
 ```
 
-**Do NOT push** - let user review locally first.
+If the user only asked to *prepare* the bump, **stop here** and let them review + release. If the user delegated the release to you ("release it", "릴리즈까지 진행해줘"), continue to step 5.
 
-### 5. After publish: announce on tracked issues
+### 5. Push, tag, and publish the release (only when the release is delegated to you)
 
-Once the maintainer has tagged + published the release (external-visible — they do this step, not you), close the loop on any issues this release addressed:
+CI builds the assets and creates a *draft*; you finish by publishing. This mirrors `beta-release` steps 4–5, but for a stable release **you publish it yourself** instead of handing off to the maintainer, and the body has **no** BRAT section.
+
+```bash
+git push origin main
+git tag X.Y.Z
+git push origin X.Y.Z          # triggers .github/workflows/release.yml
+```
+
+The tag push runs `release.yml` → `npm run build` → creates a **draft** release with assets `main.js`, `manifest.json`, `styles.css` (no body). Wait for it: `gh run watch <id>` or poll `gh run list --workflow=release.yml -L 1` until `completed success`.
+
+Then publish, supplying release notes from the CHANGELOG entry — the `### Added/Changed/Improved/Fixed` sections only (write them to a temp file and pass `--notes-file`). Match the prior stable release's body format; **omit** the BRAT install block (that is beta-only):
+
+```bash
+gh release edit X.Y.Z -R <owner>/<repo> --notes-file <body.md> --draft=false --latest
+```
+
+Verify it went public and is marked Latest:
+
+```bash
+gh release list -R <owner>/<repo> -L 3      # X.Y.Z should show "Latest", not "Draft"/"Pre-release"
+```
+
+Gotchas:
+- `gh release view --json isLatest` **errors** — `isLatest` is not a valid field for `release view`. Use `gh release list` (the "Latest" column) to confirm instead.
+- This repo has two remotes (`origin` = the public `joybro/obsidian-similar-notes`, plus `novatera-io`). Tags, releases, and issues all live on the public repo — push the tag to `origin` and target that repo with `gh`.
+- Publishing the release is external-visible, but the user delegating "release it" covers push + tag + publish. It does **not** auto-cover the issue announcements in step 6 — those ping reporters directly, so still confirm wording before posting.
+
+### 6. After publish: announce on tracked issues
+
+Once the release is published (step 5, or by the maintainer if the bump was only prepared), close the loop on any issues this release addressed:
 
 - `gh issue comment <N> -b "<short fix announcement with release link>"` for each tracked issue
 - `gh issue close <N>` after the comment lands
@@ -120,7 +149,8 @@ These actions are external-visible — **require explicit user approval** before
 | Including development-phase bug fixes | Only include fixes for bugs in previous releases |
 | Copying commit messages directly | Summarize from user perspective |
 | Including internal refactoring | Only include if it affects user experience |
-| Pushing without user review | Always stop after commit |
+| Pushing/publishing when the user only wanted a prepared bump | Stop after commit unless the release was delegated (step 5) |
+| Publishing as draft or pre-release | Stable publish needs `--draft=false --latest`; verify via `gh release list` |
 | Missing manifest.json | Check if project has manifest.json before updating |
 | Wrong changelog format | Use Keep a Changelog format consistently |
 | Missing issue numbers | Include `(#123)` when commits reference issues |
