@@ -10,7 +10,7 @@ interface OllamaSettingsSectionProps {
     tempOllamaModel: string | undefined;
     onOllamaUrlChange: (value: string) => void;
     onOllamaModelChange: (value: string) => void;
-    onRender: () => void;
+    updateApplyButtonState: () => void;
     onDropdownCreated: (dropdown: DropdownComponent) => void;
 }
 
@@ -26,7 +26,7 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
         tempOllamaModel,
         onOllamaUrlChange,
         onOllamaModelChange,
-        onRender,
+        updateApplyButtonState,
         onDropdownCreated,
     } = props;
 
@@ -100,9 +100,13 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                         .setValue(ollamaUrl)
                         .onChange((value) => {
                             onOllamaUrlChange(value);
-                            // Update client URL and refresh the page
+                            // Update the client URL for later "Refresh"/"Test"
+                            // actions. Do NOT re-render the section here: doing so
+                            // rebuilds this very input element and steals focus
+                            // after every keystroke (issue #43). Only the apply
+                            // button state needs to react to the change.
                             ollamaClient.setBaseUrl(value);
-                            onRender();
+                            updateApplyButtonState();
                         });
                 });
         },
@@ -118,7 +122,9 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                     dropdown.setValue(tempOllamaModel || "");
                     dropdown.onChange((value) => {
                         onOllamaModelChange(value);
-                        onRender(); // Redraw to update Apply button state
+                        // Update only the apply button; a full re-render would
+                        // re-fetch the model list and reset the dropdown.
+                        updateApplyButtonState();
                     });
                 })
                 .addButton((button) => {

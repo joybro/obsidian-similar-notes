@@ -279,7 +279,7 @@ export class ModelSettingsSection {
                 onOllamaModelChange: (value: string) => {
                     this.tempOllamaModel = value;
                 },
-                onRender: () => this.render(),
+                updateApplyButtonState: () => this.updateApplyButtonState(settings),
                 onDropdownCreated: () => {
                     // Dropdown reference handled internally
                 },
