@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **Non-English notes failing to index on Ollama** (#46): Notes with Korean/CJK (or other multi-byte) content could fail to index with an "input length exceeds the context" error. The chunk-size estimate assumed English-length tokens and packed far too much text into each chunk for the model's context window. The estimate is now based on UTF-8 byte length, so chunks stay within the model's limit regardless of script.
 -   **Honest indexing status** (#45, #46): Indexing failures are no longer hidden. The plugin previously reported the whole vault as indexed — and lumped failed notes into the "Excluded" count — even when notes had silently failed to index. The Index settings now show separate **Indexed / Errored / Excluded** counts, and the status bar shows how many notes errored. A note is retried a few times before being marked errored, and a terminally-errored note is no longer re-attempted on every restart (which previously crashed at the same point each launch).
 
 ## [1.4.0] - 2026-06-06
