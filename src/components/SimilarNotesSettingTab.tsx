@@ -207,6 +207,29 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             });
                     });
             },
+            // Semantic link trigger
+            (setting: Setting) => {
+                setting
+                    .setName("Semantic link trigger")
+                    .setDesc(
+                        "Type this prefix in the editor to get semantic note suggestions and insert a [[link]]. Leave empty to disable. Cannot start with '['."
+                    )
+                    .addText((text) => {
+                        text
+                            .setValue(settings.semanticLinkTrigger)
+                            .setPlaceholder(";;")
+                            .onChange(async (value) => {
+                                const trigger = value.trim();
+                                // Reject '[' prefixes so the trigger can never
+                                // re-collide with Obsidian's built-in [[ suggester.
+                                if (trigger.startsWith("[")) return;
+                                await this.settingsService.update({
+                                    semanticLinkTrigger: trigger,
+                                });
+                            });
+                        text.inputEl.style.width = "80px";
+                    });
+            },
             // Show source chunk
             (setting: Setting) => {
                 setting
