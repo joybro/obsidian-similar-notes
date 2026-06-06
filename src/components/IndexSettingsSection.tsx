@@ -231,12 +231,12 @@ export class IndexSettingsSection {
             // Apply exclusion patterns (acts on folder/glob patterns)
             (setting) => {
                 setting
-                    .setName("Apply exclusion patterns")
-                    .setDesc("Synchronize the index with current exclusion patterns without full reindexing")
+                    .setName("Apply folder patterns")
+                    .setDesc("Add or remove files to match the current folder patterns, without a full reindex. Content patterns apply only on reindex or when a note is edited.")
                     .addButton((button) => {
                         button
                             .setButtonText("Apply Patterns")
-                            .setTooltip("Apply current exclusion patterns to synchronize the index")
+                            .setTooltip("Sync indexed files with the current folder patterns")
                             .onClick(async () => this.handleApplyExclusionPatterns());
                     });
             },
