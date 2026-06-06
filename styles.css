@@ -224,6 +224,57 @@
     padding: 1rem;
 }
 
+/* Errored files list */
+.similar-notes-errored-files-list {
+    height: 120px;
+    min-height: 60px;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background-color: var(--background-secondary);
+    padding: 0.5rem;
+    font-size: var(--font-ui-small);
+    width: 90%;
+    max-width: 600px;
+    box-sizing: border-box;
+    margin-top: 0.5rem;
+    resize: vertical;
+}
+
+.similar-notes-errored-file-item {
+    padding: 0.25rem 0;
+    color: var(--text-normal);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: left;
+}
+
+.similar-notes-errored-file-reason {
+    color: var(--text-error);
+    font-size: var(--font-ui-smaller);
+    opacity: 0.85;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.similar-notes-errored-empty {
+    color: var(--text-faint);
+    font-style: italic;
+    text-align: left;
+    padding: 1rem;
+}
+
+.similar-notes-errored-more {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    padding: 0.25rem 0;
+}
+
 /* Semantic Search Modal Styles */
 /* Uses Obsidian's native .prompt class for base styling */
 
