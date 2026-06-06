@@ -3,11 +3,13 @@ import type { SettingsService, SimilarNotesSettings } from "@/application/Settin
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
+import { computeIndexStatus } from "@/application/indexStatus";
 import { isValidGlobPattern, shouldExcludeFile } from "@/utils/folderExclusion";
 import log from "loglevel";
 import type { App, Setting } from "obsidian";
 import { Notice, SettingGroup } from "obsidian";
 import type MainPlugin from "../main";
+import { renderErroredFilesList } from "./erroredFilesList";
 import { LoadModelModal } from "./LoadModelModal";
 import type { SettingBuilder } from "./OpenAISettingsSection";
 
@@ -25,11 +27,14 @@ export class IndexSettingsSection {
     private sectionContainer?: HTMLElement;
     private statsContainer?: HTMLElement;
     private indexedStat?: HTMLElement;
+    private erroredStat?: HTMLElement;
     private excludedStat?: HTMLElement;
 
     // State for dynamic updates
     private excludedFilesDescription?: HTMLElement;
     private excludedFilesList?: HTMLElement;
+    private erroredFilesList?: HTMLElement;
+    private retryErroredButton?: HTMLButtonElement;
     private testInputTextArea?: HTMLTextAreaElement;
     private testOutputTextArea?: HTMLTextAreaElement;
 
@@ -42,16 +47,37 @@ export class IndexSettingsSection {
         indexedNoteCount: number;
         indexedChunkCount: number;
     }): void {
-        if (this.indexedStat && this.excludedStat) {
-            const { app } = this.props;
-            const allFiles = app.vault.getMarkdownFiles();
-            const actuallyExcludedCount = allFiles.length - stats.indexedNoteCount;
+        this.renderStats(stats.indexedChunkCount);
+        this.updateErroredFilesList();
+    }
 
-            this.indexedStat.setText(
-                `• Indexed: ${stats.indexedNoteCount} notes (${stats.indexedChunkCount} chunks)`
-            );
-            this.excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
+    /**
+     * Render the honest, mutually-exclusive Indexed / Errored / Excluded counts
+     * (indexing-status spec §3) — replaces the old `total - indexed` guess that
+     * lumped errored/pending files into "Excluded".
+     */
+    private renderStats(indexedChunkCount: number): void {
+        if (!this.indexedStat || !this.excludedStat) return;
+        const { app, settingsService } = this.props;
+        const allPaths = app.vault.getMarkdownFiles().map((f) => f.path);
+        const patterns = settingsService.get().excludeFolderPatterns || [];
+        const indexedPaths = this.props.mTimeStore?.getAllPaths() ?? [];
+        const erroredPaths = this.props.erroredStore?.getAllPaths() ?? [];
+
+        const status = computeIndexStatus(
+            allPaths,
+            patterns,
+            indexedPaths,
+            erroredPaths
+        );
+
+        this.indexedStat.setText(
+            `• Indexed: ${status.indexed} notes (${indexedChunkCount} chunks)`
+        );
+        if (this.erroredStat) {
+            this.erroredStat.setText(`• Errored: ${status.errored} files`);
         }
+        this.excludedStat.setText(`• Excluded: ${status.excluded} files`);
     }
 
     /**
@@ -63,8 +89,6 @@ export class IndexSettingsSection {
     }): void {
         this.initializeSectionContainer();
 
-        const { app } = this.props;
-        const indexedNoteCount = currentStats.indexedNoteCount;
         const indexedChunkCount = currentStats.indexedChunkCount;
 
         // Build all settings in a single SettingGroup
@@ -74,18 +98,10 @@ export class IndexSettingsSection {
         const builders = this.getSettingBuilders();
         builders.forEach(builder => settingGroup.addSetting(builder));
 
-        // Initialize stats and excluded files list
+        // Initialize stats and excluded/errored files lists
         setTimeout(() => {
-            const allFiles = app.vault.getMarkdownFiles();
-            const actuallyExcludedCount = allFiles.length - indexedNoteCount;
-
-            if (this.indexedStat && this.excludedStat) {
-                this.indexedStat.setText(
-                    `• Indexed: ${indexedNoteCount} notes (${indexedChunkCount} chunks)`
-                );
-                this.excludedStat.setText(`• Excluded: ${actuallyExcludedCount} files`);
-            }
-
+            this.renderStats(indexedChunkCount);
+            this.updateErroredFilesList();
             this.updateExcludedFilesList();
             this.processTestInput();
         }, 0);
@@ -102,6 +118,7 @@ export class IndexSettingsSection {
                 if (!this.statsContainer) {
                     this.statsContainer = setting.descEl.createDiv("similar-notes-stats-container");
                     this.indexedStat = this.statsContainer.createDiv("similar-notes-stat-item");
+                    this.erroredStat = this.statsContainer.createDiv("similar-notes-stat-item");
                     this.excludedStat = this.statsContainer.createDiv("similar-notes-stat-item");
                 }
             },
@@ -154,6 +171,25 @@ export class IndexSettingsSection {
                 setting.setDesc("");
                 this.excludedFilesDescription = setting.descEl;
                 this.excludedFilesList = setting.controlEl.createDiv("similar-notes-excluded-files-list");
+            },
+            // Errored files preview + retry
+            (setting) => {
+                setting
+                    .setName("Errored files")
+                    .setDesc(
+                        "Notes that failed indexing after repeated attempts. Editing a note retries it automatically; use this button if you fixed the cause (e.g. switched model, restored Ollama)."
+                    )
+                    .addButton((button) => {
+                        this.retryErroredButton = button.buttonEl;
+                        button
+                            .setButtonText("Retry errored")
+                            .setTooltip("Re-queue all errored notes for another attempt")
+                            .onClick(async () => {
+                                await this.props.plugin.retryErroredNotes();
+                                this.updateErroredFilesList();
+                            });
+                    });
+                this.erroredFilesList = setting.controlEl.createDiv("similar-notes-errored-files-list");
             },
             // Apply exclusion patterns
             (setting) => {
@@ -278,11 +314,23 @@ export class IndexSettingsSection {
         // Reset state
         this.statsContainer = undefined;
         this.indexedStat = undefined;
+        this.erroredStat = undefined;
         this.excludedStat = undefined;
         this.excludedFilesDescription = undefined;
         this.excludedFilesList = undefined;
+        this.erroredFilesList = undefined;
+        this.retryErroredButton = undefined;
         this.testInputTextArea = undefined;
         this.testOutputTextArea = undefined;
+    }
+
+    private updateErroredFilesList(): void {
+        if (!this.erroredFilesList) return;
+        renderErroredFilesList(
+            this.erroredFilesList,
+            this.retryErroredButton,
+            this.props.erroredStore?.getAll() ?? {}
+        );
     }
 
     private updateExcludedFilesList(): void {
