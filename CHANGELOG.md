@@ -10,6 +10,11 @@ All notable changes to this project will be documented in this file.
     -   Same inline dropdown as Obsidian's `[[` linker — type a rough description (e.g. `;;book with zombie`) and pick the note you meant, even when you've forgotten its exact title
     -   Selecting a result replaces the `;;…` text with a `[[wikilink]]` at your cursor
     -   New "Semantic link trigger" field under Display settings — change the trigger (e.g. `@@`) or leave it empty to disable. The trigger is standalone (not `[[`) so Obsidian's built-in link autocomplete is left untouched
+-   **Errored notes are visible and retryable** (#45, #46): Notes that fail to index now appear under a new "Errored files" list in the Index settings, with the error reason — separate from excluded files. A "Retry errored" button (also in the status-bar menu and as a "Retry errored notes" command) re-attempts them after you fix the cause (e.g. switch model, restore Ollama). Editing a note retries it automatically.
+
+### Fixed
+
+-   **Honest indexing status** (#45, #46): Indexing failures are no longer hidden. The plugin previously reported the whole vault as indexed — and lumped failed notes into the "Excluded" count — even when notes had silently failed to index. The Index settings now show separate **Indexed / Errored / Excluded** counts, and the status bar shows how many notes errored. A note is retried a few times before being marked errored, and a terminally-errored note is no longer re-attempted on every restart (which previously crashed at the same point each launch).
 
 ## [1.4.0] - 2026-06-06
 
