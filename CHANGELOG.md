@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+-   **Semantic Link Suggestions in the Editor** (#35): Type a trigger (default `;;`) followed by a description to get semantic note suggestions inline and insert a `[[link]]`
+    -   Same inline dropdown as Obsidian's `[[` linker — type a rough description (e.g. `;;book with zombie`) and pick the note you meant, even when you've forgotten its exact title
+    -   Selecting a result replaces the `;;…` text with a `[[wikilink]]` at your cursor
+    -   New "Semantic link trigger" field under Display settings — change the trigger (e.g. `@@`) or leave it empty to disable. The trigger is standalone (not `[[`) so Obsidian's built-in link autocomplete is left untouched
+
 ## [1.4.0] - 2026-06-06
 
 ### Added
