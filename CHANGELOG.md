@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
--   **Index settings reorganized**: The exclusion options (folder/glob patterns, the excluded-files preview, Apply Patterns, the content-regex field, and the RegExp tester) moved out of the crowded Index section into their own **"Exclude from index"** section. The Index section now holds only indexing config, statistics, and the errored-files list. The content-regex field also now appears above its RegExp tester (previously below it).
+-   **Index settings reorganized**: The single crowded Index section is split into three focused sections. **Index** keeps statistics, indexing delay, Include frontmatter, Reindex, and the errored-files list (Reindex now sits after the two indexing options instead of between them). **Exclude folders from index** holds the folder/glob patterns, the excluded-files preview, and Apply Patterns. **Exclude content from index** holds the content-regex field and its RegExp tester (the field now appears above the tester, previously below it).
 -   **Excalidraw excluded from indexing by default** (#46): New installs now skip the default `Excalidraw/` folder. Excalidraw drawings are stored as base64-compressed binary data that can't be embedded and isn't meaningful to search. Existing users' exclusion settings are unchanged — remove the pattern if you want those files indexed.
 
 ### Fixed

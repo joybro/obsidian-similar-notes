@@ -98,11 +98,15 @@ export class IndexSettingsSection {
         const indexGroup = new SettingGroup(this.sectionContainer!).setHeading("Index");
         this.getIndexSettingBuilders().forEach((builder) => indexGroup.addSetting(builder));
 
-        // Exclusion lives in its own top-level group so the Index group stays
-        // scannable. SettingGroup can't nest and Setting-level sub-headings
-        // render poorly, so a sibling group is the clean way to separate it.
-        const exclusionGroup = new SettingGroup(this.sectionContainer!).setHeading("Exclude from index");
-        this.getExclusionSettingBuilders().forEach((builder) => exclusionGroup.addSetting(builder));
+        // Folder exclusion (which files are indexed) and content exclusion (what
+        // text within a file is indexed) are distinct concerns, so each gets its
+        // own group. SettingGroup can't nest and Setting-level sub-headings
+        // render poorly, so sibling groups are the clean way to separate them.
+        const folderExclusionGroup = new SettingGroup(this.sectionContainer!).setHeading("Exclude folders from index");
+        this.getFolderExclusionSettingBuilders().forEach((builder) => folderExclusionGroup.addSetting(builder));
+
+        const contentExclusionGroup = new SettingGroup(this.sectionContainer!).setHeading("Exclude content from index");
+        this.getContentExclusionSettingBuilders().forEach((builder) => contentExclusionGroup.addSetting(builder));
 
         // Initialize stats and excluded/errored files lists
         setTimeout(() => {
@@ -115,8 +119,9 @@ export class IndexSettingsSection {
 
     /**
      * Builders for the "Index" group: general indexing config, statistics, and
-     * error recovery. Exclusion settings live in their own group
-     * ({@link getExclusionSettingBuilders}).
+     * error recovery. Exclusion settings live in their own groups
+     * ({@link getFolderExclusionSettingBuilders},
+     * {@link getContentExclusionSettingBuilders}).
      */
     private getIndexSettingBuilders(): SettingBuilder[] {
         const { plugin, settingsService } = this.props;
@@ -153,17 +158,6 @@ export class IndexSettingsSection {
                         });
                     });
             },
-            // Reindex notes
-            (setting) => {
-                setting
-                    .setName("Reindex notes")
-                    .setDesc("Rebuild the similarity index for all notes")
-                    .addButton((button) => {
-                        button.setButtonText("Reindex").onClick(async () => {
-                            await plugin.reindexNotes();
-                        });
-                    });
-            },
             // Include frontmatter
             (setting) => {
                 setting
@@ -172,6 +166,17 @@ export class IndexSettingsSection {
                     .addToggle((toggle) => {
                         toggle.setValue(settings.includeFrontmatter).onChange(async (value) => {
                             await settingsService.update({ includeFrontmatter: value });
+                        });
+                    });
+            },
+            // Reindex notes — the action that rebuilds the index from the config above
+            (setting) => {
+                setting
+                    .setName("Reindex notes")
+                    .setDesc("Rebuild the similarity index for all notes")
+                    .addButton((button) => {
+                        button.setButtonText("Reindex").onClick(async () => {
+                            await plugin.reindexNotes();
                         });
                     });
             },
@@ -206,12 +211,11 @@ export class IndexSettingsSection {
     }
 
     /**
-     * Builders for the "Exclude from index" group. Ordered as two coherent
-     * blocks: folder exclusion (which files are indexed — input, preview, and the
-     * Apply action that syncs the index) followed by content exclusion (what text
-     * within a file is indexed — regex input, then its tester).
+     * Builders for the "Exclude folders from index" group — which files are
+     * indexed: the glob-pattern input, the preview of excluded files, and the
+     * Apply action that syncs the index (which acts on folder patterns only).
      */
-    private getExclusionSettingBuilders(): SettingBuilder[] {
+    private getFolderExclusionSettingBuilders(): SettingBuilder[] {
         const { settingsService } = this.props;
         const settings = settingsService.get();
 
@@ -236,6 +240,18 @@ export class IndexSettingsSection {
                             .onClick(async () => this.handleApplyExclusionPatterns());
                     });
             },
+        ];
+    }
+
+    /**
+     * Builders for the "Exclude content from index" group — what text within a
+     * file is indexed: the regex input followed by its tester.
+     */
+    private getContentExclusionSettingBuilders(): SettingBuilder[] {
+        const { settingsService } = this.props;
+        const settings = settingsService.get();
+
+        return [
             // Exclude content
             (setting) => this.buildExcludeContentSetting(setting, settings, settingsService),
             // RegExp tester (tests the content-exclusion patterns above)
@@ -249,7 +265,7 @@ export class IndexSettingsSection {
         settingsService: SettingsService
     ): void {
         setting
-            .setName("Exclude folders from indexing")
+            .setName("Folder patterns")
             .setDesc("Enter glob patterns to exclude folders/files from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes.")
             .addTextArea((text) => {
                 text.inputEl.rows = 5;
@@ -290,7 +306,7 @@ export class IndexSettingsSection {
         settingsService: SettingsService
     ): void {
         setting
-            .setName("Exclude content from indexing")
+            .setName("Content patterns")
             .setDesc("Enter regular expressions to exclude content from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes.")
             .addTextArea((text) => {
                 text.inputEl.rows = 5;
