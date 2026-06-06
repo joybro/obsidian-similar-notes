@@ -1,4 +1,5 @@
 import type { SettingsService } from "@/application/SettingsService";
+import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import { filterMarkdownFiles } from "@/utils/folderExclusion";
 import log from "loglevel";
@@ -52,9 +53,10 @@ export class NoteChangeQueue {
      * Creates a new file change queue
      */
     constructor(
-        private vault: Vault, 
+        private vault: Vault,
         private mTimeStore: IndexedNoteMTimeStore,
-        private settingsService: SettingsService
+        private settingsService: SettingsService,
+        private erroredNoteStore: ErroredNoteStore
     ) {}
 
     /**
@@ -89,6 +91,8 @@ export class NoteChangeQueue {
                 // Check if file should be excluded
                 const files = filterMarkdownFiles([file], settings.excludeFolderPatterns);
                 if (files.length > 0) {
+                    // A fresh create supersedes any prior terminal error.
+                    void this.erroredNoteStore.delete(file.path);
                     // Add to queue with hash
                     this.queue.push({
                         path: file.path,
@@ -123,6 +127,8 @@ export class NoteChangeQueue {
                             (change) => change.path !== file.path
                         );
 
+                        // A fresh edit supersedes any prior terminal error.
+                        void this.erroredNoteStore.delete(file.path);
                         // Add to queue
                         this.queue.push({
                             path: file.path,
@@ -251,8 +257,32 @@ export class NoteChangeQueue {
             });
         }
         
+        // A full reprocess supersedes all prior terminal errors.
+        await this.erroredNoteStore.clear();
         this.queue = newQueue;
         log.info(`Enqueued all notes: ${newQueue.length} files queued for reprocessing`);
+    }
+
+    /**
+     * Re-enqueues every terminally-errored note for a fresh attempt and clears
+     * the errored store. Used by the "Retry errored" UI action — for the case
+     * where the file is unchanged but the underlying cause (model, connectivity,
+     * settings) has been fixed.
+     */
+    async retryErrored(): Promise<void> {
+        const paths = this.erroredNoteStore.getAllPaths();
+        for (const path of paths) {
+            const file = this.vault.getAbstractFileByPath(path);
+            if (file instanceof TFile) {
+                this.queue.push({
+                    path,
+                    reason: "modified",
+                    mtime: file.stat.mtime,
+                });
+            }
+        }
+        await this.erroredNoteStore.clear();
+        log.info(`Retrying ${paths.length} errored notes`);
     }
 
     /**
@@ -312,6 +342,18 @@ export class NoteChangeQueue {
         // Find files that should be added (not currently indexed but should be)
         for (const [filePath, mtime] of shouldBeIndexed) {
             if (!currentlyIndexed.has(filePath)) {
+                const errored = this.erroredNoteStore.get(filePath);
+                if (errored) {
+                    if (errored.mtime === mtime) {
+                        // Same content that previously errored — do NOT re-queue,
+                        // otherwise we re-crash on the same note every launch (#45).
+                        continue;
+                    }
+                    // File was edited since it errored — give it a fresh attempt.
+                    // delete() updates the in-memory cache + count synchronously;
+                    // the IndexedDB write completes async (fine for this sync pass).
+                    void this.erroredNoteStore.delete(filePath);
+                }
                 toAdd.push({ path: filePath, mtime });
             } else if (checkMtime) {
                 // Check if existing indexed file needs update

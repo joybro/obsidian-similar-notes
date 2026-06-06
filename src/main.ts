@@ -271,7 +271,8 @@ export default class MainPlugin extends Plugin {
         this.noteChangeQueue = new NoteChangeQueue(
             this.app.vault,
             this.indexedNotesMTimeStore,
-            this.settingsService
+            this.settingsService,
+            this.erroredNoteStore
         );
         await this.noteChangeQueue.initialize();
 

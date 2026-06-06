@@ -1,4 +1,5 @@
 import type { SettingsService } from "@/application/SettingsService";
+import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import type { TFile, Vault } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -39,12 +40,16 @@ const createMockTFile = (path: string, mtime: number): TFile => {
 };
 
 // Mock Vault with only the methods we need
-type MockVault = Pick<Vault, "getMarkdownFiles" | "read" | "on" | "offref">;
+type MockVault = Pick<
+    Vault,
+    "getMarkdownFiles" | "read" | "on" | "offref" | "getAbstractFileByPath"
+>;
 
 // eslint-disable-next-line max-lines-per-function
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
     let mockMTimeStore: IndexedNoteMTimeStore;
+    let mockErroredStore: ErroredNoteStore;
     let mockSettingsService: SettingsService;
     let fileChangeQueue: NoteChangeQueue;
 
@@ -69,6 +74,7 @@ describe("FileChangeQueue", () => {
                 };
             }),
             offref: vi.fn(),
+            getAbstractFileByPath: vi.fn(),
         };
         mockMTimeStore = {
             getMTime: vi.fn().mockReturnValue(undefined),
@@ -76,6 +82,14 @@ describe("FileChangeQueue", () => {
             deleteMTime: vi.fn(),
             getAllPaths: vi.fn().mockReturnValue([]),
         } as unknown as IndexedNoteMTimeStore;
+        mockErroredStore = {
+            get: vi.fn().mockReturnValue(undefined),
+            getAllPaths: vi.fn().mockReturnValue([]),
+            getAll: vi.fn().mockReturnValue({}),
+            delete: vi.fn().mockResolvedValue(undefined),
+            clear: vi.fn().mockResolvedValue(undefined),
+            set: vi.fn().mockResolvedValue(undefined),
+        } as unknown as ErroredNoteStore;
         
         mockSettingsService = {
             get: vi.fn().mockReturnValue({
@@ -88,12 +102,61 @@ describe("FileChangeQueue", () => {
         fileChangeQueue = new NoteChangeQueue(
             mockVault as unknown as Vault,
             mockMTimeStore,
-            mockSettingsService
+            mockSettingsService,
+            mockErroredStore
         );
     });
 
     test("should create a new file change queue", () => {
         expect(fileChangeQueue.getFileChangeCount()).toBe(0);
+    });
+
+    describe("errored-aware queueing (indexing-status spec §3, §4.3)", () => {
+        test("an errored note with UNCHANGED mtime is not re-queued on initialize", async () => {
+            mockMTimeStore.getAllPaths = vi.fn().mockReturnValue([]);
+            mockErroredStore.get = vi.fn().mockImplementation((p: string) =>
+                p === "file1.md"
+                    ? { path: "file1.md", error: "x", attempts: 3, mtime: 1000, lastTriedAt: 0 }
+                    : undefined
+            );
+            mockVault.getMarkdownFiles = vi
+                .fn()
+                .mockReturnValue([testFile1, testFile2]);
+
+            await fileChangeQueue.initialize();
+
+            const queued = fileChangeQueue.pollFileChanges(100).map((c) => c.path);
+            expect(queued).not.toContain("file1.md"); // skipped — no re-crash loop
+            expect(queued).toContain("file2.md");
+        });
+
+        test("an errored note whose mtime CHANGED (edited offline) is cleared and re-queued", async () => {
+            mockMTimeStore.getAllPaths = vi.fn().mockReturnValue([]);
+            mockErroredStore.get = vi.fn().mockImplementation((p: string) =>
+                p === "file1.md"
+                    ? { path: "file1.md", error: "x", attempts: 3, mtime: 999, lastTriedAt: 0 }
+                    : undefined
+            );
+            mockVault.getMarkdownFiles = vi.fn().mockReturnValue([testFile1]); // current mtime 1000 != 999
+
+            await fileChangeQueue.initialize();
+
+            expect(mockErroredStore.delete).toHaveBeenCalledWith("file1.md");
+            const queued = fileChangeQueue.pollFileChanges(100).map((c) => c.path);
+            expect(queued).toContain("file1.md");
+        });
+
+        test("retryErrored clears the store and enqueues exactly the errored paths", async () => {
+            mockErroredStore.getAllPaths = vi.fn().mockReturnValue(["file1.md"]);
+            mockVault.getAbstractFileByPath = vi.fn().mockReturnValue(testFile1);
+
+            await fileChangeQueue.retryErrored();
+
+            const queued = fileChangeQueue.pollFileChanges(100);
+            expect(queued.map((c) => c.path)).toEqual(["file1.md"]);
+            expect(queued[0].attempts ?? 0).toBe(0); // fresh attempt budget
+            expect(mockErroredStore.clear).toHaveBeenCalled();
+        });
     });
 
     test("should initialize queue with new files", async () => {
