@@ -3,13 +3,14 @@ import type { SettingsService, SimilarNotesSettings } from "@/application/Settin
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
-import { computeIndexStatus } from "@/application/indexStatus";
+import { computeIndexStatus, visibleErroredEntries } from "@/application/indexStatus";
 import { isValidGlobPattern, shouldExcludeFile } from "@/utils/folderExclusion";
 import log from "loglevel";
 import type { App, Setting } from "obsidian";
 import { Notice, SettingGroup } from "obsidian";
 import type MainPlugin from "../main";
 import { renderErroredFilesList } from "./erroredFilesList";
+import { RegexpExclusionTester } from "./regexpExclusionTester";
 import { LoadModelModal } from "./LoadModelModal";
 import type { SettingBuilder } from "./OpenAISettingsSection";
 
@@ -36,10 +37,11 @@ export class IndexSettingsSection {
     private erroredFilesDescription?: HTMLElement;
     private erroredFilesList?: HTMLElement;
     private retryErroredButton?: HTMLButtonElement;
-    private testInputTextArea?: HTMLTextAreaElement;
-    private testOutputTextArea?: HTMLTextAreaElement;
+    private regexpTester: RegexpExclusionTester;
 
-    constructor(private props: IndexSettingsSectionProps) {}
+    constructor(private props: IndexSettingsSectionProps) {
+        this.regexpTester = new RegexpExclusionTester(props.settingsService);
+    }
 
     /**
      * Update just the statistics without rebuilding the entire section
@@ -104,7 +106,7 @@ export class IndexSettingsSection {
             this.renderStats(indexedChunkCount);
             this.updateErroredFilesList();
             this.updateExcludedFilesList();
-            this.processTestInput();
+            this.regexpTester.run();
         }, 0);
     }
 
@@ -186,7 +188,7 @@ export class IndexSettingsSection {
                     });
             },
             // RegExp tester
-            (setting) => this.renderRegExpTesterContent(setting),
+            (setting) => this.regexpTester.render(setting),
             // Exclude content
             (setting) => this.buildExcludeContentSetting(setting, settings, settingsService),
             // Errored files preview — mirrors the Excluded files preview exactly:
@@ -306,7 +308,7 @@ export class IndexSettingsSection {
 
                     applyErrorStyles();
                     await settingsService.update({ excludeRegexPatterns: validPatterns });
-                    this.processTestInput();
+                    this.regexpTester.run();
                 });
             });
     }
@@ -330,12 +332,20 @@ export class IndexSettingsSection {
         this.erroredFilesDescription = undefined;
         this.erroredFilesList = undefined;
         this.retryErroredButton = undefined;
-        this.testInputTextArea = undefined;
-        this.testOutputTextArea = undefined;
+        this.regexpTester.reset();
     }
 
     private updateErroredFilesList(): void {
-        const entries = this.props.erroredStore?.getAll() ?? {};
+        const allEntries = this.props.erroredStore?.getAll() ?? {};
+        // Mirror the "Errored: N" stat's precedence: hide entries for files that
+        // are now excluded by a glob, or no longer present in the vault — so the
+        // list and its count never disagree with the stat.
+        const vaultPaths = this.props.app.vault
+            .getMarkdownFiles()
+            .map((f) => f.path);
+        const patterns =
+            this.props.settingsService.get().excludeFolderPatterns || [];
+        const entries = visibleErroredEntries(allEntries, vaultPaths, patterns);
 
         if (this.erroredFilesDescription) {
             this.erroredFilesDescription.empty();
@@ -433,60 +443,4 @@ export class IndexSettingsSection {
         ).open();
     }
 
-    private renderRegExpTesterContent(setting: Setting): void {
-        const { settingsService } = this.props;
-        const settings = settingsService.get();
-
-        const container = setting.settingEl;
-        container.addClass("similar-notes-regexp-tester");
-
-        setting.setDesc("Test your regular expressions against sample text");
-
-        const regExpTesterContent = setting.controlEl;
-        regExpTesterContent.addClass("similar-notes-regexp-tester-content");
-
-        const testInputContainer = regExpTesterContent.createDiv("similar-notes-test-input-container");
-        const testOutputContainer = regExpTesterContent.createDiv("similar-notes-test-output-container");
-
-        testInputContainer.createDiv("similar-notes-test-label").setText("Input text:");
-        testOutputContainer.createDiv("similar-notes-test-label").setText("Result (content that will be indexed):");
-
-        this.testInputTextArea = testInputContainer.createEl("textarea");
-        this.testInputTextArea.rows = 8;
-        this.testInputTextArea.cols = 30;
-        this.testInputTextArea.placeholder = "Enter text to test against your regular expressions";
-        this.testInputTextArea.value = settings.regexpTestInputText || "";
-
-        this.testOutputTextArea = testOutputContainer.createEl("textarea");
-        this.testOutputTextArea.rows = 8;
-        this.testOutputTextArea.cols = 30;
-        this.testOutputTextArea.readOnly = true;
-        this.testOutputTextArea.placeholder = "Filtered content will appear here";
-
-        this.testInputTextArea.addEventListener("input", () => {
-            settingsService.update({ regexpTestInputText: this.testInputTextArea!.value });
-            this.processTestInput();
-        });
-    }
-
-    private processTestInput(): void {
-        if (!this.testInputTextArea || !this.testOutputTextArea) return;
-
-        const { settingsService } = this.props;
-        const inputText = this.testInputTextArea.value || "";
-        let outputText = inputText;
-
-        try {
-            const currentSettings = settingsService.get();
-            const patterns = currentSettings.excludeRegexPatterns;
-
-            for (const pattern of patterns) {
-                const regex = new RegExp(pattern, "gm");
-                outputText = outputText.replace(regex, "");
-            }
-            this.testOutputTextArea.value = outputText;
-        } catch (e) {
-            this.testOutputTextArea.value = `Error processing RegExp: ${e.message}`;
-        }
-    }
 }
