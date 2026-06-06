@@ -8,6 +8,22 @@ vi.mock("obsidian", () => ({
             this.app = app;
         }
     },
+    // Minimal trailing-debounce mock: each call resets the timer and only the
+    // last invocation's args run, mirroring Obsidian's debounce(fn, ms, true).
+    debounce: (fn: (...args: never[]) => void, timeout: number) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let lastArgs: never[];
+        const debounced = (...args: never[]) => {
+            lastArgs = args;
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => fn(...lastArgs), timeout);
+        };
+        debounced.cancel = () => {
+            if (timer) clearTimeout(timer);
+        };
+        debounced.run = () => undefined;
+        return debounced;
+    },
     TFile: class TFile {
         path: string;
         basename: string;
@@ -71,7 +87,7 @@ describe("SemanticLinkSuggest.onTrigger (spec item 1)", () => {
 });
 
 describe("SemanticLinkSuggest.getSuggestions (spec item 2)", () => {
-    it("returns [] and does not search below the minimum query length", async () => {
+    it("returns [] without searching below the minimum query length", async () => {
         const service = { findSimilarNotesFromText: vi.fn() };
         const suggest = makeSuggest({ service });
         const short = "a".repeat(MIN_SEARCH_LENGTH - 1);
@@ -79,7 +95,7 @@ describe("SemanticLinkSuggest.getSuggestions (spec item 2)", () => {
         expect(service.findSimilarNotesFromText).not.toHaveBeenCalled();
     });
 
-    it("debounces then returns the service's similarNotes for a valid query", async () => {
+    it("debounces then resolves with the service's similarNotes for a valid query", async () => {
         vi.useFakeTimers();
         const notes = [makeNote("Frankenstein")];
         const service = {
@@ -97,7 +113,7 @@ describe("SemanticLinkSuggest.getSuggestions (spec item 2)", () => {
         expect(service.findSimilarNotesFromText).toHaveBeenCalledWith("frank");
     });
 
-    it("discards superseded (stale) results, keeping only the latest query", async () => {
+    it("cancels the superseded search and only runs the latest query", async () => {
         vi.useFakeTimers();
         const service = {
             findSimilarNotesFromText: vi.fn(async (q: string) => ({
@@ -108,11 +124,11 @@ describe("SemanticLinkSuggest.getSuggestions (spec item 2)", () => {
             })),
         };
         const suggest = makeSuggest({ service });
-        const stale = suggest.getSuggestions({ query: "frank" } as never);
+        // The superseded call's promise is intentionally never resolved.
+        void suggest.getSuggestions({ query: "frank" } as never);
         const latest = suggest.getSuggestions({ query: "franke" } as never);
         await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
 
-        expect(await stale).toEqual([]);
         expect((await latest).map((n) => n.title)).toEqual(["franke"]);
         expect(service.findSimilarNotesFromText).toHaveBeenCalledTimes(1);
         expect(service.findSimilarNotesFromText).toHaveBeenCalledWith("franke");
