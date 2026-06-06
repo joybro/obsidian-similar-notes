@@ -18,6 +18,7 @@ import {
     sanitizeFileName,
     createNoteFromQuery,
     insertLinkForNote,
+    resolveWikilink,
     handleSemanticSearchKey,
     type SearchKeyContext,
 } from "../semanticSearchActions";
@@ -194,5 +195,24 @@ describe("handleSemanticSearchKey (spec item 1)", () => {
         expect(ctx.moveSelection).toHaveBeenCalledWith(-1);
         handleSemanticSearchKey(keyEvent("Escape"), ctx);
         expect(ctx.close).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("resolveWikilink (spec item: shared linktext helper)", () => {
+    function appFor(file: unknown) {
+        return {
+            vault: { getAbstractFileByPath: vi.fn(() => file) },
+            metadataCache: { fileToLinktext: vi.fn(() => "Target") },
+        } as never;
+    }
+
+    it("returns a [[linktext]] string for an existing file", () => {
+        expect(resolveWikilink(appFor(new TFile("Target.md")), "Target.md", "src.md")).toBe(
+            "[[Target]]"
+        );
+    });
+
+    it("returns null when the path is not a TFile", () => {
+        expect(resolveWikilink(appFor(null), "missing.md", "src.md")).toBeNull();
     });
 });
