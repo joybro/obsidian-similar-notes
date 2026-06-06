@@ -45,7 +45,7 @@ If the user just says "release 1.3.0" (no beta), use `bump-version` instead.
 
 - `package.json` → `"version": "X.Y.Z-beta.N"`
 - `manifest.json` → **leave at the previous stable** (do not change)
-- `CHANGELOG.md` → add a new section `## [X.Y.Z] - YYYY-MM-DD` (the stable header, not `-beta.N`). Reuse it as-is for the eventual stable bump. Follow the existing categories (Added / Changed / Improved / Fixed) and reference issue numbers `(#N)`. Write from user perspective — see `bump-version` for the same conventions.
+- `CHANGELOG.md` → rename the existing `## [Unreleased]` section to `## [X.Y.Z] - YYYY-MM-DD` (the stable header, not `-beta.N`). Feature sessions maintain `## [Unreleased]` as work lands (see repo `CLAUDE.md` → Changelog), so the entries should already be present — add any that were missed. Reuse it as-is for the eventual stable bump. Follow the existing categories (Added / Changed / Improved / Fixed) and reference issue numbers `(#N)`. Write from user perspective — see `bump-version` for the same conventions.
 
 **Verify each entry against the user-facing surface before finalizing.** Commit descriptions tell *why* and *how* a change was made; CHANGELOG entries tell *what the user sees*. These diverge in small but visible ways — e.g. a UI control described as a "slider" that's actually `addText` (number input); a fix said to affect "the sidebar" that also affects the in-document panel; a setting whose label in code differs from the working name in the commit. For each entry, open the component that implements the change and confirm control type, exact label, and which views are affected. The same verified entry text feeds into the release body in step 5 — getting it right here means the release body is correct by construction.
 
