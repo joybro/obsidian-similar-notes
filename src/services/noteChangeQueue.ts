@@ -12,6 +12,9 @@ export type NoteChange = {
     // Only set when reason === "renamed". Lets the indexing service carry
     // the existing embedding from oldPath to path without re-embedding.
     oldPath?: string;
+    // How many processing attempts this change has already had. Used to cap
+    // in-session retries before a note is moved to the terminal Errored state.
+    attempts?: number;
 };
 
 interface FileInfo {
@@ -264,6 +267,14 @@ export class NoteChangeQueue {
         const changes = this.queue.slice(0, maxCount);
         this.queue = this.queue.slice(maxCount);
         return changes;
+    }
+
+    /**
+     * Re-adds a change to the back of the queue for another attempt.
+     * Used by the indexing service to retry a failed change in-session.
+     */
+    requeue(change: NoteChange): void {
+        this.queue.push(change);
     }
 
     /**
