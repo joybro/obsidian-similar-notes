@@ -40,6 +40,21 @@ export async function createNoteFromQuery(app: App, query: string): Promise<bool
 }
 
 /**
+ * Resolve a vault path to a `[[linktext]]` string using Obsidian's configured
+ * link format (relative to `sourcePath`). Returns null when the path is not a file.
+ */
+export function resolveWikilink(
+    app: App,
+    notePath: string,
+    sourcePath: string
+): string | null {
+    const file = app.vault.getAbstractFileByPath(notePath);
+    if (!(file instanceof TFile)) return null;
+    const linktext = app.metadataCache.fileToLinktext(file, sourcePath);
+    return `[[${linktext}]]`;
+}
+
+/**
  * Insert a wiki-link to the given note path at the active editor's cursor,
  * followed by a single space so successive inserts are space-separated.
  * Returns false (caller surfaces a Notice) when there is no active editor.
@@ -48,12 +63,11 @@ export function insertLinkForNote(app: App, notePath: string): boolean {
     const view = app.workspace.getActiveViewOfType(MarkdownView);
     if (!view?.editor) return false;
 
-    const file = app.vault.getAbstractFileByPath(notePath);
-    if (!(file instanceof TFile)) return false;
-
     const sourcePath = view.file?.path ?? "";
-    const linktext = app.metadataCache.fileToLinktext(file, sourcePath);
-    view.editor.replaceSelection(`[[${linktext}]] `);
+    const wikilink = resolveWikilink(app, notePath, sourcePath);
+    if (!wikilink) return false;
+
+    view.editor.replaceSelection(`${wikilink} `);
     return true;
 }
 
