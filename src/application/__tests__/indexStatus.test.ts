@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { computeIndexStatus } from "../indexStatus";
+import { computeIndexStatus, visibleErroredEntries } from "../indexStatus";
 
 describe("computeIndexStatus (indexing-status spec §3)", () => {
     const all = ["a.md", "b.md", "c.md", "d.md", "e.md"];
@@ -43,5 +43,44 @@ describe("computeIndexStatus (indexing-status spec §3)", () => {
             indexed: 0,
             pending: 0,
         });
+    });
+});
+
+describe("visibleErroredEntries — errored list mirrors the count's precedence", () => {
+    const entries = {
+        "Excalidraw/Monzo.md": { error: "too big" },
+        "Notes/a.md": { error: "boom" },
+        "Notes/gone.md": { error: "boom" },
+    };
+
+    test("drops errored entries for now-excluded paths (so list matches 'Errored: N' stat)", () => {
+        const vaultPaths = [
+            "Excalidraw/Monzo.md",
+            "Notes/a.md",
+            "Notes/gone.md",
+        ];
+        const visible = visibleErroredEntries(entries, vaultPaths, [
+            "Excalidraw/",
+        ]);
+        expect(Object.keys(visible)).toEqual(["Notes/a.md", "Notes/gone.md"]);
+    });
+
+    test("drops errored entries for paths no longer in the vault", () => {
+        // "Notes/gone.md" was deleted — not in vaultPaths anymore.
+        const vaultPaths = ["Excalidraw/Monzo.md", "Notes/a.md"];
+        const visible = visibleErroredEntries(entries, vaultPaths, []);
+        expect(Object.keys(visible)).toEqual([
+            "Excalidraw/Monzo.md",
+            "Notes/a.md",
+        ]);
+    });
+
+    test("keeps a genuinely errored, included, present file", () => {
+        const visible = visibleErroredEntries(
+            { "Notes/a.md": { error: "boom" } },
+            ["Notes/a.md"],
+            ["Excalidraw/"]
+        );
+        expect(Object.keys(visible)).toEqual(["Notes/a.md"]);
     });
 });
