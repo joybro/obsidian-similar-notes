@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
     -   New "Semantic link trigger" field under Display settings — change the trigger (e.g. `@@`) or leave it empty to disable. The trigger is standalone (not `[[`) so Obsidian's built-in link autocomplete is left untouched
 -   **Errored notes are visible and retryable** (#45, #46): Notes that fail to index now appear under a new "Errored files" list in the Index settings, with the error reason — separate from excluded files. A "Retry errored" button (also in the status-bar menu and as a "Retry errored notes" command) re-attempts them after you fix the cause (e.g. switch model, restore Ollama). Editing a note retries it automatically.
 
+### Changed
+
+-   **Excalidraw excluded from indexing by default** (#46): New installs now skip the default `Excalidraw/` folder. Excalidraw drawings are stored as base64-compressed binary data that can't be embedded and isn't meaningful to search. Existing users' exclusion settings are unchanged — remove the pattern if you want those files indexed.
+
 ### Fixed
 
 -   **Non-English notes failing to index on Ollama** (#46): Notes with Korean/CJK (or other multi-byte) content could fail to index with an "input length exceeds the context" error. The chunk-size estimate assumed English-length tokens and packed far too much text into each chunk for the model's context window. The estimate is now based on UTF-8 byte length, so chunks stay within the model's limit regardless of script.
