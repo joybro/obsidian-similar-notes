@@ -33,6 +33,7 @@ export class IndexSettingsSection {
     // State for dynamic updates
     private excludedFilesDescription?: HTMLElement;
     private excludedFilesList?: HTMLElement;
+    private erroredFilesDescription?: HTMLElement;
     private erroredFilesList?: HTMLElement;
     private retryErroredButton?: HTMLButtonElement;
     private testInputTextArea?: HTMLTextAreaElement;
@@ -188,16 +189,13 @@ export class IndexSettingsSection {
             (setting) => this.renderRegExpTesterContent(setting),
             // Exclude content
             (setting) => this.buildExcludeContentSetting(setting, settings, settingsService),
-            // Errored files preview — the box is the sole control so it renders
-            // wide (like the Excluded files preview), which keeps the description
-            // column narrow. The Retry action is a separate row below, mirroring
-            // "Apply exclusion patterns".
+            // Errored files preview — mirrors the Excluded files preview exactly:
+            // empty name/desc so the info column stays minimal and the box claims
+            // the full control width (renders wide). The count label goes in
+            // descEl; the explanation + Retry action live in the row below.
             (setting) => {
-                setting
-                    .setName("Errored files")
-                    .setDesc(
-                        "Notes that failed to index after repeated attempts. Edit a note to retry it automatically."
-                    );
+                setting.setDesc("");
+                this.erroredFilesDescription = setting.descEl;
                 this.erroredFilesList = setting.controlEl.createDiv("similar-notes-errored-files-list");
             },
             // Retry errored notes
@@ -205,7 +203,7 @@ export class IndexSettingsSection {
                 setting
                     .setName("Retry errored notes")
                     .setDesc(
-                        "Re-attempt all errored notes — use after fixing the cause (e.g. wrong model, Ollama down)."
+                        "Re-attempt all errored notes after fixing the cause (e.g. wrong model, Ollama down). Editing a note retries it automatically."
                     )
                     .addButton((button) => {
                         this.retryErroredButton = button.buttonEl;
@@ -329,6 +327,7 @@ export class IndexSettingsSection {
         this.excludedStat = undefined;
         this.excludedFilesDescription = undefined;
         this.excludedFilesList = undefined;
+        this.erroredFilesDescription = undefined;
         this.erroredFilesList = undefined;
         this.retryErroredButton = undefined;
         this.testInputTextArea = undefined;
@@ -336,12 +335,23 @@ export class IndexSettingsSection {
     }
 
     private updateErroredFilesList(): void {
-        if (!this.erroredFilesList) return;
-        renderErroredFilesList(
-            this.erroredFilesList,
-            this.retryErroredButton,
-            this.props.erroredStore?.getAll() ?? {}
-        );
+        const entries = this.props.erroredStore?.getAll() ?? {};
+
+        if (this.erroredFilesDescription) {
+            this.erroredFilesDescription.empty();
+            this.erroredFilesDescription.createDiv().setText("Errored files:");
+            this.erroredFilesDescription
+                .createDiv("similar-notes-errored-count")
+                .setText(`${Object.keys(entries).length} errored`);
+        }
+
+        if (this.erroredFilesList) {
+            renderErroredFilesList(
+                this.erroredFilesList,
+                this.retryErroredButton,
+                entries
+            );
+        }
     }
 
     private updateExcludedFilesList(): void {
