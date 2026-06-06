@@ -51,3 +51,29 @@ export function computeIndexStatus(
 
     return { total: allPaths.length, excluded, errored, indexed, pending };
 }
+
+/**
+ * Filter a map of errored entries down to the ones that should actually be shown
+ * as Errored in the UI — mirroring computeIndexStatus's precedence. An errored
+ * store entry is hidden when its path is now excluded by a glob (the file is
+ * Excluded, not Errored) or no longer exists in the vault (deleted). Without
+ * this, the errored list/count would disagree with the "Errored: N" stat after a
+ * user excludes a folder (e.g. Excalidraw/) that still has lingering entries.
+ *
+ * @param entries         Raw errored store map (path -> entry)
+ * @param allVaultPaths   Every markdown file path currently in the vault
+ * @param excludePatterns Glob patterns from settings.excludeFolderPatterns
+ */
+export function visibleErroredEntries<T>(
+    entries: Record<string, T>,
+    allVaultPaths: string[],
+    excludePatterns: string[]
+): Record<string, T> {
+    const vault = new Set(allVaultPaths);
+    return Object.fromEntries(
+        Object.entries(entries).filter(
+            ([path]) =>
+                vault.has(path) && !shouldExcludeFile(path, excludePatterns)
+        )
+    );
+}
