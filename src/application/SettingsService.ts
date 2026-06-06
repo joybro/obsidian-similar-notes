@@ -61,7 +61,10 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     includeFrontmatter: false,
     showSourceChunk: false,
     useGPU: true, // Use GPU acceleration by default
-    excludeFolderPatterns: ["Templates/", "Archive/", ".trash/"], // Default exclusion patterns
+    // Excalidraw/ holds drawings stored as base64-compressed JSON — binary data
+    // that can't be embedded and isn't meaningful to index (#46). Only applies to
+    // new installs; existing users' saved patterns are untouched by the merge.
+    excludeFolderPatterns: ["Templates/", "Archive/", ".trash/", "Excalidraw/"], // Default exclusion patterns
     excludeRegexPatterns: [], // Default to no exclusion patterns
     regexpTestInputText: "", // Default to empty test input
     noteDisplayMode: "smart", // Default to smart mode (show path when duplicates exist)
