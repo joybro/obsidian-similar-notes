@@ -8,6 +8,7 @@ import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import type { Command } from "./commands";
 import {
     ReindexAllNotesCommand,
+    RetryErroredNotesCommand,
     SemanticSearchCommand,
     ShowSimilarNotesCommand,
     ToggleInDocumentViewCommand,
@@ -298,6 +299,7 @@ export default class MainPlugin extends Plugin {
             downloadProgress$: this.modelService.getDownloadProgress$(),
             modelError$: this.modelService.getModelError$(),
             indexedNotesMTimeStore: this.indexedNotesMTimeStore,
+            erroredNoteStore: this.erroredNoteStore,
             noteChunkRepository: this.noteChunkRepository,
             modelService: this.modelService,
             onRetry: () => {
@@ -352,6 +354,7 @@ export default class MainPlugin extends Plugin {
             new ShowSimilarNotesCommand(this),
             new ToggleInDocumentViewCommand(this.settingsService),
             new ReindexAllNotesCommand(this),
+            new RetryErroredNotesCommand(this),
             new SemanticSearchCommand(
                 this.app,
                 this.textSearchService,
