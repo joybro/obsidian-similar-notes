@@ -12,6 +12,7 @@ import {
     ShowSimilarNotesCommand,
     ToggleInDocumentViewCommand,
 } from "./commands";
+import { SemanticLinkSuggest } from "./components/SemanticLinkSuggest";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesSidebarView } from "./components/SimilarNotesSidebarView";
 import { StatusBarView } from "./components/StatusBarView";
@@ -320,6 +321,15 @@ export default class MainPlugin extends Plugin {
 
         // Register commands
         this.registerCommands();
+
+        // Register the semantic link suggester (standalone trigger; default ";;")
+        this.registerEditorSuggest(
+            new SemanticLinkSuggest(
+                this.app,
+                this.textSearchService,
+                this.settingsService
+            )
+        );
 
         // Register editor-drop event handler
         this.registerEditorDropEvent();
