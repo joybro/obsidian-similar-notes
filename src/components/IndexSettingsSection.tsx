@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { SettingsService, SimilarNotesSettings } from "@/application/SettingsService";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
+import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import { isValidGlobPattern, shouldExcludeFile } from "@/utils/folderExclusion";
 import log from "loglevel";
@@ -16,6 +17,7 @@ interface IndexSettingsSectionProps {
     settingsService: SettingsService;
     app: App;
     mTimeStore?: IndexedNoteMTimeStore;
+    erroredStore?: ErroredNoteStore;
     noteChunkRepository?: NoteChunkRepository;
 }
 

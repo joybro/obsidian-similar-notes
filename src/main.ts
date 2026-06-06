@@ -224,6 +224,7 @@ export default class MainPlugin extends Plugin {
 
         // Now that mTimeStore is initialized, set it in the settings tab
         this.settingTab.setMTimeStore(this.indexedNotesMTimeStore);
+        this.settingTab.setErroredStore(this.erroredNoteStore);
 
         // Create services in proper dependency order
         this.modelService = new EmbeddingService(this.settingsService);
@@ -487,10 +488,16 @@ export default class MainPlugin extends Plugin {
         this.noteIndexingService.startLoop();
     }
 
+    // Re-queue all terminally-errored notes for another attempt
+    async retryErroredNotes(): Promise<void> {
+        await this.noteChangeQueue.retryErrored();
+    }
+
     // Handle reindexing of notes
     async reindexNotes(): Promise<void> {
         // Clear the mTime store to ensure all notes are reindexed
         await this.indexedNotesMTimeStore.clear();
+        await this.erroredNoteStore.clear();
         await this.init(this.settingsService.get().modelId, false, false);
     }
 
@@ -512,6 +519,7 @@ export default class MainPlugin extends Plugin {
         // The actual model info is taken from settings
         // Clear the mTime store to ensure all notes are reindexed
         await this.indexedNotesMTimeStore.clear();
+        await this.erroredNoteStore.clear();
         await this.init(modelId, false, true);
     }
 
