@@ -3,12 +3,15 @@ import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepositor
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
+import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { NoteChange, NoteChangeQueue } from "@/services/noteChangeQueue";
 import { showNoteErrorNotice } from "@/utils/errorHandling";
 import log from "loglevel";
 import type { App } from "obsidian";
 import { type Observable, BehaviorSubject } from "rxjs";
 import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
+
+const MAX_ATTEMPTS = 3;
 
 export class NoteIndexingService {
     private fileChangeLoopTimer: NodeJS.Timeout | null = null;
@@ -22,7 +25,8 @@ export class NoteIndexingService {
         private embeddingService: EmbeddingService,
         private similarNoteCoordinator: SimilarNoteCoordinator,
         private settingsService: SettingsService,
-        private app: App
+        private app: App,
+        private erroredNoteStore: ErroredNoteStore
     ) {}
 
     startLoop() {
@@ -54,12 +58,13 @@ export class NoteIndexingService {
                             await this.processUpdatedNote(change.path);
                         }
 
-                        // Only mark as processed on success
+                        // Success: mark processed and clear any prior errored entry.
                         await this.noteChangeQueue.markNoteChangeProcessed(change);
+                        if (this.erroredNoteStore.get(change.path)) {
+                            await this.erroredNoteStore.delete(change.path);
+                        }
                     } catch (error) {
-                        log.error(`[NoteIndexingService] Failed to process ${change.path}:`, error);
-                        // File not marked as processed, will retry
-                        // Error notification already shown in processUpdatedNote
+                        await this.handleChangeFailure(change, error);
                     }
                 })
             );
@@ -74,6 +79,38 @@ export class NoteIndexingService {
         if (this.fileChangeLoopTimer) {
             clearTimeout(this.fileChangeLoopTimer);
         }
+    }
+
+    /**
+     * Handles a failed change: retry in-session up to MAX_ATTEMPTS, then move the
+     * note to the terminal Errored state so it stops being re-queued (and the UI
+     * can count it honestly). See indexing-status spec §3.
+     */
+    private async handleChangeFailure(
+        change: NoteChange,
+        error: unknown
+    ): Promise<void> {
+        const attempts = (change.attempts ?? 0) + 1;
+        const message = error instanceof Error ? error.message : String(error);
+
+        if (attempts < MAX_ATTEMPTS) {
+            log.warn(
+                `[NoteIndexingService] Attempt ${attempts}/${MAX_ATTEMPTS} failed for ${change.path}, will retry`,
+                error
+            );
+            this.noteChangeQueue.requeue({ ...change, attempts });
+            return;
+        }
+
+        log.error(
+            `[NoteIndexingService] Giving up on ${change.path} after ${attempts} attempts`,
+            error
+        );
+        await this.erroredNoteStore.set(change.path, {
+            error: message,
+            attempts,
+            mtime: change.mtime,
+        });
     }
 
     getNoteChangeCount$(): Observable<number> {

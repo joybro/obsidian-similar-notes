@@ -23,6 +23,7 @@ import { EmbeddingService } from "./domain/service/EmbeddingService";
 import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
 import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
 import { TextSearchService } from "./domain/service/TextSearchService";
+import { ErroredNoteStore } from "./infrastructure/ErroredNoteStore";
 import { IndexedNoteMTimeStore } from "./infrastructure/IndexedNoteMTimeStore";
 import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
@@ -43,6 +44,7 @@ export default class MainPlugin extends Plugin {
     private similarNoteCoordinator: SimilarNoteCoordinator;
     private noteIndexingService: NoteIndexingService;
     private indexedNotesMTimeStore: IndexedNoteMTimeStore;
+    private erroredNoteStore: ErroredNoteStore;
     private statusBarView: StatusBarView;
     private settingTab: SimilarNotesSettingTab;
     private commands: Command[] = [];
@@ -218,6 +220,7 @@ export default class MainPlugin extends Plugin {
         // Create core repositories
         this.noteRepository = new VaultNoteRepository(this.app);
         this.indexedNotesMTimeStore = new IndexedNoteMTimeStore();
+        this.erroredNoteStore = new ErroredNoteStore();
 
         // Now that mTimeStore is initialized, set it in the settings tab
         this.settingTab.setMTimeStore(this.indexedNotesMTimeStore);
@@ -233,6 +236,7 @@ export default class MainPlugin extends Plugin {
         // @ts-expect-error - appId exists at runtime but not in type definitions
         const vaultId = this.app.appId as string;
         await this.indexedNotesMTimeStore.init(vaultId);
+        await this.erroredNoteStore.init(vaultId);
 
         // Initialize dependent services
         this.noteChunkingService = new LangchainNoteChunkingService(
@@ -279,7 +283,8 @@ export default class MainPlugin extends Plugin {
             this.modelService,
             this.similarNoteCoordinator,
             this.settingsService,
-            this.app
+            this.app,
+            this.erroredNoteStore
         );
 
         // noteIndexingService is now initialized
