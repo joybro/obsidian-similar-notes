@@ -52,6 +52,7 @@ export interface SimilarNotesSettings {
     lastPluginVersion?: string; // Last version of the plugin that was run
     cachedModelInfo?: CachedModelInfo; // Cached model information
     indexingDelaySeconds: number; // Wait time after file changes before indexing
+    semanticLinkTrigger: string; // Editor prefix that opens semantic link suggestions ([[? alternative). Empty = disabled.
 }
 
 const DEFAULT_SETTINGS: SimilarNotesSettings = {
@@ -69,6 +70,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     bottomResultCount: 5, // Default to 5 results at bottom
     minSimilarityThreshold: 0, // No filtering by default
     indexingDelaySeconds: 1, // Default to 1 second delay
+    semanticLinkTrigger: ";;", // Default standalone trigger for semantic link suggestions
 };
 
 export class SettingsService {
