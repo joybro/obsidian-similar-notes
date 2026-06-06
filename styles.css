@@ -275,11 +275,6 @@
     padding: 0.25rem 0;
 }
 
-.similar-notes-errored-count {
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-}
-
 /* Semantic Search Modal Styles */
 /* Uses Obsidian's native .prompt class for base styling */
 
