@@ -146,11 +146,20 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     }
 
     async countTokens(text: string): Promise<number> {
-        // Ollama doesn't provide token counting API
-        // Use a conservative approximation to ensure we stay under payload limits
-        // Based on empirical testing with Ollama's 2KB bug, we need to be very conservative
-        // Use 3.5 chars/token to match our detection logic and provide safety margin
-        return Math.ceil(text.length / 3.5);
+        // Ollama exposes no token-counting API, so we estimate. We estimate from
+        // UTF-8 *byte* length rather than character count: bytes/token is far more
+        // stable across scripts (~1.3x spread) than chars/token (~4x), because
+        // Hangul/CJK take 3 bytes/char and tokenize to ~1-2 tokens/char while
+        // ASCII is 1 byte/char and ~0.25 tokens/char. The old chars/3.5 estimate
+        // undercounted CJK ~5x, so chunks blew past the model context and Ollama
+        // rejected them (#46-B). Byte-based counting also implicitly bounds the
+        // ~8KB payload limit (Ollama v0.12.5+ bug).
+        //
+        // BYTES_PER_TOKEN is deliberately conservative (rounds chunks *smaller*):
+        // the safe failure mode is more chunks, and any residual overflow now
+        // surfaces as a visible Errored note rather than silent data loss.
+        const BYTES_PER_TOKEN = 2;
+        return Math.ceil(new TextEncoder().encode(text).length / BYTES_PER_TOKEN);
     }
 
     getVectorSize(): number {
