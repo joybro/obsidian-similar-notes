@@ -188,24 +188,35 @@ export class IndexSettingsSection {
             (setting) => this.renderRegExpTesterContent(setting),
             // Exclude content
             (setting) => this.buildExcludeContentSetting(setting, settings, settingsService),
-            // Errored notes — its own sub-section (heading divider) at the bottom
-            // so it reads as separate from the exclusion-pattern settings above.
-            (setting) => setting.setName("Errored notes").setHeading(),
+            // Errored files preview — the box is the sole control so it renders
+            // wide (like the Excluded files preview), which keeps the description
+            // column narrow. The Retry action is a separate row below, mirroring
+            // "Apply exclusion patterns".
             (setting) => {
-                setting.setDesc(
-                    "Notes that failed to index after repeated attempts. Editing a note retries it automatically; or use Retry errored after fixing the cause (e.g. wrong model, Ollama down)."
-                );
-                setting.addButton((button) => {
-                    this.retryErroredButton = button.buttonEl;
-                    button
-                        .setButtonText("Retry errored")
-                        .setTooltip("Re-queue all errored notes for another attempt")
-                        .onClick(async () => {
-                            await this.props.plugin.retryErroredNotes();
-                            this.updateErroredFilesList();
-                        });
-                });
+                setting
+                    .setName("Errored files")
+                    .setDesc(
+                        "Notes that failed to index after repeated attempts. Edit a note to retry it automatically."
+                    );
                 this.erroredFilesList = setting.controlEl.createDiv("similar-notes-errored-files-list");
+            },
+            // Retry errored notes
+            (setting) => {
+                setting
+                    .setName("Retry errored notes")
+                    .setDesc(
+                        "Re-attempt all errored notes — use after fixing the cause (e.g. wrong model, Ollama down)."
+                    )
+                    .addButton((button) => {
+                        this.retryErroredButton = button.buttonEl;
+                        button
+                            .setButtonText("Retry errored")
+                            .setTooltip("Re-queue all errored notes for another attempt")
+                            .onClick(async () => {
+                                await this.props.plugin.retryErroredNotes();
+                                this.updateErroredFilesList();
+                            });
+                    });
             },
         ];
     }
