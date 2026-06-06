@@ -33,6 +33,7 @@ export class IndexSettingsSection {
     // State for dynamic updates
     private excludedFilesDescription?: HTMLElement;
     private excludedFilesList?: HTMLElement;
+    private erroredFilesDescription?: HTMLElement;
     private erroredFilesList?: HTMLElement;
     private retryErroredButton?: HTMLButtonElement;
     private testInputTextArea?: HTMLTextAreaElement;
@@ -189,23 +190,24 @@ export class IndexSettingsSection {
             // Exclude content
             (setting) => this.buildExcludeContentSetting(setting, settings, settingsService),
             // Errored files preview + retry — kept at the bottom so it doesn't
-            // split the exclusion-pattern settings group above it.
+            // split the exclusion-pattern settings group above it. Mirrors the
+            // "Excluded files" preview: a compact label (not a sentence) on the
+            // left, the retry button + list box on the right.
             (setting) => {
-                setting
-                    .setName("Errored files")
-                    .setDesc(
-                        "Notes that failed to index. Edit a note to retry it, or retry all after fixing the cause."
-                    )
-                    .addButton((button) => {
-                        this.retryErroredButton = button.buttonEl;
-                        button
-                            .setButtonText("Retry errored")
-                            .setTooltip("Re-queue all errored notes for another attempt")
-                            .onClick(async () => {
-                                await this.props.plugin.retryErroredNotes();
-                                this.updateErroredFilesList();
-                            });
-                    });
+                setting.setDesc("");
+                this.erroredFilesDescription = setting.descEl;
+                setting.addButton((button) => {
+                    this.retryErroredButton = button.buttonEl;
+                    button
+                        .setButtonText("Retry errored")
+                        .setTooltip(
+                            "Re-queue all errored notes for another attempt. Editing a note also retries it."
+                        )
+                        .onClick(async () => {
+                            await this.props.plugin.retryErroredNotes();
+                            this.updateErroredFilesList();
+                        });
+                });
                 this.erroredFilesList = setting.controlEl.createDiv("similar-notes-errored-files-list");
             },
         ];
@@ -319,6 +321,7 @@ export class IndexSettingsSection {
         this.excludedStat = undefined;
         this.excludedFilesDescription = undefined;
         this.excludedFilesList = undefined;
+        this.erroredFilesDescription = undefined;
         this.erroredFilesList = undefined;
         this.retryErroredButton = undefined;
         this.testInputTextArea = undefined;
@@ -326,12 +329,23 @@ export class IndexSettingsSection {
     }
 
     private updateErroredFilesList(): void {
-        if (!this.erroredFilesList) return;
-        renderErroredFilesList(
-            this.erroredFilesList,
-            this.retryErroredButton,
-            this.props.erroredStore?.getAll() ?? {}
-        );
+        const entries = this.props.erroredStore?.getAll() ?? {};
+
+        if (this.erroredFilesDescription) {
+            this.erroredFilesDescription.empty();
+            this.erroredFilesDescription.createDiv().setText("Errored files:");
+            this.erroredFilesDescription
+                .createDiv("similar-notes-errored-count")
+                .setText(`${Object.keys(entries).length} errored`);
+        }
+
+        if (this.erroredFilesList) {
+            renderErroredFilesList(
+                this.erroredFilesList,
+                this.retryErroredButton,
+                entries
+            );
+        }
     }
 
     private updateExcludedFilesList(): void {
