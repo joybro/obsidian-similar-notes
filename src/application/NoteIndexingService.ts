@@ -46,33 +46,42 @@ export class NoteIndexingService {
 
             // Process files in parallel (or sequentially if concurrency=1)
             await Promise.allSettled(
-                changes.map(async (change) => {
-                    log.info(`[NoteIndexingService] ===== Processing change: ${change.path} (${change.reason}) =====`);
-
-                    try {
-                        if (change.reason === "deleted") {
-                            await this.processDeletedNote(change.path);
-                        } else if (change.reason === "renamed") {
-                            await this.processRenamedNote(change);
-                        } else {
-                            await this.processUpdatedNote(change.path);
-                        }
-
-                        // Success: mark processed and clear any prior errored entry.
-                        await this.noteChangeQueue.markNoteChangeProcessed(change);
-                        if (this.erroredNoteStore.get(change.path)) {
-                            await this.erroredNoteStore.delete(change.path);
-                        }
-                    } catch (error) {
-                        await this.handleChangeFailure(change, error);
-                    }
-                })
+                changes.map((change) => this.processChange(change))
             );
 
             fileChangeLoop();
         };
 
         fileChangeLoop();
+    }
+
+    /**
+     * Processes a single change. On success the note is marked processed and any
+     * prior errored entry is cleared; on failure it is routed through the
+     * attempts machinery (retry, then terminal Errored). See indexing-status
+     * spec §5/§6 — the failure routing must own ALL processing exceptions, so
+     * nothing downstream may swallow them.
+     */
+    private async processChange(change: NoteChange): Promise<void> {
+        log.info(`[NoteIndexingService] ===== Processing change: ${change.path} (${change.reason}) =====`);
+
+        try {
+            if (change.reason === "deleted") {
+                await this.processDeletedNote(change.path);
+            } else if (change.reason === "renamed") {
+                await this.processRenamedNote(change);
+            } else {
+                await this.processUpdatedNote(change.path);
+            }
+
+            // Success: mark processed and clear any prior errored entry.
+            await this.noteChangeQueue.markNoteChangeProcessed(change);
+            if (this.erroredNoteStore.get(change.path)) {
+                await this.erroredNoteStore.delete(change.path);
+            }
+        } catch (error) {
+            await this.handleChangeFailure(change, error);
+        }
     }
 
     stopLoop() {
@@ -92,6 +101,13 @@ export class NoteIndexingService {
     ): Promise<void> {
         const attempts = (change.attempts ?? 0) + 1;
         const message = error instanceof Error ? error.message : String(error);
+
+        // Surface the failure to the user on its first occurrence. (Throttled
+        // per-path inside showNoteErrorNotice; the durable record is the Errored
+        // list once attempts reach MAX_ATTEMPTS.)
+        if (attempts === 1) {
+            showNoteErrorNotice(change.path, error);
+        }
 
         if (attempts < MAX_ATTEMPTS) {
             log.warn(
@@ -196,28 +212,25 @@ export class NoteIndexingService {
         }
 
         log.info(`[NoteIndexingService] Generating embeddings for ${splitted.length} chunks (for indexing)`);
-        let noteChunks;
-        try {
-            // Prepare all texts for batch embedding
-            const textsToEmbed = splitted.map((chunk) =>
-                // Include title in first chunk to make it searchable
-                chunk.chunkIndex === 0
-                    ? `${chunk.title}\n\n${chunk.content}`
-                    : chunk.content
-            );
 
-            // Single batch API call for all chunks
-            const embeddings = await this.embeddingService.embedTexts(textsToEmbed);
+        // Prepare all texts for batch embedding
+        const textsToEmbed = splitted.map((chunk) =>
+            // Include title in first chunk to make it searchable
+            chunk.chunkIndex === 0
+                ? `${chunk.title}\n\n${chunk.content}`
+                : chunk.content
+        );
 
-            // Map embeddings back to chunks by index
-            noteChunks = splitted.map((chunk, index) =>
-                chunk.withEmbedding(embeddings[index])
-            );
-        } catch (error) {
-            log.error("Failed to generate embeddings for note:", path, error);
-            showNoteErrorNotice(path, error);
-            return;
-        }
+        // Single batch API call for all chunks. A failure here MUST propagate to
+        // processChange's catch → handleChangeFailure (retry, then terminal
+        // Errored). Do NOT swallow it: swallowing made a failed note take the
+        // success path and get recorded as Indexed with zero chunks (#45/#46).
+        const embeddings = await this.embeddingService.embedTexts(textsToEmbed);
+
+        // Map embeddings back to chunks by index
+        const noteChunks = splitted.map((chunk, index) =>
+            chunk.withEmbedding(embeddings[index])
+        );
 
         log.info(`[NoteIndexingService] Successfully generated embeddings, saving to repository`);
 
