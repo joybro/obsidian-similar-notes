@@ -1,5 +1,6 @@
 import type { SettingsService } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
+import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import { collectEnvironmentInfo, formatEnvironmentInfoAsMarkdown } from "@/utils/environmentInfo";
@@ -16,7 +17,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     private indexedNoteCount = 0;
     private indexedChunkCount = 0;
     private subscription: { unsubscribe: () => void } | null = null;
+    private erroredSubscription: { unsubscribe: () => void } | null = null;
     private mTimeStore?: IndexedNoteMTimeStore;
+    private erroredStore?: ErroredNoteStore;
     private modelService?: EmbeddingService;
     private noteChunkRepository?: NoteChunkRepository;
     private modelSettingsSection?: ModelSettingsSection;
@@ -78,6 +81,26 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     }
 
     /**
+     * Set the ErroredNoteStore and refresh stats when the errored count changes.
+     */
+    setErroredStore(erroredStore: ErroredNoteStore): void {
+        if (this.erroredSubscription) {
+            this.erroredSubscription.unsubscribe();
+        }
+        this.erroredStore = erroredStore;
+        this.erroredSubscription = erroredStore
+            .getErroredCount$()
+            .subscribe(() => {
+                if (this.containerEl.isShown() && this.indexSettingsSection) {
+                    this.indexSettingsSection.updateStats({
+                        indexedNoteCount: this.indexedNoteCount,
+                        indexedChunkCount: this.indexedChunkCount,
+                    });
+                }
+            });
+    }
+
+    /**
      * Set the NoteChunkRepository to get chunk count.
      * This allows the NoteChunkRepository to be initialized after the tab is created.
      */
@@ -124,6 +147,10 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             this.subscription.unsubscribe();
             this.subscription = null;
         }
+        if (this.erroredSubscription) {
+            this.erroredSubscription.unsubscribe();
+            this.erroredSubscription = null;
+        }
         
         // Clean up model settings section
         if (this.modelSettingsSection) {
@@ -155,6 +182,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                 settingsService: this.settingsService,
                 app: this.app,
                 mTimeStore: this.mTimeStore,
+                erroredStore: this.erroredStore,
                 noteChunkRepository: this.noteChunkRepository
             });
         }
