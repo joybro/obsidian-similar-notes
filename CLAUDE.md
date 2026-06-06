@@ -43,6 +43,14 @@ This is the canonical manual-verification path. (The `Young_Old` vault instead
 symlinks its plugin folder to this repo root, so a `npm run build` + reload there
 picks up changes without copying — but Test_local is the one to use by default.)
 
+## Changelog
+
+`CHANGELOG.md` entries are written from the **user-facing surface** (what the user sees), not from commit logs — and they're written **while the feature is fresh, during the dev session**, not at release time. A later release session re-deriving the exact UI (trigger text, setting labels, affected views) from cold context is slower and error-prone.
+
+- When you ship a user-facing feature or fix, add an entry under a `## [Unreleased]` section at the top of `CHANGELOG.md` before wrapping up the session — match the existing format: `**Title** (#N): what the user sees`, grouped under Added / Changed / Improved / Fixed.
+- Do **not** assign a version or date. The `beta-release` / `bump-version` skills rename `## [Unreleased]` → `## [X.Y.Z] - YYYY-MM-DD` at release time.
+- Internal-only changes (refactors, test scaffolding, build config) need no entry.
+
 ## Architecture
 
 **IMPORTANT**: Before designing or implementing features, read `docs/architecture.md` to understand the codebase structure, domain flow, and key services.

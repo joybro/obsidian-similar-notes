@@ -75,6 +75,8 @@ Only the first commit matters for CHANGELOG. The fixes are for bugs introduced d
 
 ### 3. Update CHANGELOG.md
 
+Feature sessions maintain a `## [Unreleased]` section as work lands (see repo `CLAUDE.md` → Changelog). If one exists, **rename it** to `## [X.Y.Z] - YYYY-MM-DD` and add anything missed, rather than writing from scratch. Otherwise create the section.
+
 Follow [Keep a Changelog](https://keepachangelog.com) format:
 
 ```markdown
