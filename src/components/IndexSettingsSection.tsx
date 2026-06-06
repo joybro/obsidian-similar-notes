@@ -94,12 +94,15 @@ export class IndexSettingsSection {
 
         const indexedChunkCount = currentStats.indexedChunkCount;
 
-        // Build all settings in a single SettingGroup
-        const settingGroup = new SettingGroup(this.sectionContainer!).setHeading("Index");
+        // Index group: general config, statistics, and error recovery.
+        const indexGroup = new SettingGroup(this.sectionContainer!).setHeading("Index");
+        this.getIndexSettingBuilders().forEach((builder) => indexGroup.addSetting(builder));
 
-        // Add all setting builders
-        const builders = this.getSettingBuilders();
-        builders.forEach(builder => settingGroup.addSetting(builder));
+        // Exclusion lives in its own top-level group so the Index group stays
+        // scannable. SettingGroup can't nest and Setting-level sub-headings
+        // render poorly, so a sibling group is the clean way to separate it.
+        const exclusionGroup = new SettingGroup(this.sectionContainer!).setHeading("Exclude from index");
+        this.getExclusionSettingBuilders().forEach((builder) => exclusionGroup.addSetting(builder));
 
         // Initialize stats and excluded/errored files lists
         setTimeout(() => {
@@ -110,7 +113,12 @@ export class IndexSettingsSection {
         }, 0);
     }
 
-    private getSettingBuilders(): SettingBuilder[] {
+    /**
+     * Builders for the "Index" group: general indexing config, statistics, and
+     * error recovery. Exclusion settings live in their own group
+     * ({@link getExclusionSettingBuilders}).
+     */
+    private getIndexSettingBuilders(): SettingBuilder[] {
         const { plugin, settingsService } = this.props;
         const settings = settingsService.get();
 
@@ -167,30 +175,6 @@ export class IndexSettingsSection {
                         });
                     });
             },
-            // Exclude folders
-            (setting) => this.buildExcludeFoldersSetting(setting, settings, settingsService),
-            // Excluded files preview
-            (setting) => {
-                setting.setDesc("");
-                this.excludedFilesDescription = setting.descEl;
-                this.excludedFilesList = setting.controlEl.createDiv("similar-notes-excluded-files-list");
-            },
-            // Apply exclusion patterns
-            (setting) => {
-                setting
-                    .setName("Apply exclusion patterns")
-                    .setDesc("Synchronize the index with current exclusion patterns without full reindexing")
-                    .addButton((button) => {
-                        button
-                            .setButtonText("Apply Patterns")
-                            .setTooltip("Apply current exclusion patterns to synchronize the index")
-                            .onClick(async () => this.handleApplyExclusionPatterns());
-                    });
-            },
-            // RegExp tester
-            (setting) => this.regexpTester.render(setting),
-            // Exclude content
-            (setting) => this.buildExcludeContentSetting(setting, settings, settingsService),
             // Errored files preview — mirrors the Excluded files preview exactly:
             // empty name/desc so the info column stays minimal and the box claims
             // the full control width (renders wide). The count label goes in
@@ -218,6 +202,44 @@ export class IndexSettingsSection {
                             });
                     });
             },
+        ];
+    }
+
+    /**
+     * Builders for the "Exclude from index" group. Ordered as two coherent
+     * blocks: folder exclusion (which files are indexed — input, preview, and the
+     * Apply action that syncs the index) followed by content exclusion (what text
+     * within a file is indexed — regex input, then its tester).
+     */
+    private getExclusionSettingBuilders(): SettingBuilder[] {
+        const { settingsService } = this.props;
+        const settings = settingsService.get();
+
+        return [
+            // Exclude folders
+            (setting) => this.buildExcludeFoldersSetting(setting, settings, settingsService),
+            // Excluded files preview
+            (setting) => {
+                setting.setDesc("");
+                this.excludedFilesDescription = setting.descEl;
+                this.excludedFilesList = setting.controlEl.createDiv("similar-notes-excluded-files-list");
+            },
+            // Apply exclusion patterns (acts on folder/glob patterns)
+            (setting) => {
+                setting
+                    .setName("Apply exclusion patterns")
+                    .setDesc("Synchronize the index with current exclusion patterns without full reindexing")
+                    .addButton((button) => {
+                        button
+                            .setButtonText("Apply Patterns")
+                            .setTooltip("Apply current exclusion patterns to synchronize the index")
+                            .onClick(async () => this.handleApplyExclusionPatterns());
+                    });
+            },
+            // Exclude content
+            (setting) => this.buildExcludeContentSetting(setting, settings, settingsService),
+            // RegExp tester (tests the content-exclusion patterns above)
+            (setting) => this.regexpTester.render(setting),
         ];
     }
 
