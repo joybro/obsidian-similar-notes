@@ -3,6 +3,7 @@ import { Menu, Notice, setIcon, setTooltip } from "obsidian";
 import { Subscription, type Observable } from "rxjs";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
+import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 
 export interface StatusBarViewConfig {
@@ -12,6 +13,7 @@ export interface StatusBarViewConfig {
     downloadProgress$: Observable<number>;
     modelError$: Observable<string | null>;
     indexedNotesMTimeStore: IndexedNoteMTimeStore;
+    erroredNoteStore?: ErroredNoteStore;
     noteChunkRepository: NoteChunkRepository;
     modelService: EmbeddingService;
     onRetry: () => void;
@@ -28,6 +30,7 @@ export class StatusBarView {
     private currentState: StatusBarState = "idle";
     private downloadProgress = 100;
     private noteChangeCount = 0;
+    private erroredCount = 0;
 
     private readonly subscriptions = new Subscription();
     private clickHandler?: (evt: MouseEvent) => void;
@@ -88,6 +91,17 @@ export class StatusBarView {
                 this.updateState();
             })
         );
+
+        if (this.config.erroredNoteStore) {
+            this.subscriptions.add(
+                this.config.erroredNoteStore
+                    .getErroredCount$()
+                    .subscribe((count) => {
+                        this.erroredCount = count;
+                        this.updateState();
+                    })
+            );
+        }
     }
 
     private updateState(): void {
@@ -185,10 +199,12 @@ export class StatusBarView {
             const modelId = this.config.modelService.getCurrentModelId();
             const providerType = this.config.modelService.getCurrentProviderType();
 
+            const erroredSuffix =
+                this.erroredCount > 0 ? ` (${this.erroredCount} errored)` : "";
             menu.addItem((item) =>
                 item
                     .setTitle(
-                        `Indexed: ${indexedNoteCount}/${totalNoteCount} notes (${chunkCount} chunks)`
+                        `Indexed: ${indexedNoteCount}/${totalNoteCount} notes (${chunkCount} chunks)${erroredSuffix}`
                     )
                     .setIsLabel(true)
             );
@@ -213,6 +229,20 @@ export class StatusBarView {
                         );
                     })
             );
+
+            if (this.erroredCount > 0) {
+                menu.addItem((item) =>
+                    item
+                        .setTitle("Retry errored")
+                        .setIcon("refresh-cw")
+                        .onClick(() => {
+                            // @ts-expect-error - Obsidian's commands API
+                            this.config.app.commands.executeCommandById(
+                                "similar-notes:retry-errored-notes"
+                            );
+                        })
+                );
+            }
         }
 
         menu.addItem((item) =>

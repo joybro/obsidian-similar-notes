@@ -1,11 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BehaviorSubject } from "rxjs";
 
+// Shared sink so tests can inspect the titles rendered into the status-bar menu.
+const { capturedTitles } = vi.hoisted(() => ({
+    capturedTitles: [] as string[],
+}));
+
 // StatusBarView pulls Menu/Notice/setIcon/setTooltip from obsidian. Provide just
-// enough of that surface for construction + dispose.
+// enough of that surface for construction + dispose, and record menu item titles.
 vi.mock("obsidian", () => ({
     Menu: class {
-        addItem() {
+        addItem(cb?: (item: unknown) => void) {
+            const item = {
+                setTitle(t: string) {
+                    capturedTitles.push(t);
+                    return item;
+                },
+                setIsLabel() {
+                    return item;
+                },
+                setIcon() {
+                    return item;
+                },
+                onClick() {
+                    return item;
+                },
+            };
+            cb?.(item);
             return this;
         }
         addSeparator() {
@@ -39,6 +60,7 @@ function createConfig() {
     const downloadProgress$ = new BehaviorSubject<number>(100);
     const noteChangeCount$ = new BehaviorSubject<number>(0);
     const modelError$ = new BehaviorSubject<string | null>(null);
+    const erroredCount$ = new BehaviorSubject<number>(0);
 
     const config = {
         plugin: { addStatusBarItem: () => statusBarItem },
@@ -47,6 +69,7 @@ function createConfig() {
         downloadProgress$,
         modelError$,
         indexedNotesMTimeStore: { getCurrentIndexedNoteCount: () => 0 },
+        erroredNoteStore: { getErroredCount$: () => erroredCount$ },
         noteChunkRepository: { count: async () => 0 },
         modelService: {
             getCurrentModelId: () => "m",
@@ -56,7 +79,14 @@ function createConfig() {
         onOpenSettings: vi.fn(),
     } as unknown as StatusBarViewConfig;
 
-    return { config, statusBarItem, downloadProgress$, noteChangeCount$, modelError$ };
+    return {
+        config,
+        statusBarItem,
+        downloadProgress$,
+        noteChangeCount$,
+        modelError$,
+        erroredCount$,
+    };
 }
 
 describe("StatusBarView cleanup (issue #8 — leaked subscriptions/listeners on reload)", () => {
@@ -95,5 +125,30 @@ describe("StatusBarView cleanup (issue #8 — leaked subscriptions/listeners on 
         view.dispose();
 
         expect(statusBarItem.removeEventListener).toHaveBeenCalledWith(event, handler);
+    });
+});
+
+describe("StatusBarView errored count (indexing-status spec §4.7)", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        capturedTitles.length = 0;
+    });
+
+    it("shows the errored count in the menu when there are errored notes", async () => {
+        const { config, statusBarItem, erroredCount$ } = createConfig();
+        const view = new StatusBarView(config);
+        erroredCount$.next(2);
+
+        // Trigger the click handler that opens the (async) menu.
+        const handler = statusBarItem.addEventListener.mock.calls[0][1] as (
+            evt: MouseEvent
+        ) => void;
+        handler({} as MouseEvent);
+
+        await vi.waitFor(() => {
+            expect(capturedTitles.some((t) => /\(2 errored\)/.test(t))).toBe(true);
+        });
+
+        view.dispose();
     });
 });
