@@ -2,12 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
-### Fixed
-
--   **Token-dense notes failing to index on Ollama** (#46): Notes packed with tables, numbers, code, or file paths could still fail with an "input length exceeds the context length" error — even after the byte-based estimate above — because that content tokenizes into more tokens than any byte estimate predicts, overflowing the model's context window. Two changes fix it: indexing now uses Ollama's modern `/api/embed` endpoint with truncation enabled, so an over-long chunk is trimmed to fit instead of failing the whole note; and chunk size is now capped against the model's real context length (read from the model info), not just an empirical size probe. For these documents, `bge-m3` (8K context) and `nomic-embed-text` (2K) have the most headroom.
-
 ## [1.5.0] - 2026-06-06
 
 ### Added
@@ -23,9 +17,14 @@ All notable changes to this project will be documented in this file.
 -   **Index settings reorganized**: The single crowded Index section is split into three focused sections. **Index** keeps statistics, indexing delay, Include frontmatter, Reindex, and the errored-files list (Reindex now sits after the two indexing options instead of between them). **Exclude folders from index** holds the folder/glob patterns, the excluded-files preview, and the Apply action (renamed from "Apply exclusion patterns" to **"Apply folder patterns"**, since it only adds/removes files by folder pattern — content patterns take effect on reindex). **Exclude content from index** holds the content-regex field and its RegExp tester (the field now appears above the tester, previously below it).
 -   **Excalidraw excluded from indexing by default** (#46): New installs now skip the default `Excalidraw/` folder. Excalidraw drawings are stored as base64-compressed binary data that can't be embedded and isn't meaningful to search. Existing users' exclusion settings are unchanged — remove the pattern if you want those files indexed.
 
+### Improved
+
+-   **Faster Ollama indexing** (#46): A note's chunks are now embedded in batched requests instead of one network round-trip per chunk, so indexing on Ollama is quicker — most noticeable on large vaults and with small-context models (which split notes into many chunks).
+
 ### Fixed
 
 -   **Non-English notes failing to index on Ollama** (#46): Notes with Korean/CJK (or other multi-byte) content could fail to index with an "input length exceeds the context" error. The chunk-size estimate assumed English-length tokens and packed far too much text into each chunk for the model's context window. The estimate is now based on UTF-8 byte length, so chunks stay within the model's limit regardless of script.
+-   **Token-dense notes failing to index on Ollama** (#46): Notes packed with tables, numbers, code, or file paths could still fail with an "input length exceeds the context length" error — even after the byte-based estimate above — because that content tokenizes into more tokens than any byte estimate predicts, overflowing the model's context window. Two changes fix it: indexing now uses Ollama's modern `/api/embed` endpoint with truncation enabled, so an over-long chunk is trimmed to fit instead of failing the whole note; and chunk size is now capped against the model's real context length (read from the model info), not just an empirical size probe. For these documents, `bge-m3` (8K context) and `nomic-embed-text` (2K) have the most headroom.
 -   **Honest indexing status** (#45, #46): Indexing failures are no longer hidden. The plugin previously reported the whole vault as indexed — and lumped failed notes into the "Excluded" count — even when notes had silently failed to index. The Index settings now show separate **Indexed / Errored / Excluded** counts, and the status bar shows how many notes errored. A note is retried a few times before being marked errored, and a terminally-errored note is no longer re-attempted on every restart (which previously crashed at the same point each launch).
 
 ## [1.4.0] - 2026-06-06
