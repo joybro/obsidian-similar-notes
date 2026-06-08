@@ -61,7 +61,9 @@ src/
 
 3. **Vector Database**: Orama is used for vector storage and search. Database is persisted and reloaded between sessions.
 
-4. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
+4. **Ollama chunk sizing & batching**: Ollama rejects inputs longer than the model context, and a chunk's true token count can't be known cheaply before sending. Chunk size is the smaller of a transport-payload ceiling and a context-window ceiling, with `truncate: true` as a hard backstop, and chunks are embedded in payload-bounded batches. The rationale (why the 0.5 safety factor, which ceiling binds per model) is non-obvious — see `docs/ollama-embedding-sizing.md`.
+
+5. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
 
    - **Sectioning**: The settings tab is divided into top-level sections using Obsidian's `SettingGroup` (`@since 1.11.0`) — one per area (e.g. Model, Index, Exclude folders from index, Exclude content from index, Display, Debug & Support). Each section is built by a `*SettingsSection` class (e.g. `IndexSettingsSection`) that returns `SettingBuilder` arrays.
    - **Use sibling groups, not sub-headings.** `SettingGroup` cannot nest, and inserting `Setting.setHeading()` divider rows *inside* a group renders poorly (tried more than once and reverted). To break a crowded section into sub-areas, add another sibling top-level `SettingGroup` instead of nesting or in-group headings.
