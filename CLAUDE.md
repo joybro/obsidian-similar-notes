@@ -55,6 +55,10 @@ picks up changes without copying — but Test_local is the one to use by default
 
 **IMPORTANT**: Before designing or implementing features, read `docs/architecture.md` to understand the codebase structure, domain flow, and key services.
 
+### Documentation conventions
+
+- **Spec/design docs use a `-spec` suffix** and live in `docs/` (e.g. `docs/ollama-embedding-sizing-spec.md`). When logic is non-obvious from the code (a chosen constant, a tradeoff, why one approach over another), write the *rationale* in a `-spec` doc first, then link it from `docs/architecture.md`'s implementation-details list. Goal: a reader understands the design from the spec before reading the code.
+
 ## Testing Approach
 
 - Tests use Vitest with React Testing Library
