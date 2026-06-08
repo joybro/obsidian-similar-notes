@@ -33,6 +33,43 @@ export function capMaxTokensToContext(
     return Math.min(detected, Math.floor(contextLength * safety));
 }
 
+// #46 fast-follow: a note's chunks are embedded in batched /api/embed requests
+// instead of one request per chunk. Each batch's combined input is kept under
+// this byte budget — matching detectMaxTokens' single-request payload guard —
+// so batching never pushes a request past the transport-safe envelope.
+export const BATCH_PAYLOAD_BUDGET_BYTES = 8192;
+
+/**
+ * Group texts into consecutive batches whose combined UTF-8 byte size stays
+ * within `budgetBytes`. A single text larger than the budget gets its own batch
+ * (truncate:true trims it to the model context server-side). Order is preserved
+ * so the flattened result aligns 1:1 with the input.
+ */
+export function batchTextsByPayload(
+    texts: string[],
+    budgetBytes: number = BATCH_PAYLOAD_BUDGET_BYTES
+): string[][] {
+    const encoder = new TextEncoder();
+    const batches: string[][] = [];
+    let current: string[] = [];
+    let currentBytes = 0;
+
+    for (const text of texts) {
+        const bytes = encoder.encode(text).length;
+        if (current.length > 0 && currentBytes + bytes > budgetBytes) {
+            batches.push(current);
+            current = [];
+            currentBytes = 0;
+        }
+        current.push(text);
+        currentBytes += bytes;
+    }
+    if (current.length > 0) {
+        batches.push(current);
+    }
+    return batches;
+}
+
 export class OllamaEmbeddingProvider implements EmbeddingProvider {
     private ollamaClient: OllamaClient;
     private modelId: string | null = null;
@@ -161,13 +198,17 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 
         this.modelBusy$.next(true);
         try {
-            // Process embeddings sequentially
-            // Ollama processes requests in a queue internally, so parallel requests
-            // don't improve performance and only add network overhead
+            // Embed in payload-bounded batches: Ollama embeds a whole batch in
+            // one /api/embed request, cutting HTTP round-trips from one-per-chunk
+            // to a few-per-note. Batches run sequentially because Ollama queues
+            // requests internally, so parallelism adds no throughput here.
             const results: number[][] = [];
-            for (const text of texts) {
-                const embedding = await this.ollamaClient.generateEmbedding(this.modelId, text);
-                results.push(embedding);
+            for (const batch of batchTextsByPayload(texts)) {
+                const embeddings = await this.ollamaClient.generateEmbeddings(
+                    this.modelId,
+                    batch
+                );
+                results.push(...embeddings);
             }
             // Clear error state on success
             this.modelError$.next(null);

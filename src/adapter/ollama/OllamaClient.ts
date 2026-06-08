@@ -179,6 +179,62 @@ export class OllamaClient {
     }
 
     /**
+     * Generate embeddings for a batch of inputs in a single /api/embed request.
+     * Ollama returns one embedding per input, in order. Batching cuts the HTTP
+     * round-trips from one-per-chunk to a few-per-note (#46 fast-follow); the
+     * caller is responsible for keeping each batch's payload transport-safe.
+     */
+    async generateEmbeddings(model: string, inputs: string[]): Promise<number[][]> {
+        try {
+            const requestBody = JSON.stringify({
+                model,
+                input: inputs,
+                truncate: true,
+            } as OllamaEmbeddingRequest);
+            const requestSize = new Blob([requestBody]).size;
+            log.debug(`[Ollama] Embedding batch of ${inputs.length} input(s), payload ${requestSize} bytes`);
+
+            const startTime = Date.now();
+            const response = await fetch(`${this.baseUrl}/api/embed`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: requestBody
+            });
+            const elapsed = Date.now() - startTime;
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                log.error(`[Ollama] Batch embedding failed after ${elapsed}ms - status: ${response.status}, inputs: ${inputs.length}, request size: ${requestSize} bytes`);
+                throw new Error(`Failed to generate embedding: ${response.statusText}. ${errorText}`);
+            }
+
+            log.debug(`[Ollama] Batch embedding successful in ${elapsed}ms`);
+            const data: OllamaEmbeddingResponse = await response.json();
+
+            // The embedding count MUST match the input count: NoteIndexingService
+            // maps embeddings back to chunks by array index, so a short or
+            // misshapen response would silently misalign vectors with chunks.
+            if (
+                !data.embeddings ||
+                !Array.isArray(data.embeddings) ||
+                data.embeddings.length !== inputs.length ||
+                !data.embeddings.every((e) => Array.isArray(e))
+            ) {
+                throw new Error(
+                    `Invalid embedding response from Ollama (expected ${inputs.length} embeddings, got ${data.embeddings?.length})`
+                );
+            }
+
+            return data.embeddings;
+        } catch (error) {
+            log.error("Failed to generate batch embeddings", error);
+            throw error;
+        }
+    }
+
+    /**
      * Get detailed information about a specific model
      */
     async getModelInfo(modelName: string): Promise<OllamaModelInfo | null> {
