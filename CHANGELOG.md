@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+-   **Token-dense notes failing to index on Ollama** (#46): Notes packed with tables, numbers, code, or file paths could still fail with an "input length exceeds the context length" error — even after the byte-based estimate above — because that content tokenizes into more tokens than any byte estimate predicts, overflowing the model's context window. Two changes fix it: indexing now uses Ollama's modern `/api/embed` endpoint with truncation enabled, so an over-long chunk is trimmed to fit instead of failing the whole note; and chunk size is now capped against the model's real context length (read from the model info), not just an empirical size probe. For these documents, `bge-m3` (8K context) and `nomic-embed-text` (2K) have the most headroom.
+
 ## [1.5.0] - 2026-06-06
 
 ### Added

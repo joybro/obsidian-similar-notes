@@ -23,11 +23,14 @@ export interface OllamaModelsResponse {
 
 export interface OllamaEmbeddingRequest {
     model: string;
-    prompt: string;
+    input: string | string[];
+    // truncate the end of over-long input to fit the model context instead of
+    // erroring (the modern /api/embed default; we set it explicitly). See #46.
+    truncate: boolean;
 }
 
 export interface OllamaEmbeddingResponse {
-    embedding: number[];
+    embeddings: number[][];
 }
 
 export interface OllamaModelInfo {
@@ -127,15 +130,21 @@ export class OllamaClient {
             const textByteSize = new Blob([text]).size;
             log.debug(`[Ollama] Generating embedding - text length: ${textLength} chars, ${textByteSize} bytes`);
 
+            // Use the modern /api/embed endpoint with truncate:true. The legacy
+            // /api/embeddings endpoint rejects any input longer than the model
+            // context with HTTP 500 "input length exceeds the context length"
+            // (it has no truncate option), which made token-dense notes fail to
+            // index (#46). /api/embed truncates the overflow instead of erroring.
             const requestBody = JSON.stringify({
                 model,
-                prompt: text
+                input: text,
+                truncate: true,
             } as OllamaEmbeddingRequest);
             const requestSize = new Blob([requestBody]).size;
             log.debug(`[Ollama] Request payload size: ${requestSize} bytes`);
 
             const startTime = Date.now();
-            const response = await fetch(`${this.baseUrl}/api/embeddings`, {
+            const response = await fetch(`${this.baseUrl}/api/embed`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -153,11 +162,16 @@ export class OllamaClient {
             log.debug(`[Ollama] Embedding successful in ${elapsed}ms`);
             const data: OllamaEmbeddingResponse = await response.json();
 
-            if (!data.embedding || !Array.isArray(data.embedding)) {
+            if (
+                !data.embeddings ||
+                !Array.isArray(data.embeddings) ||
+                data.embeddings.length === 0 ||
+                !Array.isArray(data.embeddings[0])
+            ) {
                 throw new Error("Invalid embedding response from Ollama");
             }
 
-            return data.embedding;
+            return data.embeddings[0];
         } catch (error) {
             log.error("Failed to generate embedding", error);
             throw error;
