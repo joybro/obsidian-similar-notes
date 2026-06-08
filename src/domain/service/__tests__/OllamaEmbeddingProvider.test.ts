@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+    batchTextsByPayload,
     capMaxTokensToContext,
     CONTEXT_SAFETY_FACTOR,
     OllamaEmbeddingProvider,
@@ -77,5 +78,40 @@ describe("OllamaEmbeddingProvider.capMaxTokensToContext — context-aware chunk 
     test("falls back to the detected value when context length is unknown", () => {
         expect(capMaxTokensToContext(512, undefined)).toBe(512);
         expect(capMaxTokensToContext(512, 0)).toBe(512);
+    });
+});
+
+// Fast-follow to #46: chunks are grouped into payload-bounded batches so a
+// note's many chunks embed in a few /api/embed requests instead of one request
+// per chunk, while each request stays within the transport-safe byte envelope.
+describe("OllamaEmbeddingProvider.batchTextsByPayload — payload-bounded batching", () => {
+    test("packs consecutive texts until the next would exceed the byte budget", () => {
+        // 4-byte texts, budget 10 → 2 per batch (3rd would make 12 > 10).
+        const texts = ["aaaa", "bbbb", "cccc", "dddd", "eeee"];
+        expect(batchTextsByPayload(texts, 10)).toEqual([
+            ["aaaa", "bbbb"],
+            ["cccc", "dddd"],
+            ["eeee"],
+        ]);
+    });
+
+    test("puts a single over-budget text in its own batch (truncate handles size server-side)", () => {
+        const texts = ["aa", "this-one-is-way-too-long", "bb"];
+        expect(batchTextsByPayload(texts, 8)).toEqual([
+            ["aa"],
+            ["this-one-is-way-too-long"],
+            ["bb"],
+        ]);
+    });
+
+    test("preserves overall order and loses no text", () => {
+        const texts = Array.from({ length: 20 }, (_, i) => `t${i}`);
+        const batches = batchTextsByPayload(texts, 7);
+        expect(batches.flat()).toEqual(texts);
+    });
+
+    test("multi-byte text is measured by UTF-8 byte length", () => {
+        // "안녕" = 6 bytes, "hi" = 2 bytes; budget 6 → they cannot share a batch.
+        expect(batchTextsByPayload(["안녕", "hi"], 6)).toEqual([["안녕"], ["hi"]]);
     });
 });
