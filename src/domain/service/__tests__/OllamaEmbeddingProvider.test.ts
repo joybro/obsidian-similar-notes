@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { OllamaEmbeddingProvider } from "../OllamaEmbeddingProvider";
+import {
+    capMaxTokensToContext,
+    CONTEXT_SAFETY_FACTOR,
+    OllamaEmbeddingProvider,
+} from "../OllamaEmbeddingProvider";
 
 // countTokens is a pure estimate (no loaded model / no network), so we can
 // construct the provider with a dummy config and call it directly.
@@ -48,5 +52,30 @@ describe("OllamaEmbeddingProvider.countTokens — byte-based estimate (#46-B)", 
         const p = makeProvider();
         const mixed = "안녕 hi"; // 6 + 1 + 2 = 9 bytes
         expect(await p.countTokens(mixed)).toBe(Math.ceil(utf8Bytes(mixed) / 2));
+    });
+});
+
+// #46: even byte-based counting (#46-B) undercounts token-dense content (tables,
+// numbers, code, paths), so chunks sized at the model's full context still
+// overflowed it. The chunk size is now also capped at a conservative fraction of
+// the model's *real* context length (from /api/show), so truncation (the
+// truncate:true backstop) rarely has to discard content.
+describe("OllamaEmbeddingProvider.capMaxTokensToContext — context-aware chunk cap (#46)", () => {
+    test("caps detected maxTokens to a safe fraction of the real context length", () => {
+        // all-minilm: detected 512, real context 512 → must drop below context.
+        expect(capMaxTokensToContext(512, 512)).toBe(
+            Math.floor(512 * CONTEXT_SAFETY_FACTOR)
+        );
+    });
+
+    test("keeps the detected value when it is already below the context cap", () => {
+        // bge-m3: detected 2048 (payload-capped), context 8192 → cap is higher,
+        // so the smaller payload-safe value wins (never inflate the chunk).
+        expect(capMaxTokensToContext(2048, 8192)).toBe(2048);
+    });
+
+    test("falls back to the detected value when context length is unknown", () => {
+        expect(capMaxTokensToContext(512, undefined)).toBe(512);
+        expect(capMaxTokensToContext(512, 0)).toBe(512);
     });
 });

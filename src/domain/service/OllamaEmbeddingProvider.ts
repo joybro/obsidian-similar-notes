@@ -9,6 +9,30 @@ export interface OllamaConfig {
     model: string;
 }
 
+// #46: byte-based token counting (countTokens) still undercounts token-dense
+// content (tables, numbers, code, file paths), so chunks sized at the model's
+// full context length overflowed it and Ollama rejected them. We cap the chunk
+// size at this fraction of the model's *real* context length (from /api/show).
+// truncate:true on /api/embed is the hard backstop; this factor just keeps
+// truncation — and thus silent content loss — rare in practice.
+export const CONTEXT_SAFETY_FACTOR = 0.5;
+
+/**
+ * Cap the empirically-detected max tokens at a safe fraction of the model's
+ * real context length. Returns `detected` unchanged when the context length is
+ * unknown (model info unavailable) or when it is already the smaller bound.
+ */
+export function capMaxTokensToContext(
+    detected: number,
+    contextLength: number | undefined,
+    safety: number = CONTEXT_SAFETY_FACTOR
+): number {
+    if (!contextLength || contextLength <= 0) {
+        return detected;
+    }
+    return Math.min(detected, Math.floor(contextLength * safety));
+}
+
 export class OllamaEmbeddingProvider implements EmbeddingProvider {
     private ollamaClient: OllamaClient;
     private modelId: string | null = null;
@@ -54,7 +78,18 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
             // Detect actual max tokens by testing increasing sizes
             // This works around a bug in Ollama v0.12.5+ where requests >2KB crash
             // Once Ollama is fixed, this will automatically use larger chunks
-            this.maxTokens = await this.detectMaxTokens(modelId);
+            const detected = await this.detectMaxTokens(modelId);
+
+            // #46: also cap by the model's real context length. detectMaxTokens
+            // probes with clean ASCII filler and only bounds the transport
+            // payload, not the context window — so for small-context models the
+            // chunk size landed at (or above) the context and token-dense notes
+            // overflowed it. getModelInfo reads the true context from /api/show.
+            const modelInfo = await this.ollamaClient.getModelInfo(modelId);
+            this.maxTokens = capMaxTokensToContext(
+                detected,
+                modelInfo?.contextLength
+            );
 
             this.modelId = modelId;
             this.config.model = modelId;
@@ -208,10 +243,12 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
             const testChars = tokens * 3.5;
             const testText = this.generateRealisticTestText(Math.floor(testChars));
 
-            // Check payload size before sending
+            // Check payload size before sending. Mirror the real request shape
+            // (/api/embed: input + truncate) so the estimate stays accurate.
             const payloadSize = new Blob([JSON.stringify({
                 model: modelId,
-                prompt: testText
+                input: testText,
+                truncate: true,
             })]).size;
 
             // Skip if payload is too large
