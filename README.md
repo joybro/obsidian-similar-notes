@@ -95,6 +95,8 @@ Output format (success):
 
 On error (e.g. no active markdown file, search failure), the same file is written with `{ "ok": false, "error": "..." }`.
 
+For driving the command from an agent (CLI flow, validation tips, drop-in skill snippet), see [docs/agent-export.md](docs/agent-export.md).
+
 ## Technical Details
 
 - **Transformers.js**: Runs Hugging Face models directly in Obsidian
