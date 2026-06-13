@@ -53,6 +53,8 @@ export class SimilarNoteFinder {
             log.debug(`[SimilarNoteFinder] Using ${noteChunks.length} pre-indexed chunks for: ${note.path}`);
         }
 
+        const linkedPaths = new Set(note.links);
+
         // Get search results for each embedding and flatten them into a single array
         const searchResultsArrays = await Promise.all(
             noteChunks.map(async ({ content, embedding }) => {
@@ -61,7 +63,7 @@ export class SimilarNoteFinder {
                         embedding,
                         15,
                         0,
-                        [note.path, ...note.links]
+                        [note.path] // exclude self only; linked notes are now shown (marked)
                     );
                 return results.map((result) => ({
                     ...result,
@@ -106,7 +108,8 @@ export class SimilarNoteFinder {
                     result.chunk.path,
                     result.score,
                     result.chunk.content,
-                    result.sourceChunk
+                    result.sourceChunk,
+                    linkedPaths.has(result.chunk.path)
                 )
         );
 
