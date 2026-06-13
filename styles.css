@@ -409,12 +409,17 @@ select option:disabled {
     margin-top: var(--size-4-6);
 }
 
-/* Muted marker shown next to similar notes the active note already links to */
-.similar-notes-linked-icon {
-    width: 14px;
-    height: 14px;
-    margin-right: 4px;
-    vertical-align: -2px;
-    color: var(--text-faint);
-    flex-shrink: 0;
+/* Muted "linked" tag shown before similar notes the active note already links to.
+   Styled like Obsidian's neutral hotkey pills (e.g. the "Blank" indicator). */
+.similar-notes-linked-tag {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 0 6px;
+    border-radius: var(--radius-s);
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+    vertical-align: middle;
+    white-space: nowrap;
 }
