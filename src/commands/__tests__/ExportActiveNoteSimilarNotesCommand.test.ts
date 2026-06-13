@@ -106,19 +106,19 @@ describe("ExportActiveNoteSimilarNotesCommand — agent-export JSON contract (do
         expect(payload.results).toEqual([]);
     });
 
-    test("results map coordinator entries to { path, title, score, excerpt }", async () => {
+    test("results map coordinator entries to { path, title, score, excerpt, linked }", async () => {
         const file = { path: "Notes/Source.md", extension: "md" };
         const entries = [
-            { file: { path: "A.md" }, title: "A", similarity: 0.9, preview: "chunk-a" },
-            { file: { path: "B.md" }, title: "B", similarity: 0.5, preview: "chunk-b" },
+            { file: { path: "A.md" }, title: "A", similarity: 0.9, preview: "chunk-a", isLinked: true },
+            { file: { path: "B.md" }, title: "B", similarity: 0.5, preview: "chunk-b", isLinked: false },
         ];
         const coord = makeCoordinator(async () => entries);
 
         await runCommand(makeApp(fs, file), coord);
 
         expect(readPayload(fs).results).toEqual([
-            { path: "A.md", title: "A", score: 0.9, excerpt: "chunk-a" },
-            { path: "B.md", title: "B", score: 0.5, excerpt: "chunk-b" },
+            { path: "A.md", title: "A", score: 0.9, excerpt: "chunk-a", linked: true },
+            { path: "B.md", title: "B", score: 0.5, excerpt: "chunk-b", linked: false },
         ]);
     });
 
