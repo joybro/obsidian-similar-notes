@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
--   **Export similar notes for active note**: New command **Similar Notes: Export similar notes for active note** writes the current note's similar-notes results to `.obsidian/plugins/similar-notes/agent-similar-notes.json`. Lets external coding agents reuse the plugin's similarity search without touching embeddings or the index — open a note, run the command, read the JSON. Output includes `path`, `title`, `score`, and `excerpt` per result; errors (e.g. no active markdown file) are written to the same file with `ok: false`.
+-   **Export similar notes for active note** (#47): New command **Similar Notes: Export similar notes for active note** writes the current note's similar-notes results to `.obsidian/plugins/similar-notes/agent-similar-notes.json`. Lets external coding agents reuse the plugin's similarity search without touching embeddings or the index — open a note, run the command, read the JSON. Each result has `path`, `title`, `score`, and `excerpt`; the payload carries a `version` for forward compatibility, is written atomically (no partial reads), and on failure reports a stable `code` (`NO_ACTIVE_FILE`, `SEARCH_FAILED`) alongside `ok: false`.
 
 ## [1.5.0] - 2026-06-13
 
