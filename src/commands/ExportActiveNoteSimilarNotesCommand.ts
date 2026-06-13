@@ -64,6 +64,7 @@ export class ExportActiveNoteSimilarNotesCommand implements Command {
                 title: entry.title,
                 score: entry.similarity,
                 excerpt: entry.preview,
+                linked: entry.isLinked,
             }));
 
             await this.writePayload(exportPath, {
