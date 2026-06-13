@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
--   **Already-linked notes now appear in Similar notes**: previously the panel hid any note the active note already linked to, so the most obvious matches were missing from recommendations. Linked notes now show, ranked by score alongside everything else, with a small link icon marking them as already linked. The agent export gains a matching `linked` field per result.
+-   **Already-linked notes now appear in Similar notes**: previously the panel hid any note the active note already linked to, so the most obvious matches were missing from recommendations. Linked notes now show, ranked by score alongside everything else, with a small muted "linked" tag marking them as already linked. The agent export gains a matching `linked` field per result.
 
 ## [1.5.0] - 2026-06-13
 
