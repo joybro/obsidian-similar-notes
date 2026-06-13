@@ -43,6 +43,29 @@ This is the canonical manual-verification path. (The `Young_Old` vault instead
 symlinks its plugin folder to this repo root, so a `npm run build` + reload there
 picks up changes without copying — but Test_local is the one to use by default.)
 
+#### Self-driven verification via the Obsidian CLI (command features)
+
+For **command**-type features (anything triggered from the command palette) you don't
+have to drive Obsidian by hand. Obsidian ships an official CLI (1.12.7+; register once
+via Settings → General → Command line interface). After `install-local`, run the whole
+loop from a shell:
+
+```bash
+obsidian vault=Test_local plugin:reload id=similar-notes        # load the fresh build
+obsidian vault=Test_local open path="Some Note.md"              # set the active note
+obsidian vault=Test_local command id=similar-notes:<command-id> # run the command
+# then read whatever the command wrote (e.g. the export JSON)
+```
+
+- `vault=<name>` **must be the first parameter**. It targets that vault even with
+  several vault windows open, so it won't touch your other vaults.
+- Requires the Obsidian app already running with the target vault open.
+- **macOS PATH gotcha:** the CLI binary lives inside the app bundle
+  (`/Applications/Obsidian.app/Contents/MacOS/obsidian` — the same file as the GUI on
+  case-insensitive APFS). Registration adds that dir to PATH via `~/.zprofile`, which a
+  **non-login shell does not source**. If `obsidian` isn't found, prepend it:
+  `PATH="$PATH:/Applications/Obsidian.app/Contents/MacOS"` (or call by full path).
+
 ## Changelog
 
 `CHANGELOG.md` entries are written from the **user-facing surface** (what the user sees), not from commit logs — and they're written **while the feature is fresh, during the dev session**, not at release time. A later release session re-deriving the exact UI (trigger text, setting labels, affected views) from cold context is slower and error-prone.
