@@ -7,6 +7,7 @@ import { SettingsService } from "./application/SettingsService";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import type { Command } from "./commands";
 import {
+    ExportActiveNoteSimilarNotesCommand,
     ReindexAllNotesCommand,
     RetryErroredNotesCommand,
     SemanticSearchCommand,
@@ -360,6 +361,7 @@ export default class MainPlugin extends Plugin {
                 this.textSearchService,
                 this.settingsService
             ),
+            new ExportActiveNoteSimilarNotesCommand(this.app, this.similarNoteCoordinator, this.manifest.id),
         ];
 
         // Register each command
