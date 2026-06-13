@@ -69,11 +69,11 @@ Supports any Ollama embedding model.
 
 ## Agent Usage
 
-External coding agents can reuse the plugin's similarity search without understanding embeddings or plugin internals:
+The active note's similar-notes results can be exported to a JSON file, so an external coding agent can reuse the plugin's similarity search without understanding embeddings or plugin internals:
 
 1. Open a note in Obsidian.
 2. Run the command **Similar Notes: Export similar notes for active note**.
-3. Read the results from `.obsidian/plugins/similar-notes/agent-similar-notes.json`.
+3. Read the results from `.obsidian/plugins/similar-notes/similar-notes-export.json`.
 
 Output format (success):
 

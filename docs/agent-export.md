@@ -1,6 +1,6 @@
-# Agent Export
+# Using the export command from an agent
 
-The `export-active-note-similar-notes` command lets external coding agents (Claude Code, opencode, Cursor, etc.) reuse Similar Notes' semantic search without touching embeddings, the index, or any plugin internals.
+Similar Notes exports the active note's similar-notes results to a JSON file via the `export-active-note-similar-notes` command. This guide shows how an external coding agent (Claude Code, opencode, Cursor, etc.) drives that export and consumes it, without touching embeddings, the index, or any plugin internals.
 
 ## Command
 
@@ -10,7 +10,7 @@ The `export-active-note-similar-notes` command lets external coding agents (Clau
 Running it writes the active markdown file's similar-notes results to:
 
 ```
-<vault>/.obsidian/plugins/similar-notes/agent-similar-notes.json
+<vault>/.obsidian/plugins/similar-notes/similar-notes-export.json
 ```
 
 ## Output
@@ -61,7 +61,7 @@ The export always targets Obsidian's currently active markdown file. To run end-
    ```bash
    obsidian command id=similar-notes:export-active-note-similar-notes
    ```
-3. **Read** `.obsidian/plugins/similar-notes/agent-similar-notes.json` from the vault root.
+3. **Read** `.obsidian/plugins/similar-notes/similar-notes-export.json` from the vault root.
 
 Without the Obsidian CLI, any mechanism that activates a file and runs the command works (Advanced URI plugin, manual user trigger, etc.).
 
@@ -89,7 +89,7 @@ Use when user asks for notes similar / related / semantically close to a given n
    `obsidian open path="Folder/Note.md"` (or `file="Note"` for wikilink-style lookup)
 2. Trigger export:
    `obsidian command id=similar-notes:export-active-note-similar-notes`
-3. Read `.obsidian/plugins/similar-notes/agent-similar-notes.json` (vault-relative).
+3. Read `.obsidian/plugins/similar-notes/similar-notes-export.json` (vault-relative).
 
 ## Output
 
