@@ -408,3 +408,13 @@ select option:disabled {
 .model-settings-section + .setting-group {
     margin-top: var(--size-4-6);
 }
+
+/* Muted marker shown next to similar notes the active note already links to */
+.similar-notes-linked-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+    vertical-align: -2px;
+    color: var(--text-faint);
+    flex-shrink: 0;
+}
