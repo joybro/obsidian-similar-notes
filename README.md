@@ -79,6 +79,7 @@ Output format (success):
 
 ```json
 {
+  "version": 1,
   "ok": true,
   "sourcePath": "Projects/My Note.md",
   "generatedAt": "2026-06-09T12:34:56.000Z",
@@ -93,7 +94,7 @@ Output format (success):
 }
 ```
 
-On error (e.g. no active markdown file, search failure), the same file is written with `{ "ok": false, "error": "..." }`.
+On error (e.g. no active markdown file, search failure), the same file is written with `{ "version": 1, "ok": false, "code": "...", "error": "..." }`, where `code` is `NO_ACTIVE_FILE` or `SEARCH_FAILED`.
 
 For driving the command from an agent (CLI flow, validation tips, drop-in skill snippet), see [docs/agent-export.md](docs/agent-export.md).
 

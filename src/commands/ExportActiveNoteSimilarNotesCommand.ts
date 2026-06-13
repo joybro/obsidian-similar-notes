@@ -5,6 +5,14 @@ import type { Command } from "./Command";
 
 const EXPORT_FILE_NAME = "agent-similar-notes.json";
 
+/**
+ * Version of the agent-export JSON contract (see docs/agent-export.md).
+ * Bump when the payload shape changes so external agents can branch on it.
+ */
+const SCHEMA_VERSION = 1;
+
+type ErrorCode = "NO_ACTIVE_FILE" | "SEARCH_FAILED";
+
 export class ExportActiveNoteSimilarNotesCommand implements Command {
     id = "export-active-note-similar-notes";
     name = "Export similar notes for active note";
@@ -40,15 +48,17 @@ export class ExportActiveNoteSimilarNotesCommand implements Command {
         const file = this.app.workspace.getActiveFile();
 
         if (!file || file.extension !== "md") {
-            await this.writePayload(exportPath, {
-                ok: false,
-                error: "No active markdown file",
-            });
+            await this.writeError(
+                exportPath,
+                "NO_ACTIVE_FILE",
+                "No active markdown file"
+            );
             throw new Error("No active markdown file");
         }
 
         try {
-            const entries = await this.similarNoteCoordinator.getSimilarNotes(file);
+            const entries =
+                await this.similarNoteCoordinator.getSimilarNotes(file);
             const results = entries.map((entry) => ({
                 path: entry.file.path,
                 title: entry.title,
@@ -57,6 +67,7 @@ export class ExportActiveNoteSimilarNotesCommand implements Command {
             }));
 
             await this.writePayload(exportPath, {
+                version: SCHEMA_VERSION,
                 ok: true,
                 sourcePath: file.path,
                 generatedAt: new Date().toISOString(),
@@ -67,12 +78,23 @@ export class ExportActiveNoteSimilarNotesCommand implements Command {
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : String(error);
-            await this.writePayload(exportPath, {
-                ok: false,
-                error: message,
-            });
+            await this.writeError(exportPath, "SEARCH_FAILED", message);
             throw error;
         }
+    }
+
+    private async writeError(
+        exportPath: string,
+        code: ErrorCode,
+        error: string
+    ): Promise<void> {
+        await this.writePayload(exportPath, {
+            version: SCHEMA_VERSION,
+            ok: false,
+            code,
+            error,
+            generatedAt: new Date().toISOString(),
+        });
     }
 
     private async resolveExportPath(): Promise<string> {
@@ -83,13 +105,26 @@ export class ExportActiveNoteSimilarNotesCommand implements Command {
         return `${pluginDataDir}/${EXPORT_FILE_NAME}`;
     }
 
+    /**
+     * Write atomically: render to a temp file, then move it onto the target.
+     * An agent polling the export therefore never observes a half-written
+     * file. Falls back to remove-then-rename for platforms whose rename does
+     * not overwrite an existing destination.
+     */
     private async writePayload(
         exportPath: string,
         payload: Record<string, unknown>
     ): Promise<void> {
-        await this.app.vault.adapter.write(
-            exportPath,
-            JSON.stringify(payload, null, 2)
-        );
+        const adapter = this.app.vault.adapter;
+        const tmpPath = `${exportPath}.tmp`;
+        await adapter.write(tmpPath, JSON.stringify(payload, null, 2));
+        try {
+            await adapter.rename(tmpPath, exportPath);
+        } catch {
+            if (await adapter.exists(exportPath)) {
+                await adapter.remove(exportPath);
+            }
+            await adapter.rename(tmpPath, exportPath);
+        }
     }
 }

@@ -19,6 +19,7 @@ Success:
 
 ```json
 {
+  "version": 1,
   "ok": true,
   "sourcePath": "Projects/My Note.md",
   "generatedAt": "2026-06-09T12:34:56.000Z",
@@ -33,15 +34,20 @@ Success:
 }
 ```
 
+- `version`: contract version (currently `1`). Bumped if the payload shape changes, so an agent can branch on it.
 - `score`: higher = more similar. No fixed scale; compare within a single export.
 - `excerpt`: chunk from the matched note that scored highest.
 - `results`: pre-sorted by `score` desc. May be empty if the source note is not yet indexed — this is not an error.
 
+The file is written atomically (rendered to a temp file, then moved into place), so a reader never observes a partially written file.
+
 Failure (same file path):
 
 ```json
-{ "ok": false, "error": "No active markdown file" }
+{ "version": 1, "ok": false, "code": "NO_ACTIVE_FILE", "error": "No active markdown file" }
 ```
+
+- `code`: stable, machine-readable reason — one of `NO_ACTIVE_FILE` (no active markdown file when the command ran) or `SEARCH_FAILED` (the similarity search threw). Branch on `code`; the human-readable `error` string may change.
 
 ## Driving the command from an agent
 
@@ -87,9 +93,9 @@ Use when user asks for notes similar / related / semantically close to a given n
 
 ## Output
 
-Success: `{ "ok": true, "sourcePath", "generatedAt", "results": [{ "path", "title", "score", "excerpt" }] }`. Pre-sorted by `score` desc.
+Success: `{ "version": 1, "ok": true, "sourcePath", "generatedAt", "results": [{ "path", "title", "score", "excerpt" }] }`. Pre-sorted by `score` desc.
 
-Failure: `{ "ok": false, "error": "..." }`.
+Failure: `{ "version": 1, "ok": false, "code", "error" }`. `code` is `NO_ACTIVE_FILE` or `SEARCH_FAILED`.
 
 ## Validation
 
