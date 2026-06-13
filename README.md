@@ -67,6 +67,36 @@ Supports any Ollama embedding model.
 - `nomic-embed-text` (English)
 - `bge-m3` (multilingual)
 
+## Agent Usage
+
+External coding agents can reuse the plugin's similarity search without understanding embeddings or plugin internals:
+
+1. Open a note in Obsidian.
+2. Run the command **Similar Notes: Export similar notes for active note**.
+3. Read the results from `.obsidian/plugins/similar-notes/agent-similar-notes.json`.
+
+Output format (success):
+
+```json
+{
+  "ok": true,
+  "sourcePath": "Projects/My Note.md",
+  "generatedAt": "2026-06-09T12:34:56.000Z",
+  "results": [
+    {
+      "path": "Knowledge/Related Note.md",
+      "title": "Related Note",
+      "score": 0.82,
+      "excerpt": "similar content..."
+    }
+  ]
+}
+```
+
+On error (e.g. no active markdown file, search failure), the same file is written with `{ "ok": false, "error": "..." }`.
+
+For driving the command from an agent (CLI flow, validation tips, drop-in skill snippet), see [docs/agent-export.md](docs/agent-export.md).
+
 ## Technical Details
 
 - **Transformers.js**: Runs Hugging Face models directly in Obsidian
