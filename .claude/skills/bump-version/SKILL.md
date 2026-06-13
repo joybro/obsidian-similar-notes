@@ -116,7 +116,9 @@ git push origin X.Y.Z          # triggers .github/workflows/release.yml
 
 The tag push runs `release.yml` → `npm run build` → creates a **draft** release with assets `main.js`, `manifest.json`, `styles.css` (no body). Wait for it: `gh run watch <id>` or poll `gh run list --workflow=release.yml -L 1` until `completed success`.
 
-Then publish, supplying release notes from the CHANGELOG entry — the `### Added/Changed/Improved/Fixed` sections only (write them to a temp file and pass `--notes-file`). Match the prior stable release's body format; **omit** the BRAT install block (that is beta-only):
+Then publish, supplying release notes from the CHANGELOG entry — the `### Added/Changed/Improved/Fixed` sections only (write them to a temp file and pass `--notes-file`). Match the prior stable release's body format; **omit** the BRAT install block (that is beta-only).
+
+**Summarize for the release body — don't copy a long CHANGELOG entry verbatim.** The release note is a scannable announcement; the CHANGELOG is the durable detailed record, and the two are allowed to diverge. Keep every item's bold title and a one-sentence "what the user sees", but drop the nested sub-bullets and the deep mechanism explanations (the *why it broke / how it's fixed* prose). When two Fixed items share a root cause (e.g. several Ollama context-overflow variants), merge them into one line. A verbatim copy of a sub-bullet-heavy entry reads as too long and gets re-edited after publish — trim it up front. (Leave the CHANGELOG file itself untouched; only the release body is trimmed.)
 
 ```bash
 gh release edit X.Y.Z -R <owner>/<repo> --notes-file <body.md> --draft=false --latest
