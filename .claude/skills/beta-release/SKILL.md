@@ -88,7 +88,7 @@ First beta of the X.Y.Z release — <one-line summary of the headline changes> (
 
 ## What's in this beta
 
-<paste the CHANGELOG entry body here — Added / Changed / Improved / Fixed sections>
+<summarize the CHANGELOG entry here — do NOT paste a long entry verbatim. Keep each item's bold title + one-sentence "what the user sees"; drop nested sub-bullets and deep mechanism prose; merge same-root-cause Fixed items into one line. The release note is a scannable announcement; the CHANGELOG file stays detailed and untouched.>
 
 ## Known limitation (optional)
 
