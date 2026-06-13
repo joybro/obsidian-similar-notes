@@ -151,6 +151,7 @@ export class SimilarNoteCoordinator {
                 sourceChunk: showSourceChunk
                     ? similarNote.sourceChunk
                     : undefined,
+                isLinked: similarNote.isLinked,
                 path: similarNote.path,
             }))
             .filter((viewModel) => {

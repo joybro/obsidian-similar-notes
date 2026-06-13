@@ -10,6 +10,7 @@ export interface SimilarNoteEntry {
     similarity: number;
     preview: string;
     sourceChunk?: string;
+    isLinked: boolean;
 }
 
 export interface NoteBottomViewModel {
