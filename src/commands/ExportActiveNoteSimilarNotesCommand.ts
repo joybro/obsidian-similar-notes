@@ -3,7 +3,7 @@ import log from "loglevel";
 import { Notice as ObsidianNotice, type App, type Plugin } from "obsidian";
 import type { Command } from "./Command";
 
-const EXPORT_FILE_NAME = "agent-similar-notes.json";
+const EXPORT_FILE_NAME = "similar-notes-export.json";
 
 /**
  * Version of the agent-export JSON contract (see docs/agent-export.md).

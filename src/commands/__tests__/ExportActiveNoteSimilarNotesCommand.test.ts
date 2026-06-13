@@ -10,7 +10,7 @@ vi.mock("obsidian", () => ({
 }));
 
 const PLUGIN_ID = "similar-notes";
-const FINAL_PATH = `.obsidian/plugins/${PLUGIN_ID}/agent-similar-notes.json`;
+const FINAL_PATH = `.obsidian/plugins/${PLUGIN_ID}/similar-notes-export.json`;
 const TMP_PATH = `${FINAL_PATH}.tmp`;
 
 /**
