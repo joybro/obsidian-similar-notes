@@ -28,7 +28,8 @@ Success:
       "path": "Knowledge/Related Note.md",
       "title": "Related Note",
       "score": 0.82,
-      "excerpt": "matched chunk from similar note"
+      "excerpt": "matched chunk from similar note",
+      "linked": false
     }
   ]
 }
@@ -37,6 +38,7 @@ Success:
 - `version`: contract version (currently `1`). Bumped if the payload shape changes, so an agent can branch on it.
 - `score`: higher = more similar. No fixed scale; compare within a single export.
 - `excerpt`: chunk from the matched note that scored highest.
+- `linked`: `true` if the active note already links to this result (an existing `[[wikilink]]`), `false` otherwise. Results are not filtered by link status — both linked and unlinked matches appear, sorted by `score`.
 - `results`: pre-sorted by `score` desc. May be empty if the source note is not yet indexed — this is not an error.
 
 The file is written atomically (rendered to a temp file, then moved into place), so a reader never observes a partially written file.
