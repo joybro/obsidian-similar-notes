@@ -29,8 +29,9 @@ signal of seeing the tool correctly surface notes the user already judged relate
 
 Stop hiding already-linked notes. Exclude only the active note itself
 (`[note.path]`). Show linked notes **interleaved by score** so the obvious top match
-appears where the user expects it, and **mark** them with a small muted link icon
-(tooltip "Already linked") so a discovery-minded user can still tell them apart. The
+appears where the user expects it, and **mark** them with a small muted "linked" text
+tag (styled like Obsidian's neutral hotkey pills) so a discovery-minded user can still
+tell them apart. The
 agent export gains a matching `linked: true/false` field per result.
 
 ## Alternatives considered
