@@ -6,7 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
--   **Export similar notes for active note** (#47): New command **Similar Notes: Export similar notes for active note** writes the current note's similar-notes results to `.obsidian/plugins/similar-notes/similar-notes-export.json`. Lets external tools (e.g. coding agents) reuse the plugin's similarity search without touching embeddings or the index — open a note, run the command, read the JSON. Each result has `path`, `title`, `score`, and `excerpt`; the payload carries a `version` for forward compatibility, is written atomically (no partial reads), and on failure reports a stable `code` (`NO_ACTIVE_FILE`, `SEARCH_FAILED`) alongside `ok: false`.
+-   **Export similar notes for active note** (#47): New command **Similar Notes: Export similar notes for active note** writes the current note's similar-notes results to `.obsidian/plugins/similar-notes/similar-notes-export.json`. Lets external tools (e.g. coding agents) reuse the plugin's similarity search without touching embeddings or the index — open a note, run the command, read the JSON. Each result has `path`, `title`, `score`, `excerpt`, and `linked`; the payload carries a `version` for forward compatibility, is written atomically (no partial reads), and on failure reports a stable `code` (`NO_ACTIVE_FILE`, `SEARCH_FAILED`) alongside `ok: false`.
+
+### Changed
+
+-   **Already-linked notes now appear in Similar notes**: previously the panel hid any note the active note already linked to, so the most obvious matches were missing from recommendations. Linked notes now show, ranked by score alongside everything else, with a small link icon marking them as already linked. The agent export gains a matching `linked` field per result.
 
 ## [1.5.0] - 2026-06-13
 
