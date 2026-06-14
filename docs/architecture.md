@@ -61,7 +61,9 @@ src/
 
 3. **Vector Database**: Orama is used for vector storage and search. Database is persisted and reloaded between sessions.
 
-4. **Ollama chunk sizing & batching**: Ollama rejects inputs longer than the model context, and a chunk's true token count can't be known cheaply before sending. Chunk size is the smaller of a transport-payload ceiling and a context-window ceiling, with `truncate: true` as a hard backstop, and chunks are embedded in payload-bounded batches. The rationale (why the 0.5 safety factor, which ceiling binds per model) is non-obvious — see `docs/ollama-embedding-sizing-spec.md`.
+4. **Ollama chunk sizing & batching**: Ollama rejects inputs longer than the model context, and a chunk's true token count can't be known cheaply before sending. The embedding-input ceiling is the smaller of a transport-payload ceiling and a context-window ceiling, with `truncate: true` as a hard backstop, and chunks are embedded in payload-bounded batches. The rationale (why the 0.5 safety factor, which ceiling binds per model) is non-obvious — see `docs/ollama-embedding-sizing-spec.md`.
+
+5. **Semantic chunk size**: Chunk size is sized for retrieval granularity, not for the model's maximum input. It is capped at a fixed `SEMANTIC_CHUNK_TOKENS` (512) with the model's `getMaxTokens()` only as the upper bound (`LangchainNoteChunkingService`). Reusing the model ceiling as the chunk size made large-context models (bge-m3, OpenAI) produce coarse chunks that diluted topical signal and missed genuine matches — see `docs/semantic-chunk-size-spec.md` and `docs/adr/0002-semantic-chunk-size-cap.md`.
 
 5. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
 

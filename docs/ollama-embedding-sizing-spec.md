@@ -39,10 +39,16 @@ estimate said they fit when they did not.
 We deliberately keep the estimate conservative (it rounds chunks *smaller*),
 but it cannot be made reliable. Two mechanisms below compensate.
 
-## Chunk size = the smaller of two ceilings
+## `maxTokens` = the smaller of two ceilings
 
-`OllamaEmbeddingProvider.loadModel` sets the chunk size (`maxTokens`, consumed
-by `LangchainNoteChunkingService` as `chunkSize`) to:
+> **`maxTokens` is the embedding-input ceiling, not the chunk size.** It bounds
+> how much can be sent to the model in one call. The chunk size used for
+> retrieval is `min(SEMANTIC_CHUNK_TOKENS, maxTokens)` — a finer semantic target
+> that this doc's ceilings only *cap*. See `semantic-chunk-size-spec.md`. The
+> ceilings below still matter: they are the upper bound, and they govern
+> truncation and batching regardless of chunk size.
+
+`OllamaEmbeddingProvider.loadModel` computes `maxTokens` as:
 
 ```
 maxTokens = min( detected,  floor(contextLength × CONTEXT_SAFETY_FACTOR) )
@@ -94,6 +100,10 @@ models with a context **below ~4096 tokens**:
 
 For large-context models the 8 KB payload ceiling is already the lower bound,
 so the context cap has no effect — `bge-m3` would be 2048 with or without it.
+
+These `maxTokens` values are the **embedding ceiling**. The **chunk size** is
+then `min(SEMANTIC_CHUNK_TOKENS=512, maxTokens)`, so bge-m3 chunks at 512 (not
+2048) and `all-minilm` stays at 256 — see `semantic-chunk-size-spec.md`.
 
 ## The hard backstop — `truncate: true`
 

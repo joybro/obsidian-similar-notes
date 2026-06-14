@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 
 -   **Already-linked notes now appear in Similar notes**: previously the panel hid any note the active note already linked to, so the most obvious matches were missing from recommendations. Linked notes now show, ranked by score alongside everything else, with a small muted "linked" tag marking them as already linked. The agent export gains a matching `linked` field per result.
 
+### Fixed
+
+-   **Better recommendations for long, multi-topic notes on large-context models**: chunk size was tied to the embedding model's context window, so with a large-context model (e.g. Ollama `bge-m3`, OpenAI) a long note mixing several topics was split into chunks so coarse that any single topic's signal was averaged away. Genuinely related notes were then missed, or buried under unrelated notes that merely shared structure (tables, headings). Notes are now chunked at a focused semantic size regardless of the model. In testing, a long note covering many topics now surfaces a focused related note clearly at the top, with the matching passage as the excerpt, where before it ranked only marginally above unrelated notes. **Run a full reindex** (Index settings → Reindex) on existing vaults to apply the finer chunking.
+
 ## [1.5.0] - 2026-06-13
 
 ### Added
