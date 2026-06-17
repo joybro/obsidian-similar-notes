@@ -13,13 +13,27 @@ Pair skill: `bump-version` handles the *stable* bump that closes out the beta cy
 
 ## The pattern this repo uses
 
-`manifest.json` stays at the previous stable. `package.json` carries the `X.Y.Z-beta.N` semver-prerelease. A tag `X.Y.Z-beta.N` triggers `release.yml`, which auto-creates a draft release; the maintainer publishes it manually with **Set as a pre-release** checked.
+The **default-branch** `manifest.json` stays at the previous stable. `package.json` carries the `X.Y.Z-beta.N` semver-prerelease. A tag `X.Y.Z-beta.N` triggers `release.yml`, which auto-creates a draft release whose **asset `manifest.json` is version-synced to the tag** and is **auto-marked pre-release** for `-beta`/`-alpha`/`-rc` tags; the maintainer just reviews and publishes.
 
-**Why this pattern (vs alternatives):**
+The key insight: the **default-branch** `manifest.json` and the **release-asset** `manifest.json` are different copies and are *meant* to differ during a beta — branch stays at stable (store-safe), asset matches the tag (BRAT-correct).
 
-- Obsidian's community plugin store reads `manifest.json` on the default branch — keeping it at the stable version is what blocks the beta from being pushed to all users.
-- A survey of 8 popular plugins (excalidraw, obsidian-tasks, omnisearch, copilot, smart-connections, obsidian-git, folder-notes, dataview) found **only dataview** uses `manifest-beta.json`. **folder-notes** uses exactly this pattern (stable manifest + `-beta` tag + prerelease checkbox). No real "standard" — this pattern is the more common shape among plugins that operate a beta channel at all.
-- BRAT fetches the release's `main.js` regardless of whether the asset `manifest.json` matches the tag; users still receive the beta build.
+**Why this pattern (verified against BRAT's official guide, not guessed):**
+
+- Obsidian's community plugin store reads `manifest.json` on the **default branch** — keeping it at the stable version is what blocks the beta from reaching all users (BRAT guide: *"Obsidian will pick up an update once the `manifest.json` in the default branch of your repository changes."*). The store does **not** read pre-release assets, so the asset version is free to be the beta version.
+- **BRAT uses the release tag as the source of truth** and *"validates both the release tag version and the version in the `manifest.json` asset … notifying users of the discrepancy"* when they disagree. So a stable asset manifest on a `-beta` tag still works (testers get the right `main.js` and BRAT shows the tag version) but shows testers a needless **version-mismatch warning** — which is why `release.yml` now syncs the asset manifest to the tag (BRAT guide best practice: *"Always ensure the version in your released `manifest.json` matches your release tag version"*).
+- `manifest-beta.json` is **not used and should not be** — BRAT **ignores it from v1.1.0 on** (legacy). A survey of 8 popular plugins found only dataview still ships one. `release.yml`'s asset-sync replaces what `manifest-beta.json` used to do.
+
+Sources: [BRAT Developer Guide](https://github.com/TfTHacker/obsidian42-brat/blob/main/BRAT-DEVELOPER-GUIDE.md), [BRAT pre-release/version-picker update](https://forum.obsidian.md/t/functional-update-to-brat-version-picker-github-pre-releases-and-frozen-version-updates/98951).
+
+## Reading current release state (don't re-derive — this tripped past sessions up)
+
+The default-branch `manifest.json` version is **not** a reliable indicator of the beta line: betas are cut without bumping it, so a `X.Y.Z-beta.N` tag's *committed* manifest still says the previous stable. Use these instead:
+
+- **What's been cut:** `git tag --sort=-creatordate`
+- **Draft vs published / prerelease:** `gh release view <tag> --json isDraft,isPrerelease,publishedAt` — NOT `gh release list` (it lists drafts too) and NOT the changelog/manifest.
+- **CHANGELOG caveat:** a dated `## [X.Y.Z] - YYYY-MM-DD` heading can exist *before* X.Y.Z ships (the beta-prep step renames `## [Unreleased]` early), so a dated heading does **not** mean that version is released.
+
+Why it matters: wrong release-state assumptions produce wrong user-facing guidance — e.g. telling the maintainer to "publish the draft" when it's already live, or sending an email that points at a release link that 404s.
 
 ## When to Use
 
@@ -70,7 +84,7 @@ git tag X.Y.Z-beta.N
 git push origin X.Y.Z-beta.N
 ```
 
-The push of the tag triggers `.github/workflows/release.yml` → builds with `npm run build` → creates a **draft** release with assets `main.js`, `manifest.json`, `styles.css`.
+The push of the tag triggers `.github/workflows/release.yml` → builds with `npm run build` → **version-syncs the asset `manifest.json` to the tag** (the committed default-branch file is untouched) → **adds `--prerelease`** for `-beta`/`-alpha`/`-rc` tags → creates a **draft** release with assets `main.js`, `manifest.json`, `styles.css`.
 
 Wait for the workflow with `gh run watch <id>` (or `gh run list --workflow=release.yml --limit 1`).
 
@@ -103,7 +117,7 @@ gh release edit X.Y.Z-beta.N --notes-file <path-to-body.md>
 
 Then hand the maintainer the draft URL and these steps:
 1. Open the draft release and review the pre-filled body + assets
-2. **Check "Set as a pre-release"** (folder-notes pattern — extra safety even with stable manifest)
+2. **Confirm "Set as a pre-release" is already ticked** — `release.yml` sets it automatically for `-beta` tags; just verify it (don't rely on memory that it's automatic — glance at the checkbox)
 3. Publish
 
 The maintainer still publishes via the UI so they visually confirm assets + the prerelease checkbox. Do **not** call `gh release edit --draft=false` yourself unless the user explicitly asks; that is the publication step and surfaces an external-visible artifact.
@@ -153,7 +167,7 @@ When the maintainer is satisfied:
 | `Closes #N` in a commit message auto-closes the issue on push, but you're only releasing a beta | GitHub keyword | Use `Refs #N` in commit messages while a stable hasn't shipped; reopen if it slipped through |
 | Lint `max-lines` fails on long test files | The repo's `.eslintrc.json` had `max-lines: 400` applied globally until #39 cycle — test overrides now relax it | If it regresses, ensure `overrides[].files: ["**/__tests__/**", "**/*.test.ts(x)"]` still disables `max-lines` and `max-lines-per-function` |
 | GitHub release page has no comment box | Releases are view-only — only issues/PRs accept comments | When writing release body or asking for feedback, point to `#<issue>` (not "leave a comment here") |
-| Workflow creates the release as `draft: true, prerelease: false` | `release.yml` uses `gh release create --draft`, no `--prerelease` flag | Maintainer must tick "Set as a pre-release" before publishing. (Or amend `release.yml` to add `--prerelease` for `*-beta*` tags — not done yet) |
+| ~~Workflow creates the release as `prerelease: false`~~ (fixed) | `release.yml` now adds `--prerelease` for `*-beta*`/`*-alpha*`/`*-rc*` tags and syncs the asset `manifest.json` version to the tag | Maintainer only verifies the (already-ticked) checkbox before publishing — no manual toggle needed |
 | BRAT testing on a different machine | The plugin needs to be installed via BRAT (not `install-local.sh`) when the test machine doesn't have the repo checkout | Confirm BRAT is installed on the test machine before betas are needed |
 
 ## Common mistakes

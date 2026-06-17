@@ -29,7 +29,21 @@ jobs:
               run: |
                   tag="${GITHUB_REF#refs/tags/}"
 
+                  # Sync the RELEASE-ASSET manifest version to the tag. BRAT uses
+                  # the release tag as the source of truth and warns testers when
+                  # the asset manifest.json disagrees, so we make them match (BRAT's
+                  # documented best practice). This edits only the uploaded asset,
+                  # NOT the committed default-branch manifest.json — the community
+                  # store reads the default-branch file, so stable users are
+                  # unaffected. No-op for stable tags (manifest already matches).
+                  node -e "const f='manifest.json',m=require('./'+f);m.version=process.argv[1];require('fs').writeFileSync(f,JSON.stringify(m,null,4)+'\n')" "$tag"
+
+                  # Auto-mark beta/alpha/rc tags as a GitHub pre-release so the
+                  # maintainer no longer has to tick the checkbox before publishing.
+                  prerelease=""
+                  case "$tag" in *-beta*|*-alpha*|*-rc*) prerelease="--prerelease" ;; esac
+
                   gh release create "$tag" \
                     --title="$tag" \
-                    --draft \
+                    --draft $prerelease \
                     main.js manifest.json styles.css
