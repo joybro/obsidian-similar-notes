@@ -348,8 +348,6 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     }
 
     private getDebugSettingBuilders(): SettingBuilder[] {
-        const settings = this.settingsService.get();
-
         return [
             // Log level
             (setting: Setting) => {
@@ -379,6 +377,12 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     .setDesc("Copy your environment and settings info to clipboard for bug reports")
                     .addButton((button) => {
                         button.setButtonText("Copy to Clipboard").onClick(() => {
+                            // Read settings fresh at click time. Capturing the
+                            // render-time `settings` snapshot made the report lag
+                            // one or two changes behind (it reflected the model /
+                            // options as of the last settings-tab render), which
+                            // silently corrupted users' bug reports.
+                            const settings = this.settingsService.get();
                             const envInfo = collectEnvironmentInfo(
                                 apiVersion,
                                 this.plugin.manifest.version,

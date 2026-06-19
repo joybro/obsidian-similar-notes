@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+-   **"Copy environment info" now reports your current settings**: the Debug & Support "Copy to Clipboard" button captured settings once when the settings tab was opened, so after switching the model (or toggling an option like GPU / Include Frontmatter) the copied report showed a stale value, usually the model from one or two changes earlier. It now reads your settings at click time, so bug reports match what you actually have selected.
+
 ## [1.6.0] - 2026-06-14
 
 ### Added
