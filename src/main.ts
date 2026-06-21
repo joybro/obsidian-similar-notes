@@ -80,6 +80,12 @@ export default class MainPlugin extends Plugin {
         // Register essential events
         this.registerEvents();
 
+        // Register the ribbon icon early (before layout restore) so Obsidian applies
+        // the user's "hide from ribbon" choice; late registration misses it (#50).
+        this.addRibbonIcon("telescope", "Open Similar Notes", () => {
+            this.activateSimilarNotesView();
+        });
+
         // Defer all other initialization to onLayoutReady
         this.app.workspace.onLayoutReady(() => this.initializeServices(needsReindex));
     }
@@ -323,11 +329,6 @@ export default class MainPlugin extends Plugin {
                     this.similarNoteCoordinator.getNoteBottomViewModelObservable()
                 )
         );
-
-        // Add ribbon icon
-        this.addRibbonIcon("telescope", "Open Similar Notes", () => {
-            this.activateSimilarNotesView();
-        });
 
         // Register commands
         this.registerCommands();
