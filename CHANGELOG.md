@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **Hiding the ribbon icon now sticks across restarts** (#50): if you hid the Similar Notes icon from the left ribbon (right-click → uncheck), it came back every time you reopened Obsidian. The icon was registered too late in startup to receive Obsidian's "hidden ribbon items" preference, so it always reappeared. It now registers early like core plugins, so a hidden icon stays hidden.
 -   **"Copy environment info" now reports your current settings**: the Debug & Support "Copy to Clipboard" button captured settings once when the settings tab was opened, so after switching the model (or toggling an option like GPU / Include Frontmatter) the copied report showed a stale value, usually the model from one or two changes earlier. It now reads your settings at click time, so bug reports match what you actually have selected.
 
 ## [1.6.0] - 2026-06-14
