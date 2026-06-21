@@ -1,5 +1,5 @@
 import log from "loglevel";
-import { Plugin, type TFile } from "obsidian";
+import { Plugin } from "obsidian";
 import { OramaNoteChunkRepository } from "./adapter/orama/OramaNoteChunkRepository";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
 import { NoteIndexingService } from "./application/NoteIndexingService";
@@ -19,6 +19,7 @@ import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesSidebarView } from "./components/SimilarNotesSidebarView";
 import { StatusBarView } from "./components/StatusBarView";
 import { VIEW_TYPE_SIMILAR_NOTES_SIDEBAR } from "./constants/viewTypes";
+import { registerEditorDropHandler } from "./editor/registerEditorDropHandler";
 import type { NoteChunkRepository } from "./domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "./domain/repository/NoteRepository";
 import { EmbeddingService } from "./domain/service/EmbeddingService";
@@ -29,6 +30,7 @@ import { ErroredNoteStore } from "./infrastructure/ErroredNoteStore";
 import { IndexedNoteMTimeStore } from "./infrastructure/IndexedNoteMTimeStore";
 import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
+import { needsReindexForUpgrade } from "./lifecycle/versionUpgrade";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
 
 const dbFileName = "similar-notes.json";
@@ -62,7 +64,7 @@ export default class MainPlugin extends Plugin {
         // Check if plugin version has changed and trigger reindex if needed
         const settings = this.settingsService.get();
         const currentVersion = this.manifest.version;
-        const needsReindex = this.checkVersionUpgrade(settings.lastPluginVersion, currentVersion);
+        const needsReindex = needsReindexForUpgrade(settings.lastPluginVersion, currentVersion);
 
         if (needsReindex) {
             log.info(`Plugin upgraded from ${settings.lastPluginVersion || 'unknown'} to ${currentVersion}. Will trigger reindex.`);
@@ -88,38 +90,6 @@ export default class MainPlugin extends Plugin {
 
         // Defer all other initialization to onLayoutReady
         this.app.workspace.onLayoutReady(() => this.initializeServices(needsReindex));
-    }
-
-    /**
-     * Check if plugin version has changed and determine if reindex is needed
-     * Returns true if upgrading from version <= 0.10.0 (includes 0.10.0 due to migration issues)
-     */
-    private checkVersionUpgrade(lastVersion: string | undefined, currentVersion: string): boolean {
-        // If no last version recorded, this is either a fresh install or upgrade from pre-0.10.0
-        if (!lastVersion) {
-            log.info("No last version recorded - will trigger reindex for IndexedDB migration");
-            return true;
-        }
-
-        // Parse versions
-        const parseVersion = (v: string): number[] => {
-            return v.split('.').map(n => parseInt(n, 10) || 0);
-        };
-
-        const last = parseVersion(lastVersion);
-
-        // Check if upgrading from <= 0.10.0 (including 0.10.0 which had migration issues)
-        if (last[0] === 0 && last[1] === 10 && last[2] === 0) {
-            log.info(`Upgrading from ${lastVersion} to ${currentVersion} - reindex needed due to 0.10.0 migration issues`);
-            return true;
-        }
-
-        if (last[0] === 0 && last[1] < 10) {
-            log.info(`Upgrading from ${lastVersion} to ${currentVersion} - reindex needed for IndexedDB migration`);
-            return true;
-        }
-
-        return false;
     }
 
     private async getPluginDataDir(): Promise<string> {
@@ -174,52 +144,6 @@ export default class MainPlugin extends Plugin {
         this.registerEvent(
             this.app.workspace.on("active-leaf-change", async (leaf) => {
                 this.leafViewCoordinator?.onActiveLeafChange(leaf);
-            })
-        );
-    }
-
-    private registerEditorDropEvent() {
-        // Register editor-drop event for drag and drop link insertion
-        this.registerEvent(
-            this.app.workspace.on("editor-drop", (evt, editor, info) => {
-                const plainText = evt.dataTransfer?.getData("text/plain");
-
-                // Check if this looks like a wiki-style link from Similar Notes
-                if (!plainText || !/^\[\[.+\]\]$/.test(plainText)) return;
-
-                // Extract path from [[path]] and resolve the file
-                const notePath = plainText.slice(2, -2);
-                const file = this.app.vault.getAbstractFileByPath(notePath);
-                if (!file) return;
-
-                evt.preventDefault();
-
-                // Compute link text respecting Obsidian's "New link format" setting
-                const sourcePath = info?.file?.path ?? "";
-                const linktext = this.app.metadataCache.fileToLinktext(
-                    file as TFile,
-                    sourcePath,
-                );
-                const linkMarkup = `[[${linktext}]]`;
-
-                // Try to insert at drop position using CodeMirror's posAtCoords
-                // @ts-expect-error - Accessing internal CodeMirror EditorView
-                const editorView = info?.editor?.cm;
-                if (editorView?.posAtCoords) {
-                    const pos = editorView.posAtCoords({
-                        x: evt.clientX,
-                        y: evt.clientY,
-                    });
-                    if (pos !== null) {
-                        editorView.dispatch({
-                            changes: { from: pos, insert: linkMarkup },
-                        });
-                        return;
-                    }
-                }
-
-                // Fallback: insert at cursor position
-                editor.replaceSelection(linkMarkup);
             })
         );
     }
@@ -343,7 +267,7 @@ export default class MainPlugin extends Plugin {
         );
 
         // Register editor-drop event handler
-        this.registerEditorDropEvent();
+        registerEditorDropHandler(this);
 
         // Complete initialization
         // If needsReindex is true, trigger a reindex to migrate from JSON to IndexedDB
