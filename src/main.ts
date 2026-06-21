@@ -1,5 +1,5 @@
 import log from "loglevel";
-import { Plugin } from "obsidian";
+import { Notice, Plugin } from "obsidian";
 import { OramaNoteChunkRepository } from "./adapter/orama/OramaNoteChunkRepository";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
 import { NoteIndexingService } from "./application/NoteIndexingService";
@@ -52,6 +52,9 @@ export default class MainPlugin extends Plugin {
     private statusBarView: StatusBarView;
     private settingTab: SimilarNotesSettingTab;
     private commands: Command[] = [];
+    // Set once the sidebar view type is registered (in initializeServices). The
+    // ribbon icon is registered earlier in onload, so this guards early clicks.
+    private sidebarViewRegistered = false;
 
     async onload() {
         log.setDefaultLevel(log.levels.ERROR);
@@ -253,6 +256,7 @@ export default class MainPlugin extends Plugin {
                     this.similarNoteCoordinator.getNoteBottomViewModelObservable()
                 )
         );
+        this.sidebarViewRegistered = true;
 
         // Register commands
         this.registerCommands();
@@ -296,6 +300,14 @@ export default class MainPlugin extends Plugin {
     }
 
     async activateSimilarNotesView() {
+        // The ribbon icon exists from onload, but the sidebar view type is only
+        // registered later in initializeServices. Guard clicks during the brief
+        // startup window before initialization completes.
+        if (!this.sidebarViewRegistered) {
+            new Notice("Similar Notes is still loading…");
+            return;
+        }
+
         const existing = this.app.workspace.getLeavesOfType(
             VIEW_TYPE_SIMILAR_NOTES_SIDEBAR
         );
