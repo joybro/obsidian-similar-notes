@@ -2,17 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
-### Improved
-
--   **Bug reports now include CPU and memory**: the "Copy environment info" output adds your CPU core count, architecture, and total RAM (desktop only). These help diagnose memory- and performance-sensitive issues with the built-in on-device model.
-
-### Fixed
-
--   **Hiding the ribbon icon now sticks across restarts** (#50): if you hid the Similar Notes icon from the left ribbon (right-click → uncheck), it came back every time you reopened Obsidian. The icon was registered too late in startup to receive Obsidian's "hidden ribbon items" preference, so it always reappeared. It now registers early like core plugins, so a hidden icon stays hidden.
--   **"Copy environment info" now reports your current settings**: the Debug & Support "Copy to Clipboard" button captured settings once when the settings tab was opened, so after switching the model (or toggling an option like GPU / Include Frontmatter) the copied report showed a stale value, usually the model from one or two changes earlier. It now reads your settings at click time, so bug reports match what you actually have selected.
-
 ## [1.6.0] - 2026-06-14
 
 ### Added
@@ -23,8 +12,14 @@ All notable changes to this project will be documented in this file.
 
 -   **Already-linked notes now appear in Similar notes**: previously the panel hid any note the active note already linked to, so the most obvious matches were missing from recommendations. Linked notes now show, ranked by score alongside everything else, with a small muted "linked" tag marking them as already linked. The agent export gains a matching `linked` field per result.
 
+### Improved
+
+-   **Bug reports now include CPU and memory**: the "Copy environment info" output adds your CPU core count, architecture, and total RAM (desktop only). These help diagnose memory- and performance-sensitive issues with the built-in on-device model.
+
 ### Fixed
 
+-   **Hiding the ribbon icon now sticks across restarts** (#50): if you hid the Similar Notes icon from the left ribbon (right-click → uncheck), it came back every time you reopened Obsidian. The icon was registered too late in startup to receive Obsidian's "hidden ribbon items" preference, so it always reappeared. It now registers early like core plugins, so a hidden icon stays hidden.
+-   **"Copy environment info" now reports your current settings**: the Debug & Support "Copy to Clipboard" button captured settings once when the settings tab was opened, so after switching the model (or toggling an option like GPU / Include Frontmatter) the copied report showed a stale value, usually the model from one or two changes earlier. It now reads your settings at click time, so bug reports match what you actually have selected.
 -   **Better recommendations for long, multi-topic notes on large-context models**: chunk size was tied to the embedding model's context window, so with a large-context model (e.g. Ollama `bge-m3`, OpenAI) a long note mixing several topics was split into chunks so coarse that any single topic's signal was averaged away. Genuinely related notes were then missed, or buried under unrelated notes that merely shared structure (tables, headings). Notes are now chunked at a focused semantic size regardless of the model. In testing, a long note covering many topics now surfaces a focused related note clearly at the top, with the matching passage as the excerpt, where before it ranked only marginally above unrelated notes. **Run a full reindex** (Index settings → Reindex) on existing vaults to apply the finer chunking.
 
 ## [1.5.0] - 2026-06-13
