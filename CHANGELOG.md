@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+-   **Built-in model no longer fails to index on recent Obsidian versions** (with GPU acceleration off): the on-device model could error on nearly every note, showing a bare number (e.g. `8934496`) in the Errored files list. Its multi-threaded WASM engine needs a browser security mode (cross-origin isolation) that Obsidian does not provide, and on recent Obsidian/Electron builds it tried to use threads anyway and crashed instead of falling back. It now runs single-threaded, the safe mode for this environment. Any crash that still occurs now shows a readable message instead of a bare number. After updating, retry the affected notes (Index settings → Retry errored, or Reindex).
+
 ## [1.6.0] - 2026-06-14
 
 ### Added

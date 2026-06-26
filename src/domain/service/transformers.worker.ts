@@ -6,6 +6,7 @@ import type {
 } from "@huggingface/transformers";
 import * as comlink from "comlink";
 import log from "loglevel";
+import { normalizeWasmError } from "../../utils/wasmError";
 
 interface Transformers {
     pipeline(
@@ -13,6 +14,11 @@ interface Transformers {
         modelId: string,
         options: PretrainedOptions
     ): Promise<Pipeline>;
+    // Only the bit we touch. `env.backends.onnx.wasm.numThreads` controls
+    // onnxruntime-web's WASM threading; see handleLoad for why we pin it.
+    env?: {
+        backends?: { onnx?: { wasm?: { numThreads?: number } } };
+    };
 }
 
 // __IS_TEST__ 는 빌드 시 esbuild에 의해 주입됩니다
@@ -108,6 +114,22 @@ class TransformersWorker {
     ): Promise<{ vectorSize: number; maxTokens: number }> {
         log.info(`Loading model: ${modelId}, useGPU: ${useGPU}`);
         const transformers = await importTransformers();
+
+        // Pin onnxruntime-web's WASM backend to a single thread. Its
+        // multi-threaded path needs SharedArrayBuffer (cross-origin isolation),
+        // which Obsidian's worker context does not provide; ort-web's
+        // auto-detection still enables threads in some Electron builds, then
+        // aborts with a bare-number WASM error the moment it touches shared
+        // memory (reported: "SharedArrayBuffer usage is restricted to
+        // cross-origin isolated sites" + a numeric throw from handleEmbedBatch).
+        // Setting numThreads explicitly skips that detection. SIMD is unaffected
+        // (no SAB). Only constrains WASM; WebGPU is unaffected, but this also
+        // covers the GPU->WASM CPU-fallback path.
+        const wasm = transformers.env?.backends?.onnx?.wasm;
+        if (wasm) {
+            wasm.numThreads = 1;
+        }
+
         this.extractor = await transformers.pipeline(
             "feature-extraction",
             modelId,
@@ -164,14 +186,18 @@ class TransformersWorker {
 
         const extractor = this.extractor; // Create a local reference to avoid null check issues
         return this.enqueue(async () => {
-            const tensor = await extractor(text, {
-                pooling: "mean",
-                normalize: true,
-            });
+            try {
+                const tensor = await extractor(text, {
+                    pooling: "mean",
+                    normalize: true,
+                });
 
-            const result = tensor.tolist()[0];
-            tensor.dispose();
-            return result;
+                const result = tensor.tolist()[0];
+                tensor.dispose();
+                return result;
+            } catch (error) {
+                throw normalizeWasmError(error);
+            }
         });
     }
 
@@ -182,14 +208,18 @@ class TransformersWorker {
 
         const extractor = this.extractor; // Create a local reference to avoid null check issues
         return this.enqueue(async () => {
-            const tensor = await extractor(texts, {
-                pooling: "mean",
-                normalize: true,
-            });
+            try {
+                const tensor = await extractor(texts, {
+                    pooling: "mean",
+                    normalize: true,
+                });
 
-            const result = tensor.tolist();
-            tensor.dispose();
-            return result;
+                const result = tensor.tolist();
+                tensor.dispose();
+                return result;
+            } catch (error) {
+                throw normalizeWasmError(error);
+            }
         });
     }
 
