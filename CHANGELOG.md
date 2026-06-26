@@ -2,12 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
-### Fixed
-
--   **Built-in model no longer fails to index in some environments** (with GPU acceleration off): the on-device model could error on nearly every note, showing a bare number (e.g. `8934496`) in the Errored files list. Its multi-threaded WASM engine needs a browser security mode (cross-origin isolation) that Obsidian does not provide; in some setups it tried to use threads anyway and crashed instead of falling back to single-threaded. It now always runs single-threaded, the safe mode here (no effect where it already worked). Any crash that still occurs now shows a readable message instead of a bare number. After updating, retry the affected notes (Index settings → Retry errored, or Reindex).
-
 ## [1.6.0] - 2026-06-14
 
 ### Added
@@ -24,7 +18,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **Built-in model no longer fails to index in some environments** (with GPU acceleration off): the on-device model could error on nearly every note, showing a bare number (e.g. `8934496`) in the Errored files list. Its multi-threaded WASM engine needs a browser security mode (cross-origin isolation) that Obsidian does not provide; in some setups it tried to use threads anyway and crashed instead of falling back to single-threaded. It now always runs single-threaded, the safe mode here (no effect where it already worked). Any crash that still occurs now shows a readable message instead of a bare number. After updating, retry the affected notes (Index settings → Retry errored, or Reindex).
 -   **Hiding the ribbon icon now sticks across restarts** (#50): if you hid the Similar Notes icon from the left ribbon (right-click → uncheck), it came back every time you reopened Obsidian. The icon was registered too late in startup to receive Obsidian's "hidden ribbon items" preference, so it always reappeared. It now registers early like core plugins, so a hidden icon stays hidden.
+-   **Clicking the ribbon icon during startup no longer opens an empty pane** (#50): registering the icon early (above) briefly made it clickable before the plugin finished loading, which could open a blank Similar Notes pane. It now shows a "still loading" notice until the view is ready.
 -   **"Copy environment info" now reports your current settings**: the Debug & Support "Copy to Clipboard" button captured settings once when the settings tab was opened, so after switching the model (or toggling an option like GPU / Include Frontmatter) the copied report showed a stale value, usually the model from one or two changes earlier. It now reads your settings at click time, so bug reports match what you actually have selected.
 -   **Better recommendations for long, multi-topic notes on large-context models**: chunk size was tied to the embedding model's context window, so with a large-context model (e.g. Ollama `bge-m3`, OpenAI) a long note mixing several topics was split into chunks so coarse that any single topic's signal was averaged away. Genuinely related notes were then missed, or buried under unrelated notes that merely shared structure (tables, headings). Notes are now chunked at a focused semantic size regardless of the model. In testing, a long note covering many topics now surfaces a focused related note clearly at the top, with the matching passage as the excerpt, where before it ranked only marginally above unrelated notes. **Run a full reindex** (Index settings → Reindex) on existing vaults to apply the finer chunking.
 
