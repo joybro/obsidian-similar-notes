@@ -65,6 +65,8 @@ src/
 
 5. **Semantic chunk size**: Chunk size is sized for retrieval granularity, not for the model's maximum input. It is capped at a fixed `SEMANTIC_CHUNK_TOKENS` (512) with the model's `getMaxTokens()` only as the upper bound (`LangchainNoteChunkingService`). Reusing the model ceiling as the chunk size made large-context models (bge-m3, OpenAI) produce coarse chunks that diluted topical signal and missed genuine matches — see `docs/semantic-chunk-size-spec.md` and `docs/adr/0002-semantic-chunk-size-cap.md`.
 
+6. **Built-in embedding per-pass batch cap**: The built-in (Transformers.js / onnxruntime-web) embedder caps chunks per forward pass at `MAX_EMBED_BATCH_SIZE` (32) and runs sub-batches sequentially (`transformers.worker.ts`, `splitIntoBatches`/`embedInBatches` in `src/utils/batching.ts`). Embedding a large note's chunks in one pass overran the wasm32 ~4GB address space and aborted with a bare number (and then cascaded). Note: this is *not* a threading issue — the beta.4 single-thread pin was a no-op. See `docs/builtin-embedding-batch-cap-spec.md`.
+
 5. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
 
    - **Sectioning**: The settings tab is divided into top-level sections using Obsidian's `SettingGroup` (`@since 1.11.0`) — one per area (e.g. Model, Index, Exclude folders from index, Exclude content from index, Display, Debug & Support). Each section is built by a `*SettingsSection` class (e.g. `IndexSettingsSection`) that returns `SettingBuilder` arrays.
