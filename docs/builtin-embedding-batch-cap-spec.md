@@ -88,6 +88,10 @@ large notes made of near-max-length chunks, where a count cap is equivalent; the
 count cap is simpler and has no token-estimation risk. Revisit if indexing
 throughput on many-small-chunk notes becomes a concern.
 
+## Verified in real Obsidian
+
+Confirmed in-app (not just Node), on the **heavier** model `paraphrase-multilingual-MiniLM-L12-v2` (~118M params, ~5× the L6 the cap was first measured against): a ~400-chunk note that reproducibly crashed the pre-fix build with a bare number (`951320544`) indexed cleanly with the cap in place (`Saved 400 chunks`, no abort), splitting into ~13 sequential sub-batches. So `MAX_EMBED_BATCH_SIZE = 32` holds with margin even on the heaviest built-in model. Side note surfaced during this test: the status-bar "indexing" indicator keys off queue length (`noteChangeCount > 10`), not actual model-busy state, so a single long-running large-note embed shows no activity — a separate UX gap, not part of this fix.
+
 ## Known follow-up (not yet implemented)
 
 **Reload-on-abort recovery.** The sub-batch cap should prevent the abort entirely,
