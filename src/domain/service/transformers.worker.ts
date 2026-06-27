@@ -6,7 +6,18 @@ import type {
 } from "@huggingface/transformers";
 import * as comlink from "comlink";
 import log from "loglevel";
+import { embedInBatches } from "../../utils/batching";
 import { normalizeWasmError } from "../../utils/wasmError";
+
+/**
+ * Max chunks fed to one on-device forward pass. A single `[N, seqLen]` pass costs
+ * ~`N * heads * seqLen^2 * 4 bytes`; in a Node repro against this exact stack,
+ * N=128 full-length (512-token) chunks peaked ~4.6GB and N=256 overran the wasm32
+ * ~4GB address space and aborted with a bare number. 32 keeps the worst case
+ * (32 chunks @ 512 tokens) near ~1.2GB, a comfortable margin below the cliff.
+ * See docs/builtin-embedding-batch-cap-spec.md.
+ */
+const MAX_EMBED_BATCH_SIZE = 32;
 
 interface Transformers {
     pipeline(
@@ -115,16 +126,14 @@ class TransformersWorker {
         log.info(`Loading model: ${modelId}, useGPU: ${useGPU}`);
         const transformers = await importTransformers();
 
-        // Pin onnxruntime-web's WASM backend to a single thread. Its
-        // multi-threaded path needs SharedArrayBuffer (cross-origin isolation),
-        // which Obsidian's worker context does not provide; ort-web's
-        // auto-detection still enables threads in some Electron builds, then
-        // aborts with a bare-number WASM error the moment it touches shared
-        // memory (reported: "SharedArrayBuffer usage is restricted to
-        // cross-origin isolated sites" + a numeric throw from handleEmbedBatch).
-        // Setting numThreads explicitly skips that detection. SIMD is unaffected
-        // (no SAB). Only constrains WASM; WebGPU is unaffected, but this also
-        // covers the GPU->WASM CPU-fallback path.
+        // Pin onnxruntime-web's WASM backend to a single thread for deterministic
+        // memory behavior. ort-web already auto-selects 1 thread when the context
+        // is not cross-origin isolated (which Obsidian's worker is not), so this
+        // is mostly explicit-intent + covers any future isolated context.
+        // NOTE: single-threading is NOT what fixes the large-note crash — that was
+        // a misdiagnosis. The real cause is an oversized forward pass overrunning
+        // the wasm32 address space; the fix is sub-batching in handleEmbedBatch
+        // (see MAX_EMBED_BATCH_SIZE). A bare-number abort reproduces single-threaded.
         const wasm = transformers.env?.backends?.onnx?.wasm;
         if (wasm) {
             wasm.numThreads = 1;
@@ -209,14 +218,22 @@ class TransformersWorker {
         const extractor = this.extractor; // Create a local reference to avoid null check issues
         return this.enqueue(async () => {
             try {
-                const tensor = await extractor(texts, {
-                    pooling: "mean",
-                    normalize: true,
-                });
-
-                const result = tensor.tolist();
-                tensor.dispose();
-                return result;
+                // Embed in bounded, sequential sub-batches so one large note
+                // (many chunks) can't hand the wasm runtime an oversized forward
+                // pass that overruns its address space and aborts.
+                return await embedInBatches(
+                    texts,
+                    MAX_EMBED_BATCH_SIZE,
+                    async (batch) => {
+                        const tensor = await extractor(batch, {
+                            pooling: "mean",
+                            normalize: true,
+                        });
+                        const embeddings = tensor.tolist();
+                        tensor.dispose();
+                        return embeddings;
+                    }
+                );
             } catch (error) {
                 throw normalizeWasmError(error);
             }
