@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 -   **Already-linked notes now appear in Similar notes**: previously the panel hid any note the active note already linked to, so the most obvious matches were missing from recommendations. Linked notes now show, ranked by score alongside everything else, with a small muted "linked" tag marking them as already linked. The agent export gains a matching `linked` field per result.
+-   **Built-in models on mobile now warn about memory use**: built-in models run entirely on-device and have to hold the whole model in memory, which a phone often can't spare, so on lower-memory devices Obsidian can crash outright. The Built-in model settings now show a warning on mobile recommending a remote provider (Ollama, OpenAI, or Gemini) instead, and the plugin description notes that cloud APIs are recommended on mobile. High-memory phones and tablets can still choose built-in models.
 
 ### Improved
 
