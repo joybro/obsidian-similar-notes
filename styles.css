@@ -423,3 +423,15 @@ select option:disabled {
     vertical-align: middle;
     white-space: nowrap;
 }
+
+/* Mobile-only caution shown in the Built-in model settings: on-device models can
+   exhaust a phone's memory and crash Obsidian. Accent it so it reads as a warning,
+   not a neutral settings row. */
+.similar-notes-mobile-warning {
+    border-left: 3px solid var(--text-warning);
+    padding-left: var(--size-4-3);
+}
+
+.similar-notes-mobile-warning .setting-item-name {
+    color: var(--text-warning);
+}

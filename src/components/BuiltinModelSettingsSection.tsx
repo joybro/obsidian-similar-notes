@@ -1,8 +1,8 @@
 import type { SimilarNotesSettings } from "@/application/SettingsService";
-import type { ButtonComponent } from "obsidian";
+import type { ButtonComponent, Setting } from "obsidian";
 import type { SettingBuilder } from "./OpenAISettingsSection";
 
-interface BuiltinModelSettingsSectionProps {
+export interface BuiltinModelSettingsSectionProps {
     settings: SimilarNotesSettings;
     tempModelId: string | undefined;
     tempUseGPU: boolean | undefined;
@@ -10,6 +10,10 @@ interface BuiltinModelSettingsSectionProps {
     onUseGPUChange: (value: boolean) => void;
     onRender: () => void;
     updateApplyButtonState: () => void;
+    // True on the Obsidian mobile app. Built-in models run fully on-device and
+    // can exhaust a phone's memory budget, crashing the whole app, so we warn
+    // (rather than block — a capable tablet should still be able to opt in).
+    isMobile: boolean;
 }
 
 export function getBuiltinModelSettingBuilders(
@@ -23,6 +27,7 @@ export function getBuiltinModelSettingBuilders(
         onUseGPUChange,
         onRender,
         updateApplyButtonState,
+        isMobile,
     } = props;
 
     const recommendedModels = [
@@ -31,6 +36,20 @@ export function getBuiltinModelSettingBuilders(
     ];
 
     return [
+        // Mobile warning: built-in models run on-device and can crash low-memory
+        // phones. Shown above the model options so it's seen before "Load & Apply".
+        ...(isMobile
+            ? [
+                (setting: Setting) => {
+                    setting
+                        .setName("⚠️ Built-in models on mobile")
+                        .setDesc(
+                            "Built-in models run entirely on-device and need a lot of memory. On low-memory phones this can crash Obsidian. For mobile, a remote provider (Ollama, OpenAI, or Gemini) is recommended."
+                        )
+                        .setClass("similar-notes-mobile-warning");
+                },
+            ]
+            : []),
         // Recommended models dropdown
         (setting) => {
             setting

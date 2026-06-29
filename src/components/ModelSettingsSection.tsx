@@ -1,7 +1,7 @@
 import type { SettingsService } from "@/application/SettingsService";
 import type { SimilarNotesSettings } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
-import { SettingGroup } from "obsidian";
+import { Platform, SettingGroup } from "obsidian";
 import type { App, ButtonComponent } from "obsidian";
 import type MainPlugin from "../main";
 import {
@@ -267,6 +267,7 @@ export class ModelSettingsSection {
                 },
                 onRender: () => this.render(),
                 updateApplyButtonState: () => this.updateApplyButtonState(settings),
+                isMobile: Platform.isMobileApp,
             });
         } else if (this.tempModelProvider === "ollama") {
             const result = getOllamaSettingBuilders({
