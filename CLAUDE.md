@@ -85,7 +85,7 @@ obsidian vault=Test_local command id=similar-notes:<command-id> # run the comman
 ## Testing Approach
 
 - Tests use Vitest with React Testing Library
-- Obsidian API is mocked in `__tests__/__mocks__/obsidian.ts`
+- Obsidian API is mocked by the `vi.mock("obsidian", ...)` factory in `src/test-setup.ts` (loaded via `setupFiles` in `vitest.config.ts`) — this factory is what tests actually get, so add missing exports (`Platform`, `TFile`, ...) THERE. The file `src/__mocks__/obsidian.ts` exists but is shadowed by the factory; editing it has no effect on tests
 - Test files are colocated with source files in `__tests__` directories
 - Focus on testing domain logic and services, not UI components
 
