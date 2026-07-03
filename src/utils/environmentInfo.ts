@@ -13,6 +13,7 @@ export interface EnvironmentInfo {
     pluginVersion: string;
     modelProvider: string;
     modelId: string;
+    serverUrl: string | null;
     webGPU: boolean;
     system: SystemInfo;
     chunkSettings: {
@@ -80,10 +81,32 @@ function getPlatformString(): string {
 }
 
 function getModelDisplayName(settings: SimilarNotesSettings): string {
-    if (settings.modelProvider === "ollama") {
-        return `Ollama (${settings.ollamaModel || "not configured"})`;
+    switch (settings.modelProvider) {
+        case "ollama":
+            return `Ollama (${settings.ollamaModel || "not configured"})`;
+        case "openai":
+            return `OpenAI (${settings.openaiModel || "not configured"})`;
+        case "gemini":
+            return `Gemini (${settings.geminiModel || "not configured"})`;
+        default:
+            return `Built-in (${settings.modelId})`;
     }
-    return `Built-in (${settings.modelId})`;
+}
+
+/**
+ * Server URL for providers where it disambiguates the actual backend (real
+ * OpenAI vs OpenRouter vs a local server; local vs remote Ollama). Null for
+ * providers with a fixed endpoint.
+ */
+function getServerUrl(settings: SimilarNotesSettings): string | null {
+    switch (settings.modelProvider) {
+        case "ollama":
+            return settings.ollamaUrl || "http://localhost:11434";
+        case "openai":
+            return settings.openaiUrl || "https://api.openai.com/v1";
+        default:
+            return null;
+    }
 }
 
 export function collectEnvironmentInfo(
@@ -97,6 +120,7 @@ export function collectEnvironmentInfo(
         pluginVersion,
         modelProvider: settings.modelProvider,
         modelId: getModelDisplayName(settings),
+        serverUrl: getServerUrl(settings),
         webGPU: settings.useGPU,
         system: collectSystemInfo(),
         chunkSettings: {
@@ -124,7 +148,14 @@ export function formatEnvironmentInfoAsMarkdown(info: EnvironmentInfo): string {
         `- **Plugin**: v${info.pluginVersion}`,
         "",
         "### Settings",
-        `- **Model**: ${info.modelId}`,
+        `- **Model**: ${info.modelId}`
+    );
+
+    if (info.serverUrl !== null) {
+        lines.push(`- **Server URL**: ${info.serverUrl}`);
+    }
+
+    lines.push(
         `- **WebGPU**: ${info.webGPU ? "Enabled" : "Disabled"}`,
         `- **Include Frontmatter**: ${info.chunkSettings.includeFrontmatter ? "Yes" : "No"}`
     );

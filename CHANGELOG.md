@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+-   **"Copy environment info" now reports OpenAI and Gemini models correctly**: with the model provider set to OpenAI API or Google Gemini, the Debug & Support environment report still showed `Model: Built-in (...)` with the built-in model name, so bug reports misidentified the active model. The report now shows the actual provider and model (e.g. `OpenAI (perplexity/pplx-embed-v1-0.6b)`), and for OpenAI and Ollama providers adds a `Server URL` line so reports distinguish real OpenAI, OpenRouter, and local servers.
+
 ## [1.6.0] - 2026-06-14
 
 ### Added

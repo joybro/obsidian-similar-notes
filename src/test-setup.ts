@@ -5,6 +5,15 @@ import { vi } from "vitest";
 // Setup any global test configurations here
 vi.mock("obsidian", () => {
     return {
+        Platform: {
+            isMobileApp: false,
+            isIosApp: false,
+            isAndroidApp: false,
+            isDesktopApp: true,
+            isMacOS: false,
+            isWin: false,
+            isLinux: true,
+        },
         TFile: class TFile {
             path: string;
             basename: string;
