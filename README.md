@@ -58,6 +58,18 @@ Supports any OpenAI-compatible embedding API.
 
 > **Note for CJK users**: For Chinese, Japanese, and Korean text, multilingual models like `bge-m3` (via Ollama) often outperform OpenAI models in both quality and token efficiency.
 
+#### Using OpenRouter
+
+[OpenRouter](https://openrouter.ai) offers embedding models from multiple vendors through one OpenAI-compatible API, often at very low cost (a whole vault typically indexes for well under a dollar). Configure it through the OpenAI provider:
+
+1. **Model provider**: OpenAI API
+2. **Server URL**: `https://openrouter.ai/api/v1`
+3. **API Key**: your OpenRouter key (`sk-or-...`)
+4. **Model**: Custom model..., then enter the model ID from OpenRouter (e.g. `perplexity/pplx-embed-v1-0.6b`, `qwen/qwen3-embedding-8b`, or `openai/text-embedding-3-small`)
+5. Use **Test connection** to verify before Load & Apply.
+
+> **Privacy note**: OpenRouter routes your note content to the model vendor, and each vendor has its own data retention policy. OpenRouter accounts have a Zero Data Retention (ZDR) option that restricts routing to providers who confirmed they do not store your data; requests that would hit a non-ZDR endpoint fail with an error instead of going through silently. If your vault contains sensitive material, enable it once at [openrouter.ai/settings/privacy](https://openrouter.ai/settings/privacy) (Data Policies, Zero Data Retention) before indexing. It applies account-wide, so no plugin configuration is needed. (Thanks to David Torrens for testing OpenRouter and researching the ZDR setting.)
+
 ### Ollama (Desktop Only)
 
 Supports any Ollama embedding model.
