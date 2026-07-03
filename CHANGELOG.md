@@ -2,13 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
-### Fixed
-
--   **"Copy environment info" now reports OpenAI and Gemini models correctly**: with the model provider set to OpenAI API or Google Gemini, the Debug & Support environment report still showed `Model: Built-in (...)` with the built-in model name, so bug reports misidentified the active model. The report now shows the actual provider and model (e.g. `OpenAI (perplexity/pplx-embed-v1-0.6b)`), and for OpenAI and Ollama providers adds a `Server URL` line so reports distinguish real OpenAI, OpenRouter, and local servers.
-
-## [1.6.0] - 2026-06-14
+## [1.6.0] - 2026-07-03
 
 ### Added
 
@@ -25,6 +19,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **"Copy environment info" now reports OpenAI and Gemini models correctly**: with the model provider set to OpenAI API or Google Gemini, the Debug & Support environment report still showed `Model: Built-in (...)` with the built-in model name, so bug reports misidentified the active model. The report now shows the actual provider and model (e.g. `OpenAI (perplexity/pplx-embed-v1-0.6b)`), and for OpenAI and Ollama providers adds a `Server URL` line so reports distinguish real OpenAI, OpenRouter, and local servers.
 -   **Built-in model no longer crashes when indexing large notes** (with GPU acceleration off): the on-device model could fail with a bare number (e.g. `8934496`) in the Errored files list, and once it hit one problem note the rest of the vault tended to fail too. The cause was embedding all of a note's chunks in a single pass; on a large note (e.g. a long config or README) that one pass exceeded the on-device engine's memory limit and aborted it. That limit is fixed and independent of how much RAM you have, so a powerful desktop was affected just like a small machine. Notes are now embedded in smaller batches, so a single large note can no longer exhaust the limit. Any crash that still occurs now shows a readable message instead of a bare number. After updating, retry the affected notes (Index settings → Retry errored, or Reindex).
 -   **Hiding the ribbon icon now sticks across restarts** (#50): if you hid the Similar Notes icon from the left ribbon (right-click → uncheck), it came back every time you reopened Obsidian. The icon was registered too late in startup to receive Obsidian's "hidden ribbon items" preference, so it always reappeared. It now registers early like core plugins, so a hidden icon stays hidden.
 -   **Clicking the ribbon icon during startup no longer opens an empty pane** (#50): registering the icon early (above) briefly made it clickable before the plugin finished loading, which could open a blank Similar Notes pane. It now shows a "still loading" notice until the view is ready.
