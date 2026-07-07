@@ -1,4 +1,35 @@
-// Mock minimal Obsidian types and interfaces needed for testing
+// Mock minimal Obsidian types and interfaces needed for testing.
+// This file is what `import ... from "obsidian"` resolves to in tests
+// (via the alias in vitest.config.ts) — the real obsidian package is
+// types-only ("main": ""). Add missing exports HERE. Individual test
+// files may still override with their own vi.mock("obsidian", factory).
+export const Platform = {
+    isMobileApp: false,
+    isIosApp: false,
+    isAndroidApp: false,
+    isDesktopApp: true,
+    isMacOS: false,
+    isWin: false,
+    isLinux: true,
+};
+
+export class PluginSettingTab {
+    app: unknown;
+    containerEl: HTMLElement;
+
+    constructor(app: unknown, _plugin: unknown) {
+        this.app = app;
+        this.containerEl = document.createElement("div");
+    }
+
+    display(): void {
+        // Mock implementation
+    }
+    hide(): void {
+        // Mock implementation
+    }
+}
+
 export class TFile {
     path: string;
     basename: string;

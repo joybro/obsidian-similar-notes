@@ -14,8 +14,6 @@ data.json
 # macOS
 .DS_Store
 
-# design
-design
 
 # claude code settings
 .claude/*
@@ -25,7 +23,6 @@ design
 scripts/install-local.sh
 
 # shared AI workspace (symlink)
-ai-workspace
 
 # superpowers artifacts (specs/plans) — local only
 .superpowers/

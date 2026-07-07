@@ -1,49 +1,8 @@
 import "@testing-library/jest-dom";
 import { TextEncoder } from "node:util";
-import { vi } from "vitest";
 
-// Setup any global test configurations here
-vi.mock("obsidian", () => {
-    return {
-        Platform: {
-            isMobileApp: false,
-            isIosApp: false,
-            isAndroidApp: false,
-            isDesktopApp: true,
-            isMacOS: false,
-            isWin: false,
-            isLinux: true,
-        },
-        TFile: class TFile {
-            path: string;
-            basename: string;
-            extension: string;
-
-            constructor(path: string) {
-                this.path = path;
-                const parts = path.split(".");
-                this.extension = parts.pop() || "";
-                this.basename = parts.join(".");
-            }
-        },
-        PluginSettingTab: class PluginSettingTab {
-            app: unknown;
-            containerEl: HTMLElement;
-
-            constructor(app: unknown, _plugin: unknown) {
-                this.app = app;
-                this.containerEl = document.createElement("div");
-            }
-
-            display(): void {
-                // Mock implementation
-            }
-            hide(): void {
-                // Mock implementation
-            }
-        },
-    };
-});
+// The "obsidian" module itself is mocked via the resolve alias in
+// vitest.config.ts pointing at src/__mocks__/obsidian.ts — see that file.
 
 // Add TextEncoder to the global scope
 global.TextEncoder = TextEncoder;

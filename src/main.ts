@@ -31,7 +31,7 @@ import { IndexedNoteMTimeStore } from "./infrastructure/IndexedNoteMTimeStore";
 import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { needsReindexForUpgrade } from "./lifecycle/versionUpgrade";
-import { NoteChangeQueue } from "./services/noteChangeQueue";
+import { NoteChangeQueue } from "./infrastructure/noteChangeQueue";
 
 const dbFileName = "similar-notes.json";
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Similar Notes is an Obsidian plugin that provides semantic note recommendations using machine learning embeddings. It uses Transformers.js to generate embeddings locally without external API calls, and Orama for vector search.
+Similar Notes is an Obsidian plugin that provides semantic note recommendations using machine learning embeddings. By default it uses Transformers.js to generate embeddings locally without external API calls; remote embedding providers (Ollama, OpenAI-compatible incl. OpenRouter, Gemini) are also supported. Orama is used for vector search.
 
 ## Common Development Commands
 
@@ -85,7 +85,7 @@ obsidian vault=Test_local command id=similar-notes:<command-id> # run the comman
 ## Testing Approach
 
 - Tests use Vitest with React Testing Library
-- Obsidian API is mocked by the `vi.mock("obsidian", ...)` factory in `src/test-setup.ts` (loaded via `setupFiles` in `vitest.config.ts`) — this factory is what tests actually get, so add missing exports (`Platform`, `TFile`, ...) THERE. The file `src/__mocks__/obsidian.ts` exists but is shadowed by the factory; editing it has no effect on tests
+- Obsidian API is mocked by `src/__mocks__/obsidian.ts`, which the `obsidian` import resolves to via the alias in `vitest.config.ts` (the real `obsidian` package is types-only). Add missing exports (`Platform`, `TFile`, ...) THERE. Individual test files may still override it with their own `vi.mock("obsidian", factory)`
 - Test files are colocated with source files in `__tests__` directories
 - Focus on testing domain logic and services, not UI components
 
