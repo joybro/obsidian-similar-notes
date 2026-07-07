@@ -4,7 +4,7 @@ import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
-import type { NoteChange, NoteChangeQueue } from "@/services/noteChangeQueue";
+import type { NoteChange, NoteChangeQueue } from "@/infrastructure/noteChangeQueue";
 import { showNoteErrorNotice } from "@/utils/errorHandling";
 import { computeIndexableTextHash } from "@/utils/indexableTextHash";
 import log from "loglevel";

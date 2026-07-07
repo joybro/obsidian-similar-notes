@@ -1,6 +1,6 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
 import { NoteIndexingService } from "../NoteIndexingService";
-import type { NoteChange } from "@/services/noteChangeQueue";
+import type { NoteChange } from "@/infrastructure/noteChangeQueue";
 import { computeIndexableTextHash } from "@/utils/indexableTextHash";
 
 // The user-facing failure Notice is a side-effect, not part of the routing

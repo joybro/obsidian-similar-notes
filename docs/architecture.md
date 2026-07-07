@@ -6,24 +6,29 @@ The codebase follows Domain-Driven Design (DDD) with clear separation of concern
 
 ```
 src/
-├── adapter/              # External system adapters
-│   ├── orama/           # Orama vector database integration
-│   └── worker/          # Web Worker implementations
+├── adapter/              # External system adapters (API clients)
+│   ├── gemini/          # Google Gemini embedding API client
+│   ├── huggingface/     # Hugging Face model info client
+│   ├── ollama/          # Ollama embedding API client
+│   ├── openai/          # OpenAI-compatible embedding API client (incl. OpenRouter)
+│   └── orama/           # Orama vector database integration (+ orama.worker.ts)
 ├── application/         # Application services and coordinators
 ├── commands/            # Command palette commands
-├── components/          # React UI components
+├── components/          # React UI components and settings sections
 ├── constants/           # Application constants
 ├── domain/              # Core domain logic
 │   ├── model/          # Domain models
 │   ├── repository/     # Repository interfaces
-│   └── service/        # Domain services
-├── infrastructure/      # Infrastructure implementations
-├── services/           # Legacy service layer (being refactored)
-├── utils/              # Utility functions
-└── main.ts             # Plugin entry point
+│   └── service/        # Domain services, embedding providers (+ transformers.worker.ts)
+├── editor/              # Editor integrations (drop handler)
+├── infrastructure/      # Infrastructure implementations (Obsidian/IndexedDB-coupled)
+├── lifecycle/           # Plugin version-upgrade handling
+├── utils/               # Utility functions
+├── __mocks__/           # obsidian module mock for tests (aliased in vitest.config.ts)
+└── main.ts              # Plugin entry point
 ```
 
-**Note on Architecture**: The current structure mixes DDD and Ports/Adapters patterns. This is not a strict requirement and is open to refactoring. Some inconsistencies exist (e.g., `adapter/orama` could be in `infrastructure`, `services/` is legacy code being phased out). Feel free to improve the structure when making changes.
+**Note on Architecture**: The current structure mixes DDD and Ports/Adapters patterns. This is not a strict requirement and is open to refactoring. Some inconsistencies exist (e.g., `adapter/orama` could be in `infrastructure`). Feel free to improve the structure when making changes.
 
 ## Core Domain Flow
 
@@ -36,7 +41,7 @@ src/
 ## Key Services and Their Responsibilities
 
 ### Domain Services
-- **EmbeddingService** (`domain/service/EmbeddingService.ts`): Manages ML model loading and text embedding generation. Uses Web Workers to avoid blocking the main thread.
+- **EmbeddingService** (`domain/service/EmbeddingService.ts`): Manages embedding generation behind the `EmbeddingProvider` abstraction. Providers: built-in Transformers.js (`TransformersEmbeddingProvider`, runs in a Web Worker), Ollama, OpenAI-compatible (incl. OpenRouter), and Gemini.
 - **NoteChunkingService** (`domain/service/NoteChunkingService.ts`): Splits notes into manageable chunks for embedding. Handles content exclusion based on RegExp patterns.
 - **SimilarNoteFinder** (`domain/service/SimilarNoteFinder.ts`): Orchestrates the process of finding similar notes using vector search.
 
@@ -53,11 +58,9 @@ src/
 
 ## Important Implementation Details
 
-1. **Web Workers**: Embedding generation runs in workers to prevent UI freezing. Worker code is in `src/adapter/worker/`.
+1. **Web Workers**: Built-in embedding generation and Orama search run in workers to prevent UI freezing. Worker code: `src/domain/service/transformers.worker.ts` (embedding) and `src/adapter/orama/orama.worker.ts` (vector DB). Workers are bundled separately (`node esbuild.config.mjs workers-only` — the `test` script runs this before vitest).
 
-2. **Model Loading**: ML models are downloaded from Hugging Face on first use. Two models available:
-   - Default: `Xenova/all-MiniLM-L6-v2` (English-optimized)
-   - Multilingual: `Xenova/paraphrase-multilingual-MiniLM-L12-v2`
+2. **Embedding providers**: The built-in provider downloads Transformers.js models from Hugging Face on first use (default `Xenova/all-MiniLM-L6-v2`, multilingual `Xenova/paraphrase-multilingual-MiniLM-L12-v2`). Remote providers — Ollama, OpenAI-compatible (incl. OpenRouter), Gemini — are configured in settings and implemented as `EmbeddingProvider`s (`domain/service/`) over API clients in `adapter/`.
 
 3. **Vector Database**: Orama is used for vector storage and search. Database is persisted and reloaded between sessions.
 
@@ -76,4 +79,4 @@ src/
 
 9. **Content Exclusion**: Supports RegExp patterns to exclude content from indexing (e.g., frontmatter, code blocks).
 
-10. **Command Palette**: Commands are implemented in `src/commands/` with a extensible structure for easy addition of new commands.
+10. **Command Palette**: Commands are implemented in `src/commands/` with an extensible structure for easy addition of new commands.
