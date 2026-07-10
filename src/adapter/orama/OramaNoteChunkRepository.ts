@@ -10,7 +10,10 @@ import InlineWorker from "./orama.worker";
 export class OramaNoteChunkRepository implements NoteChunkRepository {
     private workerManager: WorkerManager<OramaWorker>;
 
-    constructor(private readonly vault: Vault) {
+    constructor(
+        private readonly vault: Vault,
+        private readonly namespace?: string
+    ) {
         this.workerManager = new WorkerManager<OramaWorker>("OramaWorker");
     }
 
@@ -24,7 +27,8 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         await worker.init(
             vectorSize,
             vaultId,
-            loadExistingData
+            loadExistingData,
+            this.namespace
         );
     }
 

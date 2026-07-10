@@ -24,6 +24,9 @@ function makeSettings(
     return {
         modelProvider: "builtin",
         modelId: "test-model",
+        codeModeEnabled: false,
+        similarityMode: "notes",
+        codeIndexVersion: 1,
         includeFrontmatter: false,
         showSourceChunk: false,
         useGPU: false,
@@ -40,11 +43,20 @@ function makeSettings(
     };
 }
 
+function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((resolvePromise) => {
+        resolve = resolvePromise;
+    });
+    return { promise, resolve };
+}
+
 // eslint-disable-next-line max-lines-per-function
 describe("SimilarNoteCoordinator", () => {
     let vault: Vault;
     let noteRepository: NoteRepository;
     let similarNoteFinder: SimilarNoteFinder;
+    let codeSimilarNoteFinder: SimilarNoteFinder;
     let settingsService: SettingsService;
     let settings: SimilarNotesSettings;
 
@@ -71,11 +83,150 @@ describe("SimilarNoteCoordinator", () => {
         similarNoteFinder = {
             findSimilarNotes: vi.fn().mockResolvedValue([]),
         } as unknown as SimilarNoteFinder;
+        codeSimilarNoteFinder = {
+            findSimilarNotes: vi.fn().mockResolvedValue([]),
+        } as unknown as SimilarNoteFinder;
 
         settingsService = {
             get: vi.fn(() => settings),
             getNewSettingsObservable: vi.fn(() => settingsChange$),
         } as unknown as SettingsService;
+    });
+
+    describe("Code Mode routing", () => {
+        test("view queries the Code finder when Code Mode is selected", async () => {
+            settings = makeSettings({
+                codeModeEnabled: true,
+                similarityMode: "code",
+                codeModel: {
+                    modelProvider: "builtin",
+                    modelId: "code-model",
+                    useGPU: false,
+                },
+            });
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService,
+                codeSimilarNoteFinder
+            );
+
+            await coord.onFileOpen(makeFile("open.md"));
+
+            expect(codeSimilarNoteFinder.findSimilarNotes).toHaveBeenCalledOnce();
+            expect(similarNoteFinder.findSimilarNotes).not.toHaveBeenCalled();
+            expect(coord["noteBottomViewModel$"].value.searchMode).toBe("code");
+        });
+
+        test("public export-style lookup defaults to Notes mode", async () => {
+            settings = makeSettings({
+                codeModeEnabled: true,
+                similarityMode: "code",
+            });
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService,
+                codeSimilarNoteFinder
+            );
+
+            await coord.getSimilarNotes(makeFile("open.md"));
+
+            expect(similarNoteFinder.findSimilarNotes).toHaveBeenCalledOnce();
+            expect(codeSimilarNoteFinder.findSimilarNotes).not.toHaveBeenCalled();
+        });
+
+        test("Notes and Code results use separate cache entries", async () => {
+            settings = makeSettings({ codeModeEnabled: true });
+            const file = makeFile("open.md");
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService,
+                codeSimilarNoteFinder
+            );
+
+            await coord.getSimilarNotes(file, "notes");
+            await coord.getSimilarNotes(file, "code");
+            await coord.getSimilarNotes(file, "notes");
+            await coord.getSimilarNotes(file, "code");
+
+            expect(similarNoteFinder.findSimilarNotes).toHaveBeenCalledOnce();
+            expect(codeSimilarNoteFinder.findSimilarNotes).toHaveBeenCalledOnce();
+        });
+
+        test("a late Notes result cannot overwrite the selected Code mode", async () => {
+            settings = makeSettings({
+                codeModeEnabled: true,
+                similarityMode: "notes",
+            });
+            const file = makeFile("open.md");
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService,
+                codeSimilarNoteFinder
+            );
+            await coord.onFileOpen(file);
+
+            const notesResult = deferred<unknown[]>();
+            const codeResult = deferred<unknown[]>();
+            vi.mocked(similarNoteFinder.findSimilarNotes).mockReturnValue(
+                notesResult.promise as never
+            );
+            vi.mocked(codeSimilarNoteFinder.findSimilarNotes).mockReturnValue(
+                codeResult.promise as never
+            );
+            coord["cache"].clear();
+            const oldNotesRequest = coord.emitNoteBottomViewModel(file);
+            await vi.waitFor(() =>
+                expect(similarNoteFinder.findSimilarNotes).toHaveBeenCalledTimes(2)
+            );
+
+            settings = { ...settings, similarityMode: "code" };
+            settingsChange$.next({ similarityMode: "code" });
+            await vi.waitFor(() =>
+                expect(
+                    codeSimilarNoteFinder.findSimilarNotes
+                ).toHaveBeenCalledOnce()
+            );
+            codeResult.resolve([
+                {
+                    path: "code.md",
+                    title: "Code result",
+                    similarity: 0.9,
+                    similarChunk: "code",
+                    sourceChunk: "source",
+                    isLinked: false,
+                },
+            ]);
+            await vi.waitFor(() =>
+                expect(coord["noteBottomViewModel$"].value.searchMode).toBe(
+                    "code"
+                )
+            );
+
+            notesResult.resolve([
+                {
+                    path: "notes.md",
+                    title: "Late Notes result",
+                    similarity: 0.8,
+                    similarChunk: "notes",
+                    sourceChunk: "source",
+                    isLinked: false,
+                },
+            ]);
+            await oldNotesRequest;
+
+            expect(coord["noteBottomViewModel$"].value.searchMode).toBe("code");
+            expect(
+                coord["noteBottomViewModel$"].value.similarNoteEntries[0]?.title
+            ).toBe("Code result");
+        });
     });
 
     describe("#39.1: sidebar should not show stale results when the active note is closed", () => {

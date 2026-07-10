@@ -1,9 +1,9 @@
-import type { SimilarNotesSettings } from "@/application/SettingsService";
+import type { EmbeddingModelSettings } from "@/application/SettingsService";
 import type { ButtonComponent, Setting } from "obsidian";
 import type { SettingBuilder } from "./OpenAISettingsSection";
 
 export interface BuiltinModelSettingsSectionProps {
-    settings: SimilarNotesSettings;
+    settings: EmbeddingModelSettings;
     tempModelId: string | undefined;
     tempUseGPU: boolean | undefined;
     onModelIdChange: (value: string) => void;

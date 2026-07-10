@@ -2,18 +2,14 @@ import log from "loglevel";
 import { Notice, Plugin } from "obsidian";
 import { OramaNoteChunkRepository } from "./adapter/orama/OramaNoteChunkRepository";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
+import { CodeModeRuntime, type CodeModeStatus } from "./application/CodeModeRuntime";
 import { NoteIndexingService } from "./application/NoteIndexingService";
-import { SettingsService } from "./application/SettingsService";
-import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
-import type { Command } from "./commands";
 import {
-    ExportActiveNoteSimilarNotesCommand,
-    ReindexAllNotesCommand,
-    RetryErroredNotesCommand,
-    SemanticSearchCommand,
-    ShowSimilarNotesCommand,
-    ToggleInDocumentViewCommand,
-} from "./commands";
+    SettingsService,
+    type EmbeddingModelSettings,
+} from "./application/SettingsService";
+import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
+import { createPluginCommands, type Command } from "./commands";
 import { SemanticLinkSuggest } from "./components/SemanticLinkSuggest";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesSidebarView } from "./components/SimilarNotesSidebarView";
@@ -27,9 +23,15 @@ import type { NoteChunkingService } from "./domain/service/NoteChunkingService";
 import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
 import { TextSearchService } from "./domain/service/TextSearchService";
 import { ErroredNoteStore } from "./infrastructure/ErroredNoteStore";
+import { CodeAwareNoteChunkingService } from "./infrastructure/CodeAwareNoteChunkingService";
+import { FencedCodeBlockExtractor } from "./infrastructure/FencedCodeBlockExtractor";
 import { IndexedNoteMTimeStore } from "./infrastructure/IndexedNoteMTimeStore";
 import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
+import {
+    ensurePluginDataDir,
+    migrateDataFile,
+} from "./infrastructure/pluginDataFiles";
 import { needsReindexForUpgrade } from "./lifecycle/versionUpgrade";
 import { NoteChangeQueue } from "./services/noteChangeQueue";
 
@@ -49,6 +51,8 @@ export default class MainPlugin extends Plugin {
     private noteIndexingService: NoteIndexingService;
     private indexedNotesMTimeStore: IndexedNoteMTimeStore;
     private erroredNoteStore: ErroredNoteStore;
+    private readonly fencedCodeBlockExtractor = new FencedCodeBlockExtractor();
+    private codeModeRuntime!: CodeModeRuntime;
     private statusBarView: StatusBarView;
     private settingTab: SimilarNotesSettingTab;
     private commands: Command[] = [];
@@ -93,40 +97,6 @@ export default class MainPlugin extends Plugin {
 
         // Defer all other initialization to onLayoutReady
         this.app.workspace.onLayoutReady(() => this.initializeServices(needsReindex));
-    }
-
-    private async getPluginDataDir(): Promise<string> {
-        const pluginDataDir = `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
-
-        // Ensure the plugin directory exists
-        if (!(await this.app.vault.adapter.exists(pluginDataDir))) {
-            await this.app.vault.adapter.mkdir(pluginDataDir);
-        }
-
-        return pluginDataDir;
-    }
-
-    private async migrateDataFiles(
-        oldPath: string,
-        newPath: string
-    ): Promise<void> {
-        try {
-            if (
-                (await this.app.vault.adapter.exists(oldPath)) &&
-                !(await this.app.vault.adapter.exists(newPath))
-            ) {
-                log.info(`Migrating file from ${oldPath} to ${newPath}`);
-                const data = await this.app.vault.adapter.read(oldPath);
-                await this.app.vault.adapter.write(newPath, data);
-                await this.app.vault.adapter.remove(oldPath);
-                log.info(`Successfully migrated file to plugin folder`);
-            }
-        } catch (error) {
-            log.error(
-                `Failed to migrate file from ${oldPath} to ${newPath}:`,
-                error
-            );
-        }
     }
 
     private registerEvents() {
@@ -175,8 +145,13 @@ export default class MainPlugin extends Plugin {
         await this.erroredNoteStore.init(vaultId);
 
         // Initialize dependent services
-        this.noteChunkingService = new LangchainNoteChunkingService(
+        const markdownChunkingService = new LangchainNoteChunkingService(
             this.modelService
+        );
+        this.noteChunkingService = new CodeAwareNoteChunkingService(
+            markdownChunkingService,
+            this.fencedCodeBlockExtractor,
+            this.settingsService
         );
 
         this.similarNoteFinder = new SimilarNoteFinder(
@@ -196,6 +171,16 @@ export default class MainPlugin extends Plugin {
             this.similarNoteFinder,
             this.settingsService
         );
+        this.codeModeRuntime = new CodeModeRuntime({
+            app: this.app,
+            settingsService: this.settingsService,
+            noteRepository: this.noteRepository,
+            notesModelService: this.modelService,
+            similarNoteCoordinator: this.similarNoteCoordinator,
+            extractor: this.fencedCodeBlockExtractor,
+            rebuildNotesForModeToggle: () =>
+                this.rebuildNotesForCodeModeToggle(),
+        });
 
         this.leafViewCoordinator = new LeafViewCoordinator(
             this.app,
@@ -237,7 +222,7 @@ export default class MainPlugin extends Plugin {
             noteChunkRepository: this.noteChunkRepository,
             modelService: this.modelService,
             onRetry: () => {
-                this.init(this.settingsService.get().modelId, true, false);
+                void this.retryErroredNotes();
             },
             onOpenSettings: () => {
                 // @ts-expect-error - Obsidian's setting API
@@ -253,7 +238,10 @@ export default class MainPlugin extends Plugin {
             (leaf) =>
                 new SimilarNotesSidebarView(
                     leaf,
-                    this.similarNoteCoordinator.getNoteBottomViewModelObservable()
+                    this.similarNoteCoordinator.getNoteBottomViewModelObservable(),
+                    (mode) => {
+                        void this.similarNoteCoordinator.setSearchMode(mode);
+                    }
                 )
         );
         this.sidebarViewRegistered = true;
@@ -265,7 +253,10 @@ export default class MainPlugin extends Plugin {
         this.registerEditorSuggest(
             new SemanticLinkSuggest(
                 this.app,
-                this.textSearchService,
+                this.similarNoteCoordinator.coordinateTextSearch(
+                    "notes",
+                    this.textSearchService
+                ),
                 this.settingsService
             )
         );
@@ -276,24 +267,25 @@ export default class MainPlugin extends Plugin {
         // Complete initialization
         // If needsReindex is true, trigger a reindex to migrate from JSON to IndexedDB
         await this.init(this.settingsService.get().modelId, true, needsReindex);
+        if (this.settingsService.get().codeModeEnabled) {
+            await this.codeModeRuntime.initialize(!needsReindex);
+        }
     }
 
     private registerCommands() {
-        // Initialize commands
-        this.commands = [
-            new ShowSimilarNotesCommand(this),
-            new ToggleInDocumentViewCommand(this.settingsService),
-            new ReindexAllNotesCommand(this),
-            new RetryErroredNotesCommand(this),
-            new SemanticSearchCommand(
-                this.app,
-                this.textSearchService,
-                this.settingsService
+        this.commands = createPluginCommands({
+            plugin: this,
+            app: this.app,
+            settingsService: this.settingsService,
+            similarNoteCoordinator: this.similarNoteCoordinator,
+            notesTextSearch: this.similarNoteCoordinator.coordinateTextSearch(
+                "notes",
+                this.textSearchService
             ),
-            new ExportActiveNoteSimilarNotesCommand(this.app, this.similarNoteCoordinator, this.manifest.id),
-        ];
+            getCodeTextSearch: () => this.codeModeRuntime.getSearchService(),
+            manifestId: this.manifest.id,
+        });
 
-        // Register each command
         this.commands.forEach((command) => {
             command.register(this);
         });
@@ -332,23 +324,26 @@ export default class MainPlugin extends Plugin {
         this.app.workspace.detachLeavesOfType(VIEW_TYPE_SIMILAR_NOTES_SIDEBAR);
 
         this.statusBarView.dispose();
-        this.noteIndexingService.stopLoop();
-        this.leafViewCoordinator.onUnload();
+        await this.similarNoteCoordinator.closeSearchMode(
+            "notes",
+            async () => {
+                this.noteIndexingService.stopLoop();
+                await this.noteIndexingService.waitUntilIdle();
+                this.leafViewCoordinator.onUnload();
+                await this.codeModeRuntime?.dispose(false);
 
-        // Explicitly dispose Orama worker
-        if (this.noteChunkRepository) {
-            // Call our new dispose method on the repository
-            log.info("Disposing note chunk repository worker");
-            await this.noteChunkRepository.dispose();
-        }
+                if (this.noteChunkRepository) {
+                    log.info("Disposing note chunk repository worker");
+                    await this.noteChunkRepository.dispose();
+                }
 
-        this.noteChangeQueue.cleanup();
-
-        // Dispose of model service - do this last as it's the most memory intensive
-        if (this.modelService) {
-            log.info("Disposing model service");
-            this.modelService.dispose();
-        }
+                this.noteChangeQueue.cleanup();
+                if (this.modelService) {
+                    log.info("Disposing model service");
+                    await this.modelService.disposeWhenIdle();
+                }
+            }
+        );
 
         log.info("Similar Notes plugin unloaded");
     }
@@ -364,14 +359,19 @@ export default class MainPlugin extends Plugin {
         if (this.noteChunkRepository?.setLogLevel) {
             this.noteChunkRepository.setLogLevel(level);
         }
+        this.codeModeRuntime?.setLogLevel(level);
     }
 
-    async init(
-        modelId: string,
-        firstTime: boolean,
-        newModel: boolean
-    ): Promise<void> {
+    async init(modelId: string, firstTime: boolean, newModel: boolean): Promise<void> {
+        await this.similarNoteCoordinator.runSearchTransition(
+            "notes",
+            async () => this.initUnlocked(modelId, firstTime, newModel)
+        );
+    }
+
+    private async initUnlocked(modelId: string, firstTime: boolean, newModel: boolean): Promise<void> {
         this.noteIndexingService.stopLoop();
+        await this.noteIndexingService.waitUntilIdle();
 
         try {
             if (firstTime || newModel) {
@@ -379,7 +379,7 @@ export default class MainPlugin extends Plugin {
                 const settings = this.settingsService.get();
 
                 // Switch to appropriate provider based on settings
-                await this.modelService.switchProvider(settings);
+                await this.codeModeRuntime.switchNotesModel(settings);
                 log.info(
                     "Model service initialized successfully with provider:",
                     settings.modelProvider,
@@ -389,15 +389,21 @@ export default class MainPlugin extends Plugin {
                         : settings.ollamaModel
                 );
 
-                this.noteChunkingService.init();
+                await this.noteChunkingService.init();
             }
         } catch (error) {
             log.error("Failed to initialize model service:", error);
-            return;
+            if (!firstTime) {
+                this.noteIndexingService.startLoop();
+            }
+            throw error;
         }
 
         const vectorSize = this.modelService.getVectorSize();
-        const pluginDataDir = await this.getPluginDataDir();
+        const pluginDataDir = await ensurePluginDataDir(
+            this.app.vault,
+            this.manifest.id
+        );
         const dbPath = `${pluginDataDir}/${dbFileName}`;
 
         // Get vault ID for IndexedDB isolation
@@ -406,7 +412,7 @@ export default class MainPlugin extends Plugin {
 
         // Migrate existing database from old location to new location
         const oldDbPath = `${this.app.vault.configDir}/${dbFileName}`;
-        await this.migrateDataFiles(oldDbPath, dbPath);
+        await migrateDataFile(this.app.vault, oldDbPath, dbPath);
 
         if (firstTime) {
             await this.noteChunkRepository.init(
@@ -420,7 +426,7 @@ export default class MainPlugin extends Plugin {
                 vaultId,
                 false // loadExistingData - reindex from scratch
             );
-            this.noteChangeQueue.enqueueAllNotes();
+            await this.noteChangeQueue.enqueueAllNotes();
         }
 
         // Pass NoteChunkRepository to the settings tab after it's initialized
@@ -432,7 +438,10 @@ export default class MainPlugin extends Plugin {
 
     // Re-queue all terminally-errored notes for another attempt
     async retryErroredNotes(): Promise<void> {
-        await this.noteChangeQueue.retryErrored();
+        await Promise.all([
+            this.noteChangeQueue.retryErrored(),
+            this.codeModeRuntime?.retryErrored() ?? Promise.resolve(),
+        ]);
     }
 
     // Handle reindexing of notes
@@ -441,14 +450,16 @@ export default class MainPlugin extends Plugin {
         await this.indexedNotesMTimeStore.clear();
         await this.erroredNoteStore.clear();
         await this.init(this.settingsService.get().modelId, false, false);
+        if (this.settingsService.get().codeModeEnabled) {
+            await this.codeModeRuntime?.reindex();
+        }
     }
 
     // Apply current exclusion patterns to synchronize index with current patterns
-    async applyExclusionPatterns(): Promise<{
-        removed: number;
-        added: number;
-    }> {
-        return await this.noteChangeQueue.applyExclusionPatterns();
+    async applyExclusionPatterns(): Promise<{ removed: number; added: number }> {
+        const notesResult = await this.noteChangeQueue.applyExclusionPatterns();
+        await this.codeModeRuntime?.applyExclusionPatterns();
+        return notesResult;
     }
 
     // Preview how many files would be changed by current patterns
@@ -472,13 +483,14 @@ export default class MainPlugin extends Plugin {
     async reloadModel(): Promise<void> {
         // Stop the indexing service to prevent any operations during model reload
         this.noteIndexingService.stopLoop();
+        await this.noteIndexingService.waitUntilIdle();
 
         // Get current settings
         const settings = this.settingsService.get();
 
         try {
             // Reload the model with current settings
-            await this.modelService.switchProvider(settings);
+            await this.codeModeRuntime.switchNotesModel(settings);
         } catch (error) {
             log.error("Failed to reload model:", error);
             // Error state is handled by modelError$ observable in StatusBarView
@@ -487,5 +499,27 @@ export default class MainPlugin extends Plugin {
             // This ensures the service doesn't remain stopped
             this.noteIndexingService.startLoop();
         }
+    }
+
+    async applyCodeModeChanges(enabled: boolean, codeModel: EmbeddingModelSettings): Promise<void> {
+        if (!this.codeModeRuntime) {
+            throw new Error("Similar Notes is still loading");
+        }
+        await this.codeModeRuntime.applyChanges(enabled, codeModel);
+    }
+
+    async getCodeModeStatus(): Promise<CodeModeStatus> {
+        if (!this.codeModeRuntime) {
+            return { indexedNotes: 0, chunks: 0, erroredNotes: 0 };
+        }
+        return await this.codeModeRuntime.getStatus();
+    }
+
+    private async rebuildNotesForCodeModeToggle(): Promise<void> {
+        await Promise.all([
+            this.indexedNotesMTimeStore.clear(),
+            this.erroredNoteStore.clear(),
+        ]);
+        await this.initUnlocked(this.settingsService.get().modelId, false, false);
     }
 }

@@ -4,6 +4,7 @@ import type { WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
 import { createRoot, Root } from "react-dom/client";
 import type { Observable } from "rxjs";
+import type { SearchMode } from "@/domain/model/SearchMode";
 import NoteBottomViewReact, {
     type NoteBottomViewModel,
 } from "./NoteBottomViewReact";
@@ -14,7 +15,8 @@ export class SimilarNotesSidebarView extends ItemView {
 
     constructor(
         leaf: WorkspaceLeaf,
-        bottomViewModelSubject$: Observable<NoteBottomViewModel>
+        bottomViewModelSubject$: Observable<NoteBottomViewModel>,
+        private onSearchModeChange?: (mode: SearchMode) => void
     ) {
         super(leaf);
         this.bottomViewModelSubject$ = bottomViewModelSubject$;
@@ -49,6 +51,7 @@ export class SimilarNotesSidebarView extends ItemView {
                 leaf={mockLeaf}
                 bottomViewModelSubject$={this.bottomViewModelSubject$}
                 viewType="sidebar"
+                onSearchModeChange={this.onSearchModeChange}
             />
         );
     }

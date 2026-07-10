@@ -32,9 +32,10 @@ export class IndexedDBMTimeStorage {
      * Initialize the IndexedDB database
      * @param vaultId - Unique identifier for the vault (app.appId)
      */
-    async init(vaultId: string): Promise<void> {
+    async init(vaultId: string, namespace = "notes"): Promise<void> {
         // Use Obsidian's naming pattern: {vaultId}-{purpose}
-        this.dbName = `${vaultId}-similar-notes-mtimes`;
+        const namespaceSuffix = namespace === "notes" ? "" : `-${namespace}`;
+        this.dbName = `${vaultId}-similar-notes${namespaceSuffix}-mtimes`;
         log.info(`Initializing IndexedDB for mtimes: ${this.dbName}`);
 
         return new Promise((resolve, reject) => {

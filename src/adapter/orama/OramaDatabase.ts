@@ -42,7 +42,8 @@ export class OramaWorker {
     async init(
         vectorSize: number,
         vaultId: string,
-        loadExistingData: boolean
+        loadExistingData: boolean,
+        namespace?: string
     ): Promise<void> {
         this.vectorSize = vectorSize;
         this.db = null;
@@ -60,7 +61,7 @@ export class OramaWorker {
         try {
             // Initialize IndexedDB storage with vault-specific ID
             this.storage = new IndexedDBChunkStorage();
-            await this.storage.init(vaultId);
+            await this.storage.init(vaultId, namespace);
 
             if (!loadExistingData) {
                 // Reindex scenario: clear IndexedDB to start fresh

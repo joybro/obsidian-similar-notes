@@ -6,6 +6,7 @@ import { SimilarNote } from "../model/SimilarNote";
 import type { NoteChunkRepository } from "../repository/NoteChunkRepository";
 import type { EmbeddingService } from "./EmbeddingService";
 import type { NoteChunkingService } from "./NoteChunkingService";
+import { getChunkEmbeddingText } from "./chunkEmbeddingText";
 
 export class SimilarNoteFinder {
     constructor(
@@ -35,12 +36,10 @@ export class SimilarNoteFinder {
             try {
                 noteChunks = await Promise.all(
                     splitted.map(async (chunk) => {
-                        // Include title in first chunk to make it searchable
-                        const textToEmbed = chunk.chunkIndex === 0
-                            ? `${chunk.title}\n\n${chunk.content}`
-                            : chunk.content;
                         return chunk.withEmbedding(
-                            await this.modelService.embedText(textToEmbed)
+                            await this.modelService.embedText(
+                                getChunkEmbeddingText(chunk)
+                            )
                         );
                     })
                 );

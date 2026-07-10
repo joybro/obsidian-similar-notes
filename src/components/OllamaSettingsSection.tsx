@@ -1,11 +1,11 @@
 import { OllamaClient, type OllamaModelWithEmbeddingInfo } from "@/adapter/ollama";
-import type { SimilarNotesSettings } from "@/application/SettingsService";
+import type { EmbeddingModelSettings } from "@/application/SettingsService";
 import { Notice } from "obsidian";
 import type { DropdownComponent } from "obsidian";
 import type { SettingBuilder } from "./OpenAISettingsSection";
 
 interface OllamaSettingsSectionProps {
-    settings: SimilarNotesSettings;
+    settings: EmbeddingModelSettings;
     tempOllamaUrl: string | undefined;
     tempOllamaModel: string | undefined;
     onOllamaUrlChange: (value: string) => void;

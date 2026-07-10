@@ -157,6 +157,48 @@ describe("EmbeddingModelService", () => {
             expect(results[1]).toBe(5); // Math.ceil(18 / 4) = 5
             expect(results[2]).toBe(7); // Math.ceil(27 / 4) = 7
         });
+
+        it("drains old operations and blocks new ones during a provider switch", async () => {
+            let resolveEmbedding!: (embedding: number[]) => void;
+            const pendingEmbedding = new Promise<number[]>((resolve) => {
+                resolveEmbedding = resolve;
+            });
+            const oldProvider = {
+                supportsParallelProcessing: vi.fn(() => true),
+                embedText: vi.fn(() => pendingEmbedding),
+                embedTexts: vi.fn(),
+                isModelLoaded: vi.fn(() => false),
+                dispose: vi.fn(),
+            };
+            service.dispose();
+            Object.assign(service as object, {
+                provider: oldProvider,
+                currentProviderType: "ollama",
+            });
+
+            const active = service.embedText("active");
+            await vi.waitFor(() =>
+                expect(oldProvider.embedText).toHaveBeenCalledOnce()
+            );
+            const switching = service.switchProvider({
+                modelProvider: "builtin",
+                modelId: "new-model",
+                useGPU: false,
+            } as SimilarNotesSettings);
+            const later = service.embedTexts(["later"]);
+
+            await Promise.resolve();
+            expect(oldProvider.dispose).not.toHaveBeenCalled();
+            expect(oldProvider.embedText).toHaveBeenCalledOnce();
+
+            resolveEmbedding([1]);
+            await expect(active).resolves.toEqual([1]);
+            await switching;
+            expect(oldProvider.dispose).toHaveBeenCalledOnce();
+            await expect(later).resolves.toHaveLength(1);
+            expect(oldProvider.embedText).toHaveBeenCalledOnce();
+            expect(oldProvider.embedTexts).not.toHaveBeenCalled();
+        });
     });
 
     describe("unloadModel", () => {

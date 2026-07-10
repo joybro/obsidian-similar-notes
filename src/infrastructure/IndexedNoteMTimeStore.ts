@@ -8,7 +8,7 @@ export class IndexedNoteMTimeStore {
     private storage: IndexedDBMTimeStorage;
     private vaultId = "";
 
-    constructor() {
+    constructor(private readonly namespace = "notes") {
         this.storage = new IndexedDBMTimeStorage();
     }
 
@@ -20,7 +20,7 @@ export class IndexedNoteMTimeStore {
         this.vaultId = vaultId;
 
         // Initialize IndexedDB storage
-        await this.storage.init(vaultId);
+        await this.storage.init(vaultId, this.namespace);
 
         // Load all mtimes from IndexedDB to memory cache
         this.mtimes = await this.storage.getAll();
@@ -88,6 +88,10 @@ export class IndexedNoteMTimeStore {
      */
     getCurrentIndexedNoteCount(): number {
         return this.indexedNoteCount$.getValue();
+    }
+
+    close(): void {
+        this.storage.close();
     }
 
     /**

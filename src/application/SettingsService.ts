@@ -9,6 +9,29 @@ export interface CachedModelInfo {
     quantizationLevel?: string;   // Quantization level (for Ollama)
 }
 
+export type ModelProvider = "builtin" | "ollama" | "openai" | "gemini";
+export const CURRENT_CODE_INDEX_VERSION = 1;
+
+/**
+ * Complete configuration for one embedding model. SimilarNotesSettings keeps
+ * the existing note model fields at the top level for backwards compatibility,
+ * while optional secondary models can use this nested shape.
+ */
+export interface EmbeddingModelSettings {
+    modelProvider: ModelProvider;
+    modelId: string;
+    ollamaUrl?: string;
+    ollamaModel?: string;
+    openaiUrl?: string;
+    openaiApiKey?: string;
+    openaiModel?: string;
+    openaiMaxTokens?: number;
+    geminiApiKey?: string;
+    geminiModel?: string;
+    useGPU: boolean;
+    cachedModelInfo?: CachedModelInfo;
+}
+
 export interface DailyUsage {
     tokens: number;
     requestCount: number;
@@ -25,22 +48,16 @@ export interface UsageStats {
     total: TotalUsage;
 }
 
-export interface SimilarNotesSettings {
-    modelProvider: "builtin" | "ollama" | "openai" | "gemini"; // Model provider type
-    modelId: string; // The model ID to use for embeddings
-    ollamaUrl?: string; // Ollama server URL
-    ollamaModel?: string; // Ollama model name
-    openaiUrl?: string; // OpenAI-compatible server URL (default: https://api.openai.com/v1)
-    openaiApiKey?: string; // OpenAI API key
-    openaiModel?: string; // OpenAI model name (default: text-embedding-3-small)
-    openaiMaxTokens?: number; // Max tokens for custom OpenAI-compatible models (default: 8191)
+export interface SimilarNotesSettings extends EmbeddingModelSettings {
     openaiPricePerMillionTokens?: number; // Price per million tokens for cost estimation
-    geminiApiKey?: string; // Google Gemini API key
-    geminiModel?: string; // Gemini model name (default: text-embedding-004)
     usageStats?: UsageStats; // API usage statistics
+    codeModeEnabled: boolean; // Whether fenced code blocks are indexed separately
+    codeModel?: EmbeddingModelSettings; // Independent embedding model for code blocks
+    similarityMode: "notes" | "code"; // Active index for similar-note views
+    codeIndexVersion: number; // Extraction/chunking schema used by persisted code vectors
+    codeIndexFingerprint?: string; // Persisted Code vector schema/model identity
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
     showSourceChunk: boolean; // Whether to show the original chunk in the results
-    useGPU: boolean; // Whether to use GPU acceleration for model inference
     excludeFolderPatterns: string[]; // Glob patterns to exclude folders/files from indexing
     excludeRegexPatterns: string[]; // Regular expressions to exclude content from indexing
     regexpTestInputText: string; // Saved test input for RegExp testing
@@ -50,17 +67,62 @@ export interface SimilarNotesSettings {
     bottomResultCount: number; // Number of similar notes to show at bottom of notes
     minSimilarityThreshold: number; // Hide results below this cosine similarity (0..1, 0 = no filtering)
     lastPluginVersion?: string; // Last version of the plugin that was run
-    cachedModelInfo?: CachedModelInfo; // Cached model information
     indexingDelaySeconds: number; // Wait time after file changes before indexing
     semanticLinkTrigger: string; // Editor prefix that opens semantic link suggestions ([[? alternative). Empty = disabled.
 }
 
-const DEFAULT_SETTINGS: SimilarNotesSettings = {
-    modelProvider: "builtin", // Default to built-in models
+export const DEFAULT_EMBEDDING_MODEL_SETTINGS: Readonly<EmbeddingModelSettings> = {
+    modelProvider: "builtin",
     modelId: "sentence-transformers/all-MiniLM-L6-v2",
+    useGPU: true,
+};
+
+/** Create a detached model profile from the legacy top-level note settings. */
+export function snapshotNoteModelSettings(
+    settings: SimilarNotesSettings
+): EmbeddingModelSettings {
+    return {
+        modelProvider: settings.modelProvider,
+        modelId: settings.modelId,
+        ollamaUrl: settings.ollamaUrl,
+        ollamaModel: settings.ollamaModel,
+        openaiUrl: settings.openaiUrl,
+        openaiApiKey: settings.openaiApiKey,
+        openaiModel: settings.openaiModel,
+        openaiMaxTokens: settings.openaiMaxTokens,
+        geminiApiKey: settings.geminiApiKey,
+        geminiModel: settings.geminiModel,
+        useGPU: settings.useGPU,
+        cachedModelInfo: settings.cachedModelInfo
+            ? { ...settings.cachedModelInfo }
+            : undefined,
+    };
+}
+
+/**
+ * Fill fields omitted from a persisted nested profile without mutating either
+ * the profile or its fallback.
+ */
+export function normalizeEmbeddingModelSettings(
+    settings: Partial<EmbeddingModelSettings>,
+    fallback: Readonly<EmbeddingModelSettings> = DEFAULT_EMBEDDING_MODEL_SETTINGS
+): EmbeddingModelSettings {
+    const normalized = { ...fallback, ...settings };
+    return {
+        ...normalized,
+        cachedModelInfo: normalized.cachedModelInfo
+            ? { ...normalized.cachedModelInfo }
+            : undefined,
+    };
+}
+
+const DEFAULT_SETTINGS: SimilarNotesSettings = {
+    ...DEFAULT_EMBEDDING_MODEL_SETTINGS,
+    codeModeEnabled: false,
+    similarityMode: "notes",
+    codeIndexVersion: CURRENT_CODE_INDEX_VERSION,
     includeFrontmatter: false,
     showSourceChunk: false,
-    useGPU: true, // Use GPU acceleration by default
     // Excalidraw/ holds drawings stored as base64-compressed JSON — binary data
     // that can't be embedded and isn't meaningful to index (#46). Only applies to
     // new installs; existing users' saved patterns are untouched by the merge.
@@ -85,8 +147,19 @@ export class SettingsService {
     constructor(private plugin: Plugin) {}
 
     async load(): Promise<void> {
-        const data = await this.plugin.loadData();
-        this.settings = { ...DEFAULT_SETTINGS, ...data };
+        const data = (await this.plugin.loadData()) as
+            | (Partial<Omit<SimilarNotesSettings, "codeModel">> & {
+                  codeModel?: Partial<EmbeddingModelSettings>;
+              })
+            | null
+            | undefined;
+        this.settings = {
+            ...DEFAULT_SETTINGS,
+            ...data,
+            codeModel: data?.codeModel
+                ? normalizeEmbeddingModelSettings(data.codeModel)
+                : undefined,
+        };
 
         // For new mobile installations, default to OpenAI provider
         // Built-in models can cause crashes on mobile devices

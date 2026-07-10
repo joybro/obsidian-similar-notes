@@ -71,10 +71,82 @@ function makeService() {
         queue,
         erroredStore,
         noteRepository,
+        noteChunkRepository,
         noteChunkingService,
         embeddingService,
     };
 }
+
+describe("NoteIndexingService lifecycle draining", () => {
+    test("waitUntilIdle includes an iteration paused in queue polling", async () => {
+        let resolvePoll!: (changes: NoteChange[]) => void;
+        const pollResult = new Promise<NoteChange[]>((resolve) => {
+            resolvePoll = resolve;
+        });
+        const noteChangeQueue = {
+            getFileChangeCount: vi.fn(() => 0),
+            pollFileChanges: vi.fn(() => pollResult),
+        };
+        const service = new NoteIndexingService(
+            {} as never,
+            {} as never,
+            noteChangeQueue as never,
+            {} as never,
+            { supportsParallelProcessing: vi.fn(() => false) } as never,
+            undefined,
+            {} as never,
+            {} as never,
+            {} as never
+        );
+
+        service.startLoop();
+        await vi.waitFor(() =>
+            expect(noteChangeQueue.pollFileChanges).toHaveBeenCalledOnce()
+        );
+        service.stopLoop();
+        let drained = false;
+        const drain = service.waitUntilIdle().then(() => {
+            drained = true;
+        });
+
+        await Promise.resolve();
+        expect(drained).toBe(false);
+        resolvePoll([]);
+        await drain;
+        expect(drained).toBe(true);
+    });
+});
+
+describe("NoteIndexingService empty Code corpus cleanup", () => {
+    test("removes stale chunks without embedding when splitting returns no chunks", async () => {
+        const {
+            service,
+            queue,
+            noteRepository,
+            noteChunkRepository,
+            noteChunkingService,
+            embeddingService,
+        } = makeService();
+        const change: NoteChange = {
+            path: "note.md",
+            reason: "modified",
+            mtime: 1234,
+        };
+        noteRepository.findByPath.mockResolvedValue({
+            path: "note.md",
+            content: "prose without fenced code",
+        });
+        noteChunkingService.split.mockResolvedValue([]);
+
+        await (service as unknown as ChangeProcessor).processChange(change);
+
+        expect(noteChunkRepository.removeByPath).toHaveBeenCalledWith(
+            "note.md"
+        );
+        expect(embeddingService.embedTexts).not.toHaveBeenCalled();
+        expect(queue.markNoteChangeProcessed).toHaveBeenCalledWith(change);
+    });
+});
 
 describe("NoteIndexingService retry/errored transition (indexing-status spec §3)", () => {
     let change: NoteChange;

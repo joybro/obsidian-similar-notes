@@ -1,4 +1,8 @@
-import type { SimilarNotesSettings, SettingsService } from "@/application/SettingsService";
+import type {
+    EmbeddingModelSettings,
+    SettingsService,
+} from "@/application/SettingsService";
+import { AsyncOperationGate } from "@/utils/AsyncOperationGate";
 import log from "loglevel";
 import { Subject, type Observable, type Subscription } from "rxjs";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
@@ -23,7 +27,10 @@ export class EmbeddingService {
     private provider: EmbeddingProvider | null = null;
     private currentProviderType: "builtin" | "ollama" | "openai" | "gemini" | null = null;
 
-    constructor(private settingsService?: SettingsService) {}
+    constructor(
+        private settingsService?: SettingsService,
+        private onDisableGPU?: () => Promise<void>
+    ) {}
 
     // Proxy subjects that relay provider's observables
     private modelBusy$ = new Subject<boolean>();
@@ -34,11 +41,21 @@ export class EmbeddingService {
     private modelBusySubscription?: Subscription;
     private downloadProgressSubscription?: Subscription;
     private modelErrorSubscription?: Subscription;
+    private localOperationQueue: Promise<void> = Promise.resolve();
+    private readonly providerOperations = new AsyncOperationGate();
 
     /**
      * Switch to a different embedding provider based on settings
      */
-    async switchProvider(settings: SimilarNotesSettings): Promise<void> {
+    async switchProvider(settings: EmbeddingModelSettings): Promise<void> {
+        await this.providerOperations.transition(async () => {
+            await this.switchProviderUnlocked(settings);
+        });
+    }
+
+    private async switchProviderUnlocked(
+        settings: EmbeddingModelSettings
+    ): Promise<void> {
         const newProviderType = settings.modelProvider;
 
         // If same provider type and model, check if GPU settings changed for builtin provider
@@ -57,17 +74,9 @@ export class EmbeddingService {
                             : settings.geminiModel;
 
             if (currentModelId === targetModelId) {
-                // For builtin provider, GPU settings change requires reload
-                if (newProviderType === "builtin") {
-                    log.info(
-                        "Same model but GPU settings may have changed, continuing with provider switch"
-                    );
-                } else {
-                    log.info(
-                        "Same provider and model already loaded, skipping switch"
-                    );
-                    return;
-                }
+                log.info(
+                    "Same model selected; reloading so runtime configuration changes take effect"
+                );
             }
         }
 
@@ -78,21 +87,20 @@ export class EmbeddingService {
                 this.currentProviderType
             );
 
-            // Unsubscribe from current provider's observables
-            this.modelBusySubscription?.unsubscribe();
-            this.downloadProgressSubscription?.unsubscribe();
-            this.modelErrorSubscription?.unsubscribe();
-
-            this.provider.dispose();
-            this.provider = null;
+            this.disposeProvider();
         }
 
         // Create new provider
         if (newProviderType === "builtin") {
             log.info("Switching to Transformers embedding provider");
-            this.provider = new TransformersEmbeddingProvider(this.settingsService);
+            this.provider = new TransformersEmbeddingProvider(
+                this.settingsService,
+                this.onDisableGPU
+            );
             this.setupProviderSubscriptions();
-            await this.loadModel(settings.modelId, { useGPU: settings.useGPU });
+            await this.provider.loadModel(settings.modelId, {
+                useGPU: settings.useGPU,
+            });
         } else if (newProviderType === "ollama") {
             log.info("Switching to Ollama embedding provider");
             const ollamaConfig: OllamaConfig = {
@@ -101,7 +109,10 @@ export class EmbeddingService {
             };
             this.provider = new OllamaEmbeddingProvider(ollamaConfig);
             this.setupProviderSubscriptions();
-            await this.loadModel(settings.ollamaModel || "", ollamaConfig);
+            await this.provider.loadModel(
+                settings.ollamaModel || "",
+                ollamaConfig
+            );
         } else if (newProviderType === "openai") {
             log.info("Switching to OpenAI embedding provider");
             const openaiConfig: OpenAIConfig = {
@@ -113,7 +124,10 @@ export class EmbeddingService {
             };
             this.provider = new OpenAIEmbeddingProvider(openaiConfig);
             this.setupProviderSubscriptions();
-            await this.loadModel(settings.openaiModel || "text-embedding-3-small", openaiConfig);
+            await this.provider.loadModel(
+                settings.openaiModel || "text-embedding-3-small",
+                openaiConfig
+            );
         } else if (newProviderType === "gemini") {
             log.info("Switching to Gemini embedding provider");
             const geminiConfig: GeminiConfig = {
@@ -123,7 +137,10 @@ export class EmbeddingService {
             };
             this.provider = new GeminiEmbeddingProvider(geminiConfig);
             this.setupProviderSubscriptions();
-            await this.loadModel(settings.geminiModel || "gemini-embedding-001", geminiConfig);
+            await this.provider.loadModel(
+                settings.geminiModel || "gemini-embedding-001",
+                geminiConfig
+            );
         } else {
             throw new Error(`Unknown provider type: ${newProviderType}`);
         }
@@ -165,18 +182,18 @@ export class EmbeddingService {
         modelId: string,
         config?: TransformersConfig | OllamaConfig | OpenAIConfig | GeminiConfig
     ): Promise<ModelInfo> {
-        if (!this.provider) {
-            throw new Error("No embedding provider initialized");
-        }
-
-        return await this.provider.loadModel(modelId, config);
+        return await this.providerOperations.transition(async () => {
+            if (!this.provider) {
+                throw new Error("No embedding provider initialized");
+            }
+            return await this.provider.loadModel(modelId, config);
+        });
     }
 
     async unloadModel(): Promise<void> {
-        if (!this.provider) {
-            return;
-        }
-        await this.provider.unloadModel();
+        await this.providerOperations.transition(async () => {
+            await this.provider?.unloadModel();
+        });
     }
 
     getModelBusy$(): Observable<boolean> {
@@ -192,24 +209,51 @@ export class EmbeddingService {
     }
 
     async embedText(text: string): Promise<number[]> {
-        if (!this.provider) {
-            throw new Error("No embedding provider initialized");
-        }
-        return await this.provider.embedText(text);
+        return await this.runProviderOperation((provider) =>
+            provider.embedText(text)
+        );
     }
 
     async embedTexts(texts: string[]): Promise<number[][]> {
-        if (!this.provider) {
-            throw new Error("No embedding provider initialized");
-        }
-        return await this.provider.embedTexts(texts);
+        return await this.runProviderOperation((provider) =>
+            provider.embedTexts(texts)
+        );
     }
 
     async countTokens(text: string): Promise<number> {
-        if (!this.provider) {
-            throw new Error("No embedding provider initialized");
-        }
-        return await this.provider.countTokens(text);
+        return await this.runProviderOperation((provider) =>
+            provider.countTokens(text)
+        );
+    }
+
+    private async runProviderOperation<T>(
+        operation: (provider: EmbeddingProvider) => Promise<T>
+    ): Promise<T> {
+        return await this.providerOperations.run(async () => {
+            const provider = this.provider;
+            if (!provider) {
+                throw new Error("No embedding provider initialized");
+            }
+
+            if (provider.supportsParallelProcessing()) {
+                return await operation(provider);
+            }
+
+            const result = this.localOperationQueue.then(
+                () => operation(provider),
+                () => operation(provider)
+            );
+            this.localOperationQueue = result.then(
+                () => undefined,
+                () => undefined
+            );
+            return await result;
+        });
+    }
+
+    async waitUntilIdle(): Promise<void> {
+        await this.providerOperations.waitUntilIdle();
+        await this.localOperationQueue;
     }
 
     public getVectorSize(): number {
@@ -231,36 +275,34 @@ export class EmbeddingService {
      * Uses binary search for efficiency
      */
     async truncateToMaxTokens(text: string): Promise<string> {
-        if (!this.provider) {
-            throw new Error("No embedding provider initialized");
-        }
+        return await this.runProviderOperation(async (provider) => {
+            const maxTokens = provider.getMaxTokens();
+            const tokenCount = await provider.countTokens(text);
 
-        const maxTokens = this.provider.getMaxTokens();
-        const tokenCount = await this.provider.countTokens(text);
-
-        if (tokenCount <= maxTokens) {
-            return text;
-        }
-
-        // Binary search to find the right truncation point
-        let left = 0;
-        let right = text.length;
-        let result = "";
-
-        while (left < right) {
-            const mid = Math.floor((left + right + 1) / 2);
-            const truncated = text.substring(0, mid);
-            const count = await this.provider.countTokens(truncated);
-
-            if (count <= maxTokens) {
-                result = truncated;
-                left = mid;
-            } else {
-                right = mid - 1;
+            if (tokenCount <= maxTokens) {
+                return text;
             }
-        }
 
-        return result;
+            // Binary search to find the right truncation point
+            let left = 0;
+            let right = text.length;
+            let result = "";
+
+            while (left < right) {
+                const mid = Math.floor((left + right + 1) / 2);
+                const truncated = text.substring(0, mid);
+                const count = await provider.countTokens(truncated);
+
+                if (count <= maxTokens) {
+                    result = truncated;
+                    left = mid;
+                } else {
+                    right = mid - 1;
+                }
+            }
+
+            return result;
+        });
     }
 
     public isModelLoaded(): boolean {
@@ -276,6 +318,16 @@ export class EmbeddingService {
     }
 
     public dispose(): void {
+        this.disposeProvider();
+    }
+
+    async disposeWhenIdle(): Promise<void> {
+        await this.providerOperations.transition(async () => {
+            this.disposeProvider();
+        });
+    }
+
+    private disposeProvider(): void {
         // Clean up subscriptions
         this.modelBusySubscription?.unsubscribe();
         this.downloadProgressSubscription?.unsubscribe();

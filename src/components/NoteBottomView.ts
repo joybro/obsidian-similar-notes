@@ -3,6 +3,7 @@ import { Component } from "obsidian";
 import * as React from "react";
 import { type Root, createRoot } from "react-dom/client";
 import type { Observable } from "rxjs";
+import type { SearchMode } from "@/domain/model/SearchMode";
 import NoteBottomViewReact, {
     type NoteBottomViewModel,
 } from "./NoteBottomViewReact";
@@ -16,7 +17,8 @@ export class NoteBottomView extends Component {
         private vaultName: string,
         private leaf: MarkdownView,
         private parentEl: HTMLElement,
-        private bottomViewModelSubject$: Observable<NoteBottomViewModel>
+        private bottomViewModelSubject$: Observable<NoteBottomViewModel>,
+        private onSearchModeChange?: (mode: SearchMode) => void
     ) {
         super();
         this.containerEl = parentEl.createDiv({
@@ -34,6 +36,7 @@ export class NoteBottomView extends Component {
                 leaf: this.leaf,
                 bottomViewModelSubject$: this.bottomViewModelSubject$,
                 viewType: "bottom",
+                onSearchModeChange: this.onSearchModeChange,
             })
         );
         return null;

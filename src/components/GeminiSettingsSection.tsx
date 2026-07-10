@@ -1,12 +1,12 @@
 import { GeminiClient } from "@/adapter/gemini";
-import type { SimilarNotesSettings } from "@/application/SettingsService";
+import type { EmbeddingModelSettings } from "@/application/SettingsService";
 import { Notice } from "obsidian";
 import type { Setting } from "obsidian";
 
 export type SettingBuilder = (setting: Setting) => void;
 
 interface GeminiSettingsSectionProps {
-    settings: SimilarNotesSettings;
+    settings: EmbeddingModelSettings;
     tempGeminiApiKey: string | undefined;
     tempGeminiModel: string | undefined;
     onGeminiApiKeyChange: (value: string) => void;

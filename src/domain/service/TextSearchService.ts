@@ -11,7 +11,19 @@ export interface TextSearchResult {
     isOverLimit: boolean;
 }
 
-export class TextSearchService {
+export interface TextSearch {
+    checkTokenLimit(text: string): Promise<{
+        tokenCount: number;
+        maxTokens: number;
+        isOverLimit: boolean;
+    }>;
+    findSimilarNotesFromText(
+        text: string,
+        limit?: number
+    ): Promise<TextSearchResult>;
+}
+
+export class TextSearchService implements TextSearch {
     constructor(
         private readonly noteChunkRepository: NoteChunkRepository,
         private readonly embeddingService: EmbeddingService

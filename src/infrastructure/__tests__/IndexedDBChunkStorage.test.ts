@@ -40,6 +40,62 @@ function describeInitialization(storage: () => IndexedDBChunkStorage) {
     });
 }
 
+function describeNamespaceIsolation() {
+    describe("Namespace Isolation", () => {
+        it("keeps the default and code indexes in separate databases", async () => {
+            const defaultStorage = new IndexedDBChunkStorage();
+            const codeStorage = new IndexedDBChunkStorage();
+
+            try {
+                await defaultStorage.init("namespace-test-vault");
+                await codeStorage.init("namespace-test-vault", "code");
+
+                expect(
+                    (
+                        defaultStorage as unknown as {
+                            dbName: string;
+                        }
+                    ).dbName
+                ).toBe("namespace-test-vault-similar-notes");
+                expect(
+                    (codeStorage as unknown as { dbName: string }).dbName
+                ).toBe("namespace-test-vault-similar-notes-code");
+
+                await defaultStorage.put(
+                    createMockChunk({
+                        path: "shared.md",
+                        content: "prose content",
+                    })
+                );
+                await codeStorage.put(
+                    createMockChunk({
+                        path: "shared.md",
+                        content: "code content",
+                    })
+                );
+
+                expect(await defaultStorage.count()).toBe(1);
+                expect(await codeStorage.count()).toBe(1);
+                expect(
+                    (await defaultStorage.getByPath("shared.md"))[0].content
+                ).toBe("prose content");
+                expect(
+                    (await codeStorage.getByPath("shared.md"))[0].content
+                ).toBe("code content");
+            } finally {
+                await defaultStorage.close();
+                await codeStorage.close();
+                indexedDB.deleteDatabase(
+                    "namespace-test-vault-similar-notes"
+                );
+                indexedDB.deleteDatabase(
+                    "namespace-test-vault-similar-notes-code"
+                );
+            }
+        });
+    });
+}
+
 function describeBasicCRUD(storage: () => IndexedDBChunkStorage) {
     describe("Basic CRUD Operations", () => {
         it("should store and count a single chunk", async () => {
@@ -316,6 +372,7 @@ describe("IndexedDBChunkStorage", () => {
     const getStorage = () => storage;
 
     describeInitialization(getStorage);
+    describeNamespaceIsolation();
     describeBasicCRUD(getStorage);
     describeBatchLoading(getStorage);
     describeMetadataStore(getStorage);

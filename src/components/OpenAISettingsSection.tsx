@@ -1,12 +1,12 @@
 import { OpenAIClient } from "@/adapter/openai";
-import type { SimilarNotesSettings } from "@/application/SettingsService";
+import type { EmbeddingModelSettings } from "@/application/SettingsService";
 import { Notice } from "obsidian";
 import type { Setting } from "obsidian";
 
 export type SettingBuilder = (setting: Setting) => void;
 
 interface OpenAISettingsSectionProps {
-    settings: SimilarNotesSettings;
+    settings: EmbeddingModelSettings;
     tempOpenaiUrl: string | undefined;
     tempOpenaiApiKey: string | undefined;
     tempOpenaiModel: string | undefined;

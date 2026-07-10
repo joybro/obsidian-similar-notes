@@ -45,6 +45,7 @@ src/
 - **SettingsService** (`application/SettingsService.ts`): Handles plugin settings management and persistence.
 - **SimilarNoteCoordinator** (`application/SimilarNoteCoordinator.ts`): Coordinates similar note finding and UI updates.
 - **LeafViewCoordinator** (`application/LeafViewCoordinator.ts`): Manages Obsidian leaf views and bottom panel display.
+- **CodeModeRuntime** (`application/CodeModeRuntime.ts`): Owns the optional Code model, index, queue, finder, search service, and teardown lifecycle.
 
 ### Infrastructure
 - **VaultNoteRepository** (`infrastructure/VaultNoteRepository.ts`): Implementation of NoteRepository for Obsidian vault.
@@ -67,11 +68,13 @@ src/
 
 6. **Built-in embedding per-pass batch cap**: The built-in (Transformers.js / onnxruntime-web) embedder caps chunks per forward pass at `MAX_EMBED_BATCH_SIZE` (32) and runs sub-batches sequentially (`transformers.worker.ts`, `splitIntoBatches`/`embedInBatches` in `src/utils/batching.ts`). Embedding a large note's chunks in one pass overran the wasm32 ~4GB address space and aborted with a bare number (and then cascaded). Note: this is *not* a threading issue — the beta.4 single-thread pin was a no-op. See `docs/builtin-embedding-batch-cap-spec.md`.
 
-5. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
+7. **Code Mode uses a separate vector space**: When enabled, fenced blocks are removed from the Notes corpus and indexed by a second model/repository/queue pipeline. The Code IndexedDB namespace is `<vaultId>-similar-notes-code`; the existing Notes namespace remains unchanged. Search surfaces select one index explicitly and never blend raw scores across models. Extraction, invalidation, failure, memory, and privacy behavior are specified in `docs/code-mode-spec.md`.
+
+8. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
 
    - **Sectioning**: The settings tab is divided into top-level sections using Obsidian's `SettingGroup` (`@since 1.11.0`) — one per area (e.g. Model, Index, Exclude folders from index, Exclude content from index, Display, Debug & Support). Each section is built by a `*SettingsSection` class (e.g. `IndexSettingsSection`) that returns `SettingBuilder` arrays.
    - **Use sibling groups, not sub-headings.** `SettingGroup` cannot nest, and inserting `Setting.setHeading()` divider rows *inside* a group renders poorly (tried more than once and reverted). To break a crowded section into sub-areas, add another sibling top-level `SettingGroup` instead of nesting or in-group headings.
 
-5. **Content Exclusion**: Supports RegExp patterns to exclude content from indexing (e.g., frontmatter, code blocks).
+9. **Content Exclusion**: Supports RegExp patterns to exclude content from indexing (e.g., frontmatter, code blocks).
 
-6. **Command Palette**: Commands are implemented in `src/commands/` with a extensible structure for easy addition of new commands.
+10. **Command Palette**: Commands are implemented in `src/commands/` with a extensible structure for easy addition of new commands.

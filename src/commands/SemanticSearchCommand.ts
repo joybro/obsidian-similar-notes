@@ -1,6 +1,6 @@
 import type { App, Plugin } from "obsidian";
 import type { SettingsService } from "@/application/SettingsService";
-import type { TextSearchService } from "@/domain/service/TextSearchService";
+import type { TextSearch } from "@/domain/service/TextSearchService";
 import { SemanticSearchModal } from "@/components/SemanticSearchModal";
 import type { Command } from "./Command";
 
@@ -10,8 +10,9 @@ export class SemanticSearchCommand implements Command {
 
     constructor(
         private app: App,
-        private textSearchService: TextSearchService,
-        private settingsService: SettingsService
+        private textSearchService: TextSearch,
+        private settingsService: SettingsService,
+        private getCodeSearchService?: () => TextSearch | undefined
     ) {}
 
     register(plugin: Plugin): void {
@@ -26,10 +27,13 @@ export class SemanticSearchCommand implements Command {
             ],
             callback: () => {
                 const settings = this.settingsService.get();
+                const codeSearchService = this.getCodeSearchService?.();
                 const modal = new SemanticSearchModal(
                     this.app,
                     this.textSearchService,
-                    settings.noteDisplayMode
+                    settings.noteDisplayMode,
+                    codeSearchService,
+                    settings.codeModeEnabled && Boolean(codeSearchService)
                 );
                 modal.open();
             },

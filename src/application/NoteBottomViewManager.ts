@@ -70,7 +70,10 @@ export class NoteBottomViewManager extends BaseViewManager<NoteBottomView> {
                 this.app.vault.getName(),
                 view,
                 embeddedBacklinksContainer.parentElement,
-                this.similarNoteCoordinator.getNoteBottomViewModelObservable()
+                this.similarNoteCoordinator.getNoteBottomViewModelObservable(),
+                (mode) => {
+                    void this.similarNoteCoordinator.setSearchMode(mode);
+                }
             );
 
             // Move similar notes container before embedded backlinks container

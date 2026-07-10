@@ -27,8 +27,9 @@ export class IndexedDBErroredStorage {
      * Initialize the IndexedDB database
      * @param vaultId - Unique identifier for the vault (app.appId)
      */
-    async init(vaultId: string): Promise<void> {
-        this.dbName = `${vaultId}-similar-notes-errored`;
+    async init(vaultId: string, namespace = "notes"): Promise<void> {
+        const namespaceSuffix = namespace === "notes" ? "" : `-${namespace}`;
+        this.dbName = `${vaultId}-similar-notes${namespaceSuffix}-errored`;
         log.info(`Initializing IndexedDB for errored notes: ${this.dbName}`);
 
         return new Promise((resolve, reject) => {

@@ -8,6 +8,7 @@ import log from "loglevel";
 import { apiVersion, Notice, PluginSettingTab, SettingGroup, type Setting } from "obsidian";
 import type MainPlugin from "../main";
 import { ModelSettingsSection } from "./ModelSettingsSection";
+import { CodeModelSettingsSection } from "./CodeModelSettingsSection";
 import { IndexSettingsSection } from "./IndexSettingsSection";
 import type { SettingBuilder } from "./OpenAISettingsSection";
 
@@ -23,6 +24,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
     private modelService?: EmbeddingService;
     private noteChunkRepository?: NoteChunkRepository;
     private modelSettingsSection?: ModelSettingsSection;
+    private codeModelSettingsSection?: CodeModelSettingsSection;
     private indexSettingsSection?: IndexSettingsSection;
 
     constructor(
@@ -156,6 +158,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         if (this.modelSettingsSection) {
             this.modelSettingsSection.destroy();
         }
+        this.codeModelSettingsSection?.resetDraft();
     }
 
     display(): void {
@@ -173,6 +176,16 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
             });
         }
         this.modelSettingsSection.render();
+
+        if (!this.codeModelSettingsSection) {
+            this.codeModelSettingsSection = new CodeModelSettingsSection({
+                containerEl,
+                plugin: this.plugin,
+                settingsService: this.settingsService,
+                app: this.app,
+            });
+        }
+        this.codeModelSettingsSection.render();
 
         // Initialize and render index settings section
         if (!this.indexSettingsSection) {

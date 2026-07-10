@@ -16,6 +16,13 @@ function makeInfo(system: SystemInfo): EnvironmentInfo {
         modelId: "Built-in (sentence-transformers/all-MiniLM-L6-v2)",
         serverUrl: null,
         webGPU: false,
+        codeMode: {
+            enabled: false,
+            modelProvider: null,
+            modelId: null,
+            serverUrl: null,
+            webGPU: null,
+        },
         system,
         chunkSettings: {
             includeFrontmatter: false,
@@ -135,5 +142,33 @@ describe("formatEnvironmentInfoAsMarkdown: server URL line", () => {
             makeInfo({ totalMemoryGB: null, cpuCores: null, arch: null })
         );
         expect(md).not.toContain("**Server URL**");
+    });
+});
+
+describe("Code Mode diagnostics", () => {
+    test("reports the Code profile without exposing its API key", () => {
+        const info = collectEnvironmentInfo(
+            "1.12.7",
+            "1.6.0",
+            makeSettings({
+                codeModeEnabled: true,
+                codeModel: {
+                    modelProvider: "openai",
+                    modelId: "unused",
+                    openaiUrl: "https://code.example/v1",
+                    openaiApiKey: "must-not-leak",
+                    openaiModel: "code-embed",
+                    useGPU: false,
+                },
+            })
+        );
+        const markdown = formatEnvironmentInfoAsMarkdown(info);
+
+        expect(markdown).toContain("- **Code Mode**: Enabled");
+        expect(markdown).toContain("- **Code Model**: OpenAI (code-embed)");
+        expect(markdown).toContain(
+            "- **Code Server URL**: https://code.example/v1"
+        );
+        expect(markdown).not.toContain("must-not-leak");
     });
 });

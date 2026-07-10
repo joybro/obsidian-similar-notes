@@ -1,5 +1,8 @@
 import { Platform } from "obsidian";
-import type { SimilarNotesSettings } from "@/application/SettingsService";
+import type {
+    EmbeddingModelSettings,
+    SimilarNotesSettings,
+} from "@/application/SettingsService";
 
 export interface SystemInfo {
     totalMemoryGB: number | null;
@@ -15,6 +18,13 @@ export interface EnvironmentInfo {
     modelId: string;
     serverUrl: string | null;
     webGPU: boolean;
+    codeMode: {
+        enabled: boolean;
+        modelProvider: string | null;
+        modelId: string | null;
+        serverUrl: string | null;
+        webGPU: boolean | null;
+    };
     system: SystemInfo;
     chunkSettings: {
         includeFrontmatter: boolean;
@@ -80,7 +90,7 @@ function getPlatformString(): string {
     return "Unknown";
 }
 
-function getModelDisplayName(settings: SimilarNotesSettings): string {
+function getModelDisplayName(settings: EmbeddingModelSettings): string {
     switch (settings.modelProvider) {
         case "ollama":
             return `Ollama (${settings.ollamaModel || "not configured"})`;
@@ -98,7 +108,7 @@ function getModelDisplayName(settings: SimilarNotesSettings): string {
  * OpenAI vs OpenRouter vs a local server; local vs remote Ollama). Null for
  * providers with a fixed endpoint.
  */
-function getServerUrl(settings: SimilarNotesSettings): string | null {
+function getServerUrl(settings: EmbeddingModelSettings): string | null {
     switch (settings.modelProvider) {
         case "ollama":
             return settings.ollamaUrl || "http://localhost:11434";
@@ -114,6 +124,7 @@ export function collectEnvironmentInfo(
     pluginVersion: string,
     settings: SimilarNotesSettings
 ): EnvironmentInfo {
+    const codeModel = settings.codeModel ?? settings;
     return {
         platform: getPlatformString(),
         obsidianVersion,
@@ -122,6 +133,19 @@ export function collectEnvironmentInfo(
         modelId: getModelDisplayName(settings),
         serverUrl: getServerUrl(settings),
         webGPU: settings.useGPU,
+        codeMode: {
+            enabled: settings.codeModeEnabled,
+            modelProvider: settings.codeModeEnabled
+                ? codeModel.modelProvider
+                : null,
+            modelId: settings.codeModeEnabled
+                ? getModelDisplayName(codeModel)
+                : null,
+            serverUrl: settings.codeModeEnabled
+                ? getServerUrl(codeModel)
+                : null,
+            webGPU: settings.codeModeEnabled ? codeModel.useGPU : null,
+        },
         system: collectSystemInfo(),
         chunkSettings: {
             includeFrontmatter: settings.includeFrontmatter,
@@ -153,6 +177,21 @@ export function formatEnvironmentInfoAsMarkdown(info: EnvironmentInfo): string {
 
     if (info.serverUrl !== null) {
         lines.push(`- **Server URL**: ${info.serverUrl}`);
+    }
+
+    lines.push(
+        `- **Code Mode**: ${info.codeMode.enabled ? "Enabled" : "Disabled"}`
+    );
+    if (info.codeMode.enabled && info.codeMode.modelId) {
+        lines.push(`- **Code Model**: ${info.codeMode.modelId}`);
+        if (info.codeMode.serverUrl) {
+            lines.push(`- **Code Server URL**: ${info.codeMode.serverUrl}`);
+        }
+        lines.push(
+            `- **Code WebGPU**: ${
+                info.codeMode.webGPU ? "Enabled" : "Disabled"
+            }`
+        );
     }
 
     lines.push(

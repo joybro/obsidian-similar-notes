@@ -22,6 +22,7 @@ Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not jus
 - **Mobile & Desktop**: Built-in models work on iOS, Android, and all desktop platforms
 - **OpenAI Support**: Use OpenAI embedding models or any OpenAI-compatible API
 - **Ollama Support**: Connect to custom models via Ollama (desktop only)
+- **Code Mode**: Index fenced code blocks separately with an independent embedding model
 - **No Setup Required**: Built-in models work out of the box, no API keys needed
 
 ## Getting Started
@@ -79,6 +80,21 @@ Supports any Ollama embedding model.
 - `nomic-embed-text` (English)
 - `bge-m3` (multilingual)
 
+### Code Mode
+
+Enable **Index fenced code blocks separately** under **Settings → Similar Notes → Code mode** to build an independent Code index. When enabled:
+
+- fenced code blocks move out of the normal Notes index;
+- the similar-notes views and Semantic Search gain a **Notes / Code** selector;
+- Code results show matches from fenced blocks only;
+- the Code index can use its own built-in, Ollama, OpenAI-compatible, or Gemini embedding model.
+
+Code Mode starts with a copy of the current Notes model configuration; change it under **Code model** if a code-specialized model or separate provider is preferred. Notes and Code scores remain separate because similarity values from different embedding models are not directly comparable.
+
+> **Resource note**: two indexes use more memory and local storage. Loading two different built-in models can exceed a phone's memory budget, so a remote Code model is recommended on mobile.
+
+> **Privacy note**: when the Code model uses a remote provider, fenced source code is sent to that provider under its data-handling policy.
+
 ## Agent Usage
 
 The active note's similar-notes results can be exported to a JSON file, so an external coding agent can reuse the plugin's similarity search without understanding embeddings or plugin internals:
@@ -115,6 +131,7 @@ For driving the command from an agent (CLI flow, validation tips, drop-in skill 
 - **Transformers.js**: Runs Hugging Face models directly in Obsidian
 - **WebGPU**: GPU acceleration on desktop, automatic CPU fallback
 - **Orama**: Built-in vector database for fast search
+- **Separate vector spaces**: Notes and Code use independent Orama/IndexedDB stores and may have different vector dimensions
 - **Web Workers**: All processing runs in background threads
 
 ## Multi-Device Usage

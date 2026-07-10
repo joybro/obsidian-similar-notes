@@ -14,7 +14,7 @@ export class ErroredNoteStore {
     private erroredCount$ = new BehaviorSubject<number>(0);
     private storage: IndexedDBErroredStorage;
 
-    constructor() {
+    constructor(private readonly namespace = "notes") {
         this.storage = new IndexedDBErroredStorage();
     }
 
@@ -23,7 +23,7 @@ export class ErroredNoteStore {
      * @param vaultId - Unique identifier for the vault (app.appId)
      */
     async init(vaultId: string): Promise<void> {
-        await this.storage.init(vaultId);
+        await this.storage.init(vaultId, this.namespace);
         this.entries = await this.storage.getAll();
         this.erroredCount$.next(Object.keys(this.entries).length);
         log.info(
@@ -92,5 +92,9 @@ export class ErroredNoteStore {
      */
     getCurrentErroredCount(): number {
         return this.erroredCount$.getValue();
+    }
+
+    close(): void {
+        this.storage.close();
     }
 }

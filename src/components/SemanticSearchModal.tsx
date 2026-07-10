@@ -4,15 +4,17 @@ import { Modal, Notice } from "obsidian";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { SimilarNote } from "@/domain/model/SimilarNote";
-import type { TextSearchService } from "@/domain/service/TextSearchService";
+import type { SearchMode } from "@/domain/model/SearchMode";
+import type { TextSearch } from "@/domain/service/TextSearchService";
 import {
     createNoteFromQuery,
     handleSemanticSearchKey,
     insertLinkForNote,
 } from "./semanticSearchActions";
-
-const MIN_SEARCH_LENGTH = 3;
-const DEBOUNCE_MS = 300;
+import {
+    MIN_SEARCH_LENGTH,
+    useSemanticSearch,
+} from "./useSemanticSearch";
 
 // Platform-specific modifier keys
 const isMac = typeof navigator !== "undefined" && navigator.platform.includes("Mac");
@@ -111,70 +113,54 @@ const SearchResultItem: React.FC<SearchResultItemProps> = ({
 
 interface SemanticSearchContentProps {
     app: App;
-    textSearchService: TextSearchService;
+    textSearchService: TextSearch;
+    codeSearchService?: TextSearch;
+    codeModeEnabled: boolean;
     noteDisplayMode: "title" | "path" | "smart";
     onClose: () => void;
 }
 
-function useSemanticSearch(textSearchService: TextSearchService) {
-    const [query, setQuery] = useState("");
-    const [results, setResults] = useState<SimilarNote[]>([]);
-    const [selectedIndex, setSelectedIndex] = useState(0);
-    const [isSearching, setIsSearching] = useState(false);
-    const [tokenWarning, setTokenWarning] = useState<string | null>(null);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const performSearch = useCallback(
-        async (searchQuery: string) => {
-            if (searchQuery.length < MIN_SEARCH_LENGTH) {
-                setResults([]);
-                setTokenWarning(null);
-                return;
-            }
-
-            setIsSearching(true);
-            try {
-                const searchResult =
-                    await textSearchService.findSimilarNotesFromText(searchQuery);
-
-                if (searchResult.isOverLimit) {
-                    setTokenWarning(
-                        `Text truncated: ${searchResult.tokenCount}→${searchResult.maxTokens} tokens`
-                    );
-                } else {
-                    setTokenWarning(null);
-                }
-                setResults(searchResult.similarNotes);
-                setSelectedIndex(0);
-            } catch (error) {
-                console.error("Search error:", error);
-                setResults([]);
-            } finally {
-                setIsSearching(false);
-            }
-        },
-        [textSearchService]
-    );
-
-    useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => performSearch(query), DEBOUNCE_MS);
-        return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-        };
-    }, [query, performSearch]);
-
-    return { query, setQuery, results, selectedIndex, setSelectedIndex, isSearching, tokenWarning };
-}
+const SearchModeSwitcher: React.FC<{
+    searchMode: SearchMode;
+    onChange: (mode: SearchMode) => void;
+}> = ({ searchMode, onChange }) => (
+    <div
+        className="semantic-search-mode-switcher"
+        role="group"
+        aria-label="Semantic search mode"
+    >
+        {(["notes", "code"] as const).map((mode) => (
+            <button
+                key={mode}
+                type="button"
+                className={searchMode === mode ? "is-active" : ""}
+                aria-pressed={searchMode === mode}
+                onClick={() => onChange(mode)}
+            >
+                {mode === "notes" ? "Notes" : "Code"}
+            </button>
+        ))}
+    </div>
+);
 
 const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
     app,
     textSearchService,
+    codeSearchService,
+    codeModeEnabled,
     noteDisplayMode,
     onClose,
 }) => {
-    const { query, setQuery, results, selectedIndex, setSelectedIndex, isSearching, tokenWarning } =
-        useSemanticSearch(textSearchService);
+    const [searchMode, setSearchMode] = useState<SearchMode>("notes");
+    const {
+        query, setQuery,
+        results,
+        selectedIndex,
+        setSelectedIndex,
+        isSearching,
+        tokenWarning,
+        invalidateSearch,
+    } = useSemanticSearch(textSearchService, codeSearchService, searchMode);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -246,15 +232,33 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
         },
         [results, selectedIndex, setSelectedIndex, openNote, insertLink, createNote, onClose]
     );
+    const changeSearchMode = useCallback(
+        (mode: SearchMode) => {
+            if (mode === searchMode) return;
+            invalidateSearch();
+            setSearchMode(mode);
+        },
+        [invalidateSearch, searchMode]
+    );
 
     return (
         <div className="semantic-search-wrapper" onKeyDown={handleKeyDown}>
+            {codeModeEnabled && codeSearchService ? (
+                <SearchModeSwitcher
+                    searchMode={searchMode}
+                    onChange={changeSearchMode}
+                />
+            ) : null}
             <div className="prompt-input-container">
                 <input
                     ref={inputRef}
                     type="text"
                     className="prompt-input"
-                    placeholder="Search by semantic similarity..."
+                    placeholder={
+                        searchMode === "code"
+                            ? "Search fenced code blocks..."
+                            : "Search by semantic similarity..."
+                    }
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                 />
@@ -274,7 +278,11 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                 {query.length >= MIN_SEARCH_LENGTH &&
                     !isSearching &&
                     results.length === 0 && (
-                    <div className="prompt-empty-state">No similar notes found</div>
+                    <div className="prompt-empty-state">
+                        {searchMode === "code"
+                            ? "No similar code blocks found"
+                            : "No similar notes found"}
+                    </div>
                 )}
                 {results.map((note, index) => {
                     const file = app.vault.getAbstractFileByPath(note.path) as TFile | null;
@@ -301,17 +309,23 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
 
 export class SemanticSearchModal extends Modal {
     private root: Root | null = null;
-    private textSearchService: TextSearchService;
+    private textSearchService: TextSearch;
+    private codeSearchService?: TextSearch;
+    private codeModeEnabled: boolean;
     private noteDisplayMode: "title" | "path" | "smart";
 
     constructor(
         app: App,
-        textSearchService: TextSearchService,
-        noteDisplayMode: "title" | "path" | "smart"
+        textSearchService: TextSearch,
+        noteDisplayMode: "title" | "path" | "smart",
+        codeSearchService?: TextSearch,
+        codeModeEnabled = false
     ) {
         super(app);
         this.textSearchService = textSearchService;
         this.noteDisplayMode = noteDisplayMode;
+        this.codeSearchService = codeSearchService;
+        this.codeModeEnabled = codeModeEnabled;
     }
 
     onOpen() {
@@ -333,6 +347,8 @@ export class SemanticSearchModal extends Modal {
             <SemanticSearchContent
                 app={this.app}
                 textSearchService={this.textSearchService}
+                codeSearchService={this.codeSearchService}
+                codeModeEnabled={this.codeModeEnabled}
                 noteDisplayMode={this.noteDisplayMode}
                 onClose={() => this.close()}
             />

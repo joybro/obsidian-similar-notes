@@ -12,7 +12,7 @@ import {
 import log from "loglevel";
 import type { SettingsService } from "@/application/SettingsService";
 import type { SimilarNote } from "@/domain/model/SimilarNote";
-import type { TextSearchService } from "@/domain/service/TextSearchService";
+import type { TextSearch } from "@/domain/service/TextSearchService";
 import { parseTrigger } from "./semanticLinkTrigger";
 import { resolveWikilink } from "./semanticSearchActions";
 
@@ -43,7 +43,7 @@ export class SemanticLinkSuggest extends EditorSuggest<SimilarNote> {
 
     constructor(
         app: App,
-        private readonly textSearchService: TextSearchService,
+        private readonly textSearchService: TextSearch,
         private readonly settingsService: SettingsService
     ) {
         super(app);

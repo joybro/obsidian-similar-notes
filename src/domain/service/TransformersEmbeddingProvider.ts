@@ -28,7 +28,10 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     private downloadProgress$ = new Subject<number>();
     private modelError$ = new Subject<string | null>();
 
-    constructor(private settingsService?: SettingsService) {
+    constructor(
+        private settingsService?: SettingsService,
+        private onDisableGPU?: () => Promise<void>
+    ) {
         this.workerManager = new WorkerManager<TransformersWorker>(
             "TransformersWorker"
         );
@@ -51,7 +54,11 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
             return await this.tryLoadModel(modelId, useGPU);
         } catch (error) {
             // If GPU failed and we can retry with CPU
-            if (useGPU && isGPUError(error) && this.settingsService) {
+            if (
+                useGPU &&
+                isGPUError(error) &&
+                (this.settingsService || this.onDisableGPU)
+            ) {
                 log.info("GPU failed, retrying with CPU...");
                 new Notice("GPU failed, retrying with CPU...", 3000);
                 
@@ -104,7 +111,7 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     }
 
     private showGPUSettingModal(): void {
-        if (!this.settingsService) return;
+        if (!this.settingsService && !this.onDisableGPU) return;
 
         // We need the app instance for the modal, but we don't have direct access
         // Let's use a different approach - we'll add this to the global window temporarily
@@ -112,8 +119,11 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (window as any).app, // Access global app instance
             async () => {
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                await this.settingsService!.update({ useGPU: false });
+                if (this.onDisableGPU) {
+                    await this.onDisableGPU();
+                    return;
+                }
+                await this.settingsService?.update({ useGPU: false });
             }
         );
         modal.open();

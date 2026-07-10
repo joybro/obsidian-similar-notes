@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+-   **Code Mode with separate code-block embeddings** (#52): Fenced code blocks can now move into an independent Code index with their own embedding-provider and model configuration. Similar-note views and Semantic Search gain an explicit Notes/Code selector, code-only previews, independent indexing/error state, and separate IndexedDB storage. Code Mode remains off by default; disabling it restores the previous whole-note indexing behavior.
+
 ## [1.6.0] - 2026-07-03
 
 ### Added

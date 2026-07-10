@@ -2,6 +2,7 @@ import type { SettingsService } from "@/application/SettingsService";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
+import { getChunkEmbeddingText } from "@/domain/service/chunkEmbeddingText";
 import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { NoteChange, NoteChangeQueue } from "@/services/noteChangeQueue";
@@ -16,6 +17,8 @@ const MAX_ATTEMPTS = 3;
 export class NoteIndexingService {
     private fileChangeLoopTimer: NodeJS.Timeout | null = null;
     private noteChangeCount$ = new BehaviorSubject<number>(0);
+    private stopped = true;
+    private activeIteration?: Promise<void>;
 
     constructor(
         private noteRepository: NoteRepository,
@@ -23,14 +26,37 @@ export class NoteIndexingService {
         private noteChangeQueue: NoteChangeQueue,
         private noteChunkingService: NoteChunkingService,
         private embeddingService: EmbeddingService,
-        private similarNoteCoordinator: SimilarNoteCoordinator,
+        private similarNoteCoordinator: SimilarNoteCoordinator | undefined,
         private settingsService: SettingsService,
         private app: App,
-        private erroredNoteStore: ErroredNoteStore
+        private erroredNoteStore: ErroredNoteStore,
+        private indexKind: "notes" | "code" = "notes"
     ) {}
 
     startLoop() {
+        this.stopLoop();
+        this.stopped = false;
+        const scheduleIteration = () => {
+            if (this.stopped) return;
+            const iteration = fileChangeLoop();
+            this.activeIteration = iteration;
+            void iteration.then(
+                () => {
+                    if (this.activeIteration === iteration) {
+                        this.activeIteration = undefined;
+                    }
+                },
+                (error) => {
+                    if (this.activeIteration === iteration) {
+                        this.activeIteration = undefined;
+                    }
+                    log.error("[NoteIndexingService] Index loop failed", error);
+                }
+            );
+        };
         const fileChangeLoop = async () => {
+            if (this.stopped) return;
+
             const count = this.noteChangeQueue.getFileChangeCount();
             this.noteChangeCount$.next(count);
 
@@ -40,7 +66,11 @@ export class NoteIndexingService {
 
             const changes = await this.noteChangeQueue.pollFileChanges(concurrency);
             if (changes.length === 0) {
-                this.fileChangeLoopTimer = setTimeout(fileChangeLoop, 1000);
+                if (!this.stopped) {
+                    this.fileChangeLoopTimer = setTimeout(() => {
+                        scheduleIteration();
+                    }, 1000);
+                }
                 return;
             }
 
@@ -49,10 +79,12 @@ export class NoteIndexingService {
                 changes.map((change) => this.processChange(change))
             );
 
-            fileChangeLoop();
+            if (!this.stopped) {
+                scheduleIteration();
+            }
         };
 
-        fileChangeLoop();
+        scheduleIteration();
     }
 
     /**
@@ -85,9 +117,15 @@ export class NoteIndexingService {
     }
 
     stopLoop() {
+        this.stopped = true;
         if (this.fileChangeLoopTimer) {
             clearTimeout(this.fileChangeLoopTimer);
+            this.fileChangeLoopTimer = null;
         }
+    }
+
+    async waitUntilIdle(): Promise<void> {
+        await this.activeIteration;
     }
 
     /**
@@ -137,7 +175,7 @@ export class NoteIndexingService {
         await this.noteChunkRepository.removeByPath(path);
     }
 
-    private async processRenamedNote(change: NoteChange) {
+    private async processRenamedNote(change: NoteChange): Promise<void> {
         const { oldPath, path: newPath } = change;
         if (!oldPath) {
             // Defensive: a "renamed" change without oldPath is malformed.
@@ -168,20 +206,16 @@ export class NoteIndexingService {
         );
 
         // If the renamed file is the currently active one, refresh the sidebar.
-        const activeFile = this.app.workspace.getActiveFile();
-        if (activeFile && activeFile.path === newPath) {
-            this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(
-                newPath
-            );
-        }
+        this.refreshActiveNote(newPath);
+
     }
 
-    private async processUpdatedNote(path: string) {
+    private async processUpdatedNote(path: string): Promise<void> {
         const note = await this.noteRepository.findByPath(
             path,
             !this.settingsService.get().includeFrontmatter
         );
-        if (!note || !note.content) {
+        if (!note) {
             return;
         }
 
@@ -189,12 +223,9 @@ export class NoteIndexingService {
         const settings = this.settingsService.get();
         const patterns = settings.excludeRegexPatterns || [];
 
-        // Create a copy of the note with filtered content
-        const filteredNote = { ...note };
-
         // Apply each regex pattern to exclude matching content
+        let filteredContent = note.content ?? "";
         if (patterns.length > 0) {
-            let filteredContent = note.content;
             for (const pattern of patterns) {
                 try {
                     const regex = new RegExp(pattern, "gm");
@@ -203,23 +234,26 @@ export class NoteIndexingService {
                     log.warn(`Invalid RegExp pattern: ${pattern}`, e);
                 }
             }
-            filteredNote.content = filteredContent;
+        }
+
+        // Create a copy of the note with exactly the content used for chunking.
+        const filteredNote = { ...note, content: filteredContent };
+
+        if (!filteredContent) {
+            await this.removeIndexedChunksAndRefreshActiveNote(note.path);
+            return;
         }
 
         const splitted = await this.noteChunkingService.split(filteredNote);
         if (splitted.length === 0) {
+            await this.removeIndexedChunksAndRefreshActiveNote(note.path);
             return;
         }
 
         log.info(`[NoteIndexingService] Generating embeddings for ${splitted.length} chunks (for indexing)`);
 
         // Prepare all texts for batch embedding
-        const textsToEmbed = splitted.map((chunk) =>
-            // Include title in first chunk to make it searchable
-            chunk.chunkIndex === 0
-                ? `${chunk.title}\n\n${chunk.content}`
-                : chunk.content
-        );
+        const textsToEmbed = splitted.map(getChunkEmbeddingText);
 
         // Single batch API call for all chunks. A failure here MUST propagate to
         // processChange's catch → handleChangeFailure (retry, then terminal
@@ -246,11 +280,33 @@ export class NoteIndexingService {
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile.path === note.path) {
             log.info(`[NoteIndexingService] File is currently active, triggering similar note search`);
-            this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(
-                note.path
-            );
+            this.refreshActiveNote(note.path);
         } else {
             log.info(`[NoteIndexingService] File is not currently active, skipping similar note search`);
         }
+
     }
+
+    private async removeIndexedChunksAndRefreshActiveNote(
+        path: string
+    ): Promise<void> {
+        await this.noteChunkRepository.removeByPath(path);
+
+        this.refreshActiveNote(path);
+    }
+
+    private refreshActiveNote(path: string): void {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (
+            !activeFile ||
+            activeFile.path !== path ||
+            !this.similarNoteCoordinator ||
+            this.similarNoteCoordinator.getSearchMode() !== this.indexKind
+        ) {
+            return;
+        }
+
+        void this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(path);
+    }
+
 }

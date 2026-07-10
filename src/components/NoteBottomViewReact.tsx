@@ -1,4 +1,5 @@
 import { getNoteDisplayText } from "@/utils/displayUtils";
+import type { SearchMode } from "@/domain/model/SearchMode";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { Menu } from "obsidian";
 import { useEffect, useLayoutEffect, useState } from "react";
@@ -19,11 +20,16 @@ export interface NoteBottomViewModel {
     noteDisplayMode: "title" | "path" | "smart";
     sidebarResultCount: number;
     bottomResultCount: number;
+    searchMode: SearchMode;
+    codeModeEnabled: boolean;
 }
 
 interface SimilarNotesHeaderProps {
     collapsed: boolean;
     onToggleCollapse: () => void;
+    searchMode: SearchMode;
+    codeModeEnabled: boolean;
+    onSearchModeChange?: (mode: SearchMode) => void;
 }
 
 export type ViewType = "sidebar" | "bottom";
@@ -34,12 +40,16 @@ interface NoteBottomViewProps {
     leaf: MarkdownView;
     bottomViewModelSubject$: Observable<NoteBottomViewModel>;
     viewType: ViewType;
+    onSearchModeChange?: (mode: SearchMode) => void;
 }
 
 // Header Component
 const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
     collapsed,
     onToggleCollapse,
+    searchMode,
+    codeModeEnabled,
+    onSearchModeChange,
 }) => {
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -49,18 +59,35 @@ const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
     };
 
     return (
-        <div
-            className="tree-item-self is-clickable"
-            onClick={onToggleCollapse}
-            onKeyDown={handleKeyDown}
-        >
+        <div className="similar-notes-header tree-item-self">
             <div
                 className={`similar-notes-title tree-item-itself is-clickable ${
                     collapsed ? "is-collapsed" : ""
                 }`}
+                onClick={onToggleCollapse}
+                onKeyDown={handleKeyDown}
             >
                 <div className="tree-item-inner">Similar notes</div>
             </div>
+            {codeModeEnabled && !collapsed ? (
+                <div
+                    className="similar-notes-mode-switcher"
+                    role="group"
+                    aria-label="Similarity mode"
+                >
+                    {(["notes", "code"] as const).map((mode) => (
+                        <button
+                            key={mode}
+                            type="button"
+                            className={searchMode === mode ? "is-active" : ""}
+                            aria-pressed={searchMode === mode}
+                            onClick={() => onSearchModeChange?.(mode)}
+                        >
+                            {mode === "notes" ? "Notes" : "Code"}
+                        </button>
+                    ))}
+                </div>
+            ) : null}
         </div>
     );
 };
@@ -241,17 +268,21 @@ const SearchResultsContainer = ({
     onNoteClick,
     onContextMenu,
     noteDisplayMode,
+    searchMode,
 }: {
     similarNotes: SimilarNoteEntry[];
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
     noteDisplayMode: "title" | "path" | "smart";
+    searchMode: SearchMode;
 }) => {
     if (similarNotes.length === 0) {
         return (
             <div className="search-result-container">
                 <div className="search-empty-state">
-                    No similar notes found.
+                    {searchMode === "code"
+                        ? "No similar code blocks found."
+                        : "No similar notes found."}
                 </div>
             </div>
         );
@@ -282,12 +313,15 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     leaf,
     bottomViewModelSubject$,
     viewType,
+    onSearchModeChange,
 }) => {
     const [collapsed, setCollapsed] = useState(false);
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
     const [noteDisplayMode, setNoteDisplayMode] = useState<
         "title" | "path" | "smart"
     >("title");
+    const [searchMode, setSearchMode] = useState<SearchMode>("notes");
+    const [codeModeEnabled, setCodeModeEnabled] = useState(false);
 
     useEffect(() => {
         const sub = bottomViewModelSubject$.subscribe((model: NoteBottomViewModel) => {
@@ -300,6 +334,8 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 : model.bottomResultCount;
             setSimilarNotes(model.similarNoteEntries.slice(0, limit));
             setNoteDisplayMode(model.noteDisplayMode);
+            setSearchMode(model.searchMode);
+            setCodeModeEnabled(model.codeModeEnabled);
         });
         return () => sub.unsubscribe();
     }, [bottomViewModelSubject$, leaf.file, viewType]);
@@ -337,7 +373,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     };
 
     const toggleCollapse = () => {
-        setCollapsed(!collapsed);
+        setCollapsed((current) => !current);
     };
 
     return (
@@ -347,6 +383,9 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 <SimilarNotesHeader
                     collapsed={collapsed}
                     onToggleCollapse={toggleCollapse}
+                    searchMode={searchMode}
+                    codeModeEnabled={codeModeEnabled}
+                    onSearchModeChange={onSearchModeChange}
                 />
                 {!collapsed && (
                     <SearchResultsContainer
@@ -354,6 +393,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                         onNoteClick={handleNoteClick}
                         onContextMenu={handleContextMenu}
                         noteDisplayMode={noteDisplayMode}
+                        searchMode={searchMode}
                     />
                 )}
             </div>
