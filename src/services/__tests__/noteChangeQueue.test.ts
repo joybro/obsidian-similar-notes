@@ -78,7 +78,10 @@ describe("FileChangeQueue", () => {
         };
         mockMTimeStore = {
             getMTime: vi.fn().mockReturnValue(undefined),
+            getIndexableTextHash: vi.fn().mockReturnValue(undefined),
             setMTime: vi.fn(),
+            setMetadata: vi.fn(),
+            moveMetadata: vi.fn(),
             deleteMTime: vi.fn(),
             getAllPaths: vi.fn().mockReturnValue([]),
         } as unknown as IndexedNoteMTimeStore;
@@ -155,6 +158,7 @@ describe("FileChangeQueue", () => {
             const queued = fileChangeQueue.pollFileChanges(100);
             expect(queued.map((c) => c.path)).toEqual(["file1.md"]);
             expect(queued[0].attempts ?? 0).toBe(0); // fresh attempt budget
+            expect(queued[0].forceReindex).toBe(true);
             expect(mockErroredStore.clear).toHaveBeenCalled();
         });
     });
@@ -210,9 +214,11 @@ describe("FileChangeQueue", () => {
         expect(changes[0].path).toBe("file1.md");
         expect(changes[0].reason).toBe("modified");
         expect(changes[0].mtime).toBe(1000);
+        expect(changes[0].forceReindex).toBeUndefined();
         expect(changes[1].path).toBe("file2.md");
         expect(changes[1].reason).toBe("modified");
         expect(changes[1].mtime).toBe(2000);
+        expect(changes[1].forceReindex).toBeUndefined();
     });
 
     test("should detect deleted files", async () => {
@@ -249,9 +255,11 @@ describe("FileChangeQueue", () => {
         expect(changes[0].path).toBe("file1.md");
         expect(changes[0].reason).toBe("modified");
         expect(changes[0].mtime).toBe(1000);
+        expect(changes[0].forceReindex).toBe(true);
         expect(changes[1].path).toBe("file2.md");
         expect(changes[1].reason).toBe("modified");
         expect(changes[1].mtime).toBe(2000);
+        expect(changes[1].forceReindex).toBe(true);
     });
 
     test("should poll changes from the queue", async () => {
@@ -277,6 +285,32 @@ describe("FileChangeQueue", () => {
         expect(changes[1].mtime).toBe(2000);
         expect(changes[2].path).toBe("file3.md");
         expect(changes[2].reason).toBe("deleted");
+    });
+
+    test("should expose the stored indexable-text hash", () => {
+        mockMTimeStore.getIndexableTextHash = vi
+            .fn()
+            .mockReturnValue("v1:stored");
+
+        expect(fileChangeQueue.getIndexableTextHash("file1.md")).toBe(
+            "v1:stored"
+        );
+        expect(mockMTimeStore.getIndexableTextHash).toHaveBeenCalledWith(
+            "file1.md"
+        );
+    });
+
+    test("requeue preserves the force-reindex flag", () => {
+        const change = {
+            path: "file1.md",
+            reason: "modified" as const,
+            mtime: 1000,
+            forceReindex: true,
+        };
+
+        fileChangeQueue.requeue(change);
+
+        expect(fileChangeQueue.pollFileChanges(1)).toEqual([change]);
     });
 
     describe("file change event callbacks", () => {
@@ -503,7 +537,7 @@ describe("FileChangeQueue", () => {
     });
 
     describe("markFileChangeProcessed", () => {
-        test("should update mtime store for new files", async () => {
+        test("should persist mtime and hash for new files", async () => {
             // Create a file change
             const change = {
                 path: "file1.md",
@@ -511,14 +545,15 @@ describe("FileChangeQueue", () => {
                 mtime: 1234,
             };
             // Mark the change as processed
-            await fileChangeQueue.markNoteChangeProcessed(change);
-            expect(mockMTimeStore.setMTime).toHaveBeenCalledWith(
+            await fileChangeQueue.markNoteChangeProcessed(change, "v1:new");
+            expect(mockMTimeStore.setMetadata).toHaveBeenCalledWith(
                 "file1.md",
-                1234
+                1234,
+                "v1:new"
             );
         });
 
-        test("should update mtime store for modified files", async () => {
+        test("should persist mtime and hash for modified files", async () => {
             // Create a file change
             const change = {
                 path: "file1.md",
@@ -526,10 +561,27 @@ describe("FileChangeQueue", () => {
                 mtime: 2345,
             };
             // Mark the change as processed
-            await fileChangeQueue.markNoteChangeProcessed(change);
-            expect(mockMTimeStore.setMTime).toHaveBeenCalledWith(
+            await fileChangeQueue.markNoteChangeProcessed(change, "v1:modified");
+            expect(mockMTimeStore.setMetadata).toHaveBeenCalledWith(
                 "file1.md",
-                2345
+                2345,
+                "v1:modified"
+            );
+        });
+
+        test("should persist a zero mtime", async () => {
+            const change = {
+                path: "file1.md",
+                reason: "modified" as const,
+                mtime: 0,
+            };
+
+            await fileChangeQueue.markNoteChangeProcessed(change, "v1:zero");
+
+            expect(mockMTimeStore.setMetadata).toHaveBeenCalledWith(
+                "file1.md",
+                0,
+                "v1:zero"
             );
         });
 
@@ -541,7 +593,7 @@ describe("FileChangeQueue", () => {
             expect(mockMTimeStore.deleteMTime).toHaveBeenCalledWith("file1.md");
         });
 
-        test("#39.5: renamed change transfers mtime from oldPath to newPath in one step", async () => {
+        test("#39.5: pure rename atomically carries metadata from oldPath", async () => {
             const change = {
                 path: "renamed.md",
                 reason: "renamed" as const,
@@ -549,10 +601,30 @@ describe("FileChangeQueue", () => {
                 mtime: 1000,
             };
             await fileChangeQueue.markNoteChangeProcessed(change);
-            expect(mockMTimeStore.deleteMTime).toHaveBeenCalledWith("file1.md");
-            expect(mockMTimeStore.setMTime).toHaveBeenCalledWith(
+            expect(mockMTimeStore.moveMetadata).toHaveBeenCalledWith(
+                "file1.md",
                 "renamed.md",
-                1000
+                1000,
+                undefined
+            );
+            expect(mockMTimeStore.deleteMTime).not.toHaveBeenCalled();
+        });
+
+        test("pure rename uses a freshly computed hash override", async () => {
+            const change = {
+                path: "renamed.md",
+                reason: "renamed" as const,
+                oldPath: "file1.md",
+                mtime: 1000,
+            };
+
+            await fileChangeQueue.markNoteChangeProcessed(change, "v1:fresh");
+
+            expect(mockMTimeStore.moveMetadata).toHaveBeenCalledWith(
+                "file1.md",
+                "renamed.md",
+                1000,
+                "v1:fresh"
             );
         });
     });
@@ -582,7 +654,10 @@ describe("FileChangeQueue", () => {
             };
             mockMTimeStore = {
                 getMTime: vi.fn(),
+                getIndexableTextHash: vi.fn(),
                 setMTime: vi.fn(),
+                setMetadata: vi.fn(),
+                moveMetadata: vi.fn(),
                 deleteMTime: vi.fn(),
                 getAllPaths: vi.fn(),
             } as unknown as IndexedNoteMTimeStore;

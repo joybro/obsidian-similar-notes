@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Improved
+
+-   **Unchanged indexable notes no longer regenerate embeddings** (#51): Writes that only change excluded frontmatter or regex-filtered content now advance indexing state without rerunning local or API embeddings, reducing unnecessary CPU use and provider calls.
+
 ## [1.6.0] - 2026-07-03
 
 ### Added
