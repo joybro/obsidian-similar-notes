@@ -41,6 +41,32 @@ To prevent status bar height from increasing when adding icons:
 }
 ```
 
+## EditorSuggest
+
+### The built-in `[[` link suggester always wins on `[[`
+
+Obsidian shows only **one** `EditorSuggest` popup at a time; the **first**
+suggester in `app.workspace.editorSuggest.suggests` whose `onTrigger` returns
+non-null wins. The built-in `[[` link suggester is hard-wired as **index 0**
+of that array, so any `[[`-prefixed input (e.g. a custom trigger like `[[?`)
+matches the built-in first and a plugin suggester registered later **never
+runs**.
+
+The only way to win on `[[` is to remove the built-in from the array
+(`suggests.slice(1)`), which globally kills normal `[[` autocomplete —
+unacceptable for a plugin that isn't meant to replace it.
+
+**Consequence:** if you want a custom in-editor suggester (e.g. semantic
+search triggered while typing), pick a standalone trigger the built-in
+suggester does not respond to (e.g. `;;`, as used by this plugin's semantic
+link suggester, `src/components/SemanticLinkSuggest.ts`) instead of trying to
+intercept `[[`. This leaves the built-in `[[` flow completely untouched and
+uses only public, documented `EditorSuggest` APIs.
+
+Sources: [Disable Default Link Suggester Modal (forum)](https://forum.obsidian.md/t/disable-default-link-suggester-modal/113219),
+[EditorSuggest API](https://docs.obsidian.md/Reference/TypeScript+API/EditorSuggest),
+[obsidian-tasks #2780](https://github.com/obsidian-tasks-group/obsidian-tasks/issues/2780).
+
 ## Undocumented APIs
 
 ### Opening Plugin Settings Programmatically
