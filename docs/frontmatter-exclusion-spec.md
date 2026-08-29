@@ -65,6 +65,17 @@ rules; they only keep the existing path-pattern filter. An excluded note's
 modify event flows through the queue and resolves to a removal no-op at
 processing time.
 
+## §2.1 Exclusion is one-directional (intentional)
+
+Exclusion removes a note as a recommendation *target*: it never appears in
+other notes' similar-notes results, because it has no indexed chunks. Opening
+an excluded note still shows its own similar-notes panel — the finder
+generates an ad-hoc query embedding when no indexed chunks exist. This is
+deliberate (owner decision, 2026-08-29) and matches how path-excluded notes
+have always behaved. Note the consequence for remote providers: viewing an
+excluded note still sends its content to the embedding API for the query-side
+embedding.
+
 ## §3 Status accounting
 
 `computeIndexStatus` and `visibleErroredEntries` take an
