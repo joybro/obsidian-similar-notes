@@ -66,6 +66,11 @@ obsidian vault=Test_local command id=similar-notes:<command-id> # run the comman
   **non-login shell does not source**. If `obsidian` isn't found, prepend it:
   `PATH="$PATH:/Applications/Obsidian.app/Contents/MacOS"` (or call by full path).
 
+## GitHub Interactions
+
+- **Before merging an external PR, check that origin/main is not behind local main** (`git fetch origin && git log origin/main..main`). Local commits accumulate unpushed (commit is autonomous, push needs confirmation), so a `gh pr merge` can land on a stale base and force a conflict rebase afterwards. If local is ahead, push first (with confirmation), then merge. (2026-08-29: PR #54 merged onto a base missing two local commits.)
+- **Issue/PR comments: always review the draft with the maintainer before posting.** Style for decision comments (declines, wontfix, scope calls): short, one strongest argument as the frame, drop auxiliary arguments that invite rebuttal, no weighty framing phrases ("I want to be upfront about why"). Plain statement, then reasoning.
+
 ## Changelog
 
 `CHANGELOG.md` entries are written from the **user-facing surface** (what the user sees), not from commit logs — and they're written **while the feature is fresh, during the dev session**, not at release time. A later release session re-deriving the exact UI (trigger text, setting labels, affected views) from cold context is slower and error-prone.
