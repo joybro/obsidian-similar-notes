@@ -14,6 +14,7 @@ import {
     ShowSimilarNotesCommand,
     ToggleInDocumentViewCommand,
 } from "./commands";
+import { HOVER_LINK_SOURCE_ID } from "./components/hoverLinkPreview";
 import { SemanticLinkSuggest } from "./components/SemanticLinkSuggest";
 import { SimilarNotesSettingTab } from "./components/SimilarNotesSettingTab";
 import { SimilarNotesSidebarView } from "./components/SimilarNotesSidebarView";
@@ -261,6 +262,14 @@ export default class MainPlugin extends Plugin {
 
         // Register commands
         this.registerCommands();
+
+        // Let Page Preview show note previews for our hover-link events
+        // (bottom pane, sidebar, link suggester), with a per-source Mod-key
+        // toggle in Page Preview settings.
+        this.registerHoverLinkSource(HOVER_LINK_SOURCE_ID, {
+            display: "Similar Notes",
+            defaultMod: true,
+        });
 
         // Register the semantic link suggester (standalone trigger; default ";;")
         this.registerEditorSuggest(

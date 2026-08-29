@@ -7,12 +7,15 @@ import {
     type EditorPosition,
     type EditorSuggestContext,
     type EditorSuggestTriggerInfo,
+    type HoverParent,
+    type HoverPopover,
     type TFile,
 } from "obsidian";
 import log from "loglevel";
 import type { SettingsService } from "@/application/SettingsService";
 import type { SimilarNote } from "@/domain/model/SimilarNote";
 import type { TextSearchService } from "@/domain/service/TextSearchService";
+import { triggerHoverLink } from "./hoverLinkPreview";
 import { parseTrigger } from "./semanticLinkTrigger";
 import { resolveWikilink } from "./semanticSearchActions";
 
@@ -28,7 +31,13 @@ export const DEBOUNCE_MS = 300;
  * the selected note. Uses a non-`[[` trigger on purpose: Obsidian's built-in
  * link suggester is index 0 of `editorSuggest.suggests` and always wins on `[[`.
  */
-export class SemanticLinkSuggest extends EditorSuggest<SimilarNote> {
+export class SemanticLinkSuggest
+    extends EditorSuggest<SimilarNote>
+    implements HoverParent
+{
+    /** Lets this suggester own the Page Preview popovers it triggers. */
+    hoverPopover: HoverPopover | null = null;
+
     /**
      * Trailing debounce over the expensive embedding search. Each keystroke
      * resets the timer; only the last invocation's callback fires, so superseded
@@ -104,6 +113,16 @@ export class SemanticLinkSuggest extends EditorSuggest<SimilarNote> {
         aux.createSpan({
             cls: "suggestion-flair semantic-search-score",
             text: note.similarity.toFixed(2),
+        });
+        el.addEventListener("mouseover", (event) => {
+            triggerHoverLink(
+                this.app.workspace,
+                event,
+                this,
+                el,
+                note.path,
+                this.context?.file?.path ?? ""
+            );
         });
     }
 

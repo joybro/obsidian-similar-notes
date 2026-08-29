@@ -55,6 +55,7 @@ describe("SimilarNotesViewReact", () => {
         mockWorkspace = {
             getLeaf: vi.fn().mockReturnValue(mockLeaf),
             openLinkText: mockOpenLinkText,
+            trigger: vi.fn(),
         };
         currentFile = createMockTFile("current-file.md");
         bottomViewModelSubject$ = new BehaviorSubject({
@@ -156,5 +157,27 @@ describe("SimilarNotesViewReact", () => {
         const noteElement = await screen.findByText("Similar Note 1");
         fireEvent.click(noteElement);
         expect(mockOpenLinkText).toHaveBeenCalledWith("similar1.md", "", false);
+    });
+
+    test("emits hover-link for Page Preview when a note row is hovered (issue #55)", async () => {
+        render(
+            <NoteBottomViewReact
+                workspace={mockWorkspace as unknown as Workspace}
+                leaf={mockLeaf as unknown as MarkdownView}
+                bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
+            />
+        );
+        const noteElement = await screen.findByText("Similar Note 1");
+        fireEvent.mouseOver(noteElement);
+        expect(mockWorkspace.trigger).toHaveBeenCalledWith(
+            "hover-link",
+            expect.objectContaining({
+                source: "similar-notes",
+                linktext: "similar1.md",
+                hoverParent: expect.objectContaining({ hoverPopover: null }),
+                targetEl: expect.any(HTMLElement),
+            })
+        );
     });
 });

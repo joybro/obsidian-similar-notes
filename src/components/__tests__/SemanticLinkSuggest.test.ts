@@ -166,3 +166,37 @@ describe("SemanticLinkSuggest.selectSuggestion (spec item: insert)", () => {
         );
     });
 });
+
+describe("SemanticLinkSuggest.renderSuggestion hover preview (issue #55)", () => {
+    it("emits hover-link for Page Preview when a suggestion is hovered", () => {
+        const trigger = vi.fn();
+        const app = { workspace: { trigger } };
+        const suggest = makeSuggest({ app });
+        suggest.context = { file: { path: "src.md" } } as never;
+
+        const el = document.createElement("div");
+        // renderSuggestion relies on Obsidian's DOM helpers; stub the two used.
+        (el as never as { addClass: () => void }).addClass = vi.fn();
+        (el as never as { createDiv: () => unknown }).createDiv = () => {
+            const child = document.createElement("div");
+            (child as never as { createDiv: () => unknown }).createDiv =
+                () => document.createElement("div");
+            (child as never as { createSpan: () => unknown }).createSpan =
+                () => document.createElement("span");
+            return child;
+        };
+
+        suggest.renderSuggestion(makeNote("Frankenstein"), el);
+        const event = new MouseEvent("mouseover");
+        el.dispatchEvent(event);
+
+        expect(trigger).toHaveBeenCalledWith("hover-link", {
+            event,
+            source: "similar-notes",
+            hoverParent: suggest,
+            targetEl: el,
+            linktext: "Frankenstein.md",
+            sourcePath: "src.md",
+        });
+    });
+});
