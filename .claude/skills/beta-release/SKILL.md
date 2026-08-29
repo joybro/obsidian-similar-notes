@@ -90,7 +90,11 @@ Wait for the workflow with `gh run watch <id>` (or `gh run list --workflow=relea
 
 ### 5. Draft the release body and hand off to the maintainer
 
-The maintainer publishes via the GitHub UI (so they visually confirm assets + flags). Provide a release body draft. Template:
+The maintainer publishes via the GitHub UI (so they visually confirm assets + flags). Provide a release body draft.
+
+**Scope for beta.2+ bodies: incremental, not cumulative** (decided 2026-08-29, 1.7.0-beta.3). Detail only what's new since the previous *published* beta, then one line "Everything from [X.Y.Z-beta.N-1](link) is included: <comma-list of headline items>". Rationale: the primary readers are BRAT testers already on the previous beta (they need the delta); newcomers from an issue link get the cumulative picture via the one-line link; full duplication drifts as entries get edited across betas. The CHANGELOG `[X.Y.Z]` section remains the cumulative record and the stable release note aggregates. (A beta whose predecessor was never published — like 1.7.0-beta.2 after unpublished beta.1 — is effectively the first beta: write it cumulatively.)
+
+Template (first beta of a cycle; adapt the intro and body scope per the rule above for beta.2+):
 
 ```markdown
 First beta of the X.Y.Z release — <one-line summary of the headline changes> (#refs, with contributor credits inline).
