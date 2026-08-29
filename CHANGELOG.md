@@ -12,8 +12,6 @@ All notable changes to this project will be documented in this file.
 
 -   **"Folder patterns" setting renamed to "Path patterns"**: the glob patterns have always matched full file paths (e.g. `Private/secret.md`, `**/drafts/*`), not just folders. The setting's stored value is unchanged.
 
-## [1.7.0] - 2026-08-29
-
 ### Improved
 
 -   **Unchanged indexable notes no longer regenerate embeddings** (#51): Writes that only change excluded frontmatter or regex-filtered content now advance indexing state without rerunning local or API embeddings, reducing unnecessary CPU use and provider calls.
