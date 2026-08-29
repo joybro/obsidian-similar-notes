@@ -76,6 +76,7 @@ obsidian vault=Test_local command id=similar-notes:<command-id> # run the comman
 `CHANGELOG.md` entries are written from the **user-facing surface** (what the user sees), not from commit logs — and they're written **while the feature is fresh, during the dev session**, not at release time. A later release session re-deriving the exact UI (trigger text, setting labels, affected views) from cold context is slower and error-prone.
 
 - When you ship a user-facing feature or fix, add an entry under a `## [Unreleased]` section at the top of `CHANGELOG.md` before wrapping up the session — match the existing format: `**Title** (#N): what the user sees`, grouped under Added / Changed / Improved / Fixed.
+- **Exception — a version is mid-beta:** while `X.Y.Z-beta.N` is the current version (check `package.json`) and `## [X.Y.Z]` already exists in the changelog, new entries go into that section directly, not `Unreleased` — they will ship in that version's stable release.
 - Do **not** assign a version or date. The `beta-release` / `bump-version` skills rename `## [Unreleased]` → `## [X.Y.Z] - YYYY-MM-DD` at release time.
 - Internal-only changes (refactors, test scaffolding, build config) need no entry.
 
