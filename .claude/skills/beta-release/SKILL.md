@@ -93,7 +93,7 @@ Wait for the workflow with `gh run watch <id>` (or `gh run list --workflow=relea
 The maintainer publishes via the GitHub UI (so they visually confirm assets + flags). Provide a release body draft. Template:
 
 ```markdown
-First beta of the X.Y.Z release — <one-line summary of the headline changes> (#refs).
+First beta of the X.Y.Z release — <one-line summary of the headline changes> (#refs, with contributor credits inline).
 
 ## Installing via BRAT
 
@@ -104,10 +104,16 @@ First beta of the X.Y.Z release — <one-line summary of the headline changes> (
 
 <summarize the CHANGELOG entry here — do NOT paste a long entry verbatim. Keep each item's bold title + one-sentence "what the user sees"; drop nested sub-bullets and deep mechanism prose; merge same-root-cause Fixed items into one line. The release note is a scannable announcement; the CHANGELOG file stays detailed and untouched.>
 
+## Feedback
+
+If anything looks off (<2-3 concrete symptoms specific to this beta's changes>), please report on #<issue> or #<issue>. Thanks!
+
 ## Known limitation (optional)
 
 <list anything unfixed, e.g. cannot-reproduce reports>
 ```
+
+**Credit contributors inline in the intro line** — maintainer convention (asked for explicitly on 1.7.0-beta.2 when a draft omitted it). Forms: `(#42, suggested by @user)` for an idea/report, `(#51, contributed by @user in #54)` for a PR. Check each shipped item's issue/PR for who to credit. The **Feedback section is standing, not optional** — it routes reports to the tracked issues (release pages have no comment box, see Gotchas).
 
 **Set the body on the draft yourself** — do not make the maintainer paste it. `gh release edit` modifies the draft's body only; it does NOT publish (the release stays `draft: true`):
 
