@@ -39,9 +39,7 @@ behavior, focus handling, anything not coverable by Vitest):
    `install-local` (or `./scripts/install-local.sh` if already built).
 2. In Obsidian, disable → re-enable the plugin (or restart) to load the new build.
 
-This is the canonical manual-verification path. (The `Young_Old` vault instead
-symlinks its plugin folder to this repo root, so a `npm run build` + reload there
-picks up changes without copying — but Test_local is the one to use by default.)
+This is the canonical manual-verification path.
 
 #### Self-driven verification via the Obsidian CLI (command features)
 
@@ -94,8 +92,7 @@ obsidian dev:cdp method=Input.insertText params='{"text":";;query"}'  # real typ
 
 ## GitHub Interactions
 
-- **Before merging an external PR, check that origin/main is not behind local main** (`git fetch origin && git log origin/main..main`). Local commits accumulate unpushed (commit is autonomous, push needs confirmation), so a `gh pr merge` can land on a stale base and force a conflict rebase afterwards. If local is ahead, push first (with confirmation), then merge. (2026-08-29: PR #54 merged onto a base missing two local commits.)
-- **Issue/PR comments: always review the draft with the maintainer before posting.** Style for decision comments (declines, wontfix, scope calls): short, one strongest argument as the frame, drop auxiliary arguments that invite rebuttal, no weighty framing phrases ("I want to be upfront about why"). Plain statement, then reasoning.
+- **Before merging an external PR, check that origin/main is not behind local main** (`git fetch origin && git log origin/main..main`). Local commits can accumulate unpushed, so a `gh pr merge` can land on a stale base and force a conflict rebase afterwards. If local is ahead, push first, then merge. (2026-08-29: PR #54 merged onto a base missing two local commits.)
 
 ## Changelog
 
