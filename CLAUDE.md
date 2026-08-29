@@ -57,6 +57,8 @@ obsidian vault=Test_local command id=similar-notes:<command-id> # run the comman
 
 - `vault=<name>` **must be the first parameter**. It targets that vault even with
   several vault windows open, so it won't touch your other vaults.
+- Use `obsidian help` (subcommand) — `obsidian --help` is not recognized and hangs
+  the shell instead of printing usage.
 - Requires the Obsidian app already running with the target vault open.
 - **macOS PATH gotcha:** the CLI binary lives inside the app bundle
   (`/Applications/Obsidian.app/Contents/MacOS/obsidian` — the same file as the GUI on
