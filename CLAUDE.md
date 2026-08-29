@@ -66,6 +66,32 @@ obsidian vault=Test_local command id=similar-notes:<command-id> # run the comman
   **non-login shell does not source**. If `obsidian` isn't found, prepend it:
   `PATH="$PATH:/Applications/Obsidian.app/Contents/MacOS"` (or call by full path).
 
+#### UI verification without touching the mouse (eval + CDP)
+
+For UI behavior the command CLI can't drive (hover, real typing), the CLI's developer
+commands close the gap — verified end-to-end on the #55 hover-preview feature:
+
+```bash
+obsidian eval code="<js>"        # run JS in the app; app/document available; returns => result
+obsidian dev:debug on            # attach CDP (dev:debug off when done)
+obsidian dev:cdp method=Input.dispatchMouseEvent \
+    params='{"type":"mouseMoved","x":763,"y":227,"modifiers":4}'   # modifiers:4 = Cmd
+obsidian dev:cdp method=Input.insertText params='{"text":";;query"}'  # real typing
+```
+
+- **`element.dispatchEvent(new MouseEvent(...))` does NOT work for hover-preview-class
+  features** — synthetic events are untrusted and filtered. CDP `Input.*` events are
+  trusted; this is the difference that matters.
+- Measure coordinates via `eval` (`getBoundingClientRect`), `scrollIntoView` first if
+  off-screen, and re-measure right before dispatch (result lists re-render/re-order).
+- Programmatic `editor.replaceRange` does not open an `EditorSuggest`; CDP
+  `Input.insertText` after focusing the editor does.
+- Run a **positive control** first against a core feature with the same mechanism
+  (e.g. the embedded backlinks pane for hover preview) to validate the harness before
+  trusting a negative result.
+- `eval` gotcha: a literal `\n` inside `code=` is translated by the CLI and breaks the
+  JS — use `String.fromCharCode(10)`.
+
 ## GitHub Interactions
 
 - **Before merging an external PR, check that origin/main is not behind local main** (`git fetch origin && git log origin/main..main`). Local commits accumulate unpushed (commit is autonomous, push needs confirmation), so a `gh pr merge` can land on a stale base and force a conflict rebase afterwards. If local is ahead, push first (with confirmation), then merge. (2026-08-29: PR #54 merged onto a base missing two local commits.)
