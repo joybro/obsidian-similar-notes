@@ -1,7 +1,7 @@
 import type { SettingsService } from "@/application/SettingsService";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
-import type { TFile, Vault } from "obsidian";
+import type { MetadataCache, TFile, Vault } from "obsidian";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { NoteChangeQueue } from "../noteChangeQueue";
 
@@ -48,6 +48,7 @@ type MockVault = Pick<
 // eslint-disable-next-line max-lines-per-function
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
+    let mockMetadataCache: MetadataCache;
     let mockMTimeStore: IndexedNoteMTimeStore;
     let mockErroredStore: ErroredNoteStore;
     let mockSettingsService: SettingsService;
@@ -94,16 +95,22 @@ describe("FileChangeQueue", () => {
             set: vi.fn().mockResolvedValue(undefined),
         } as unknown as ErroredNoteStore;
         
+        mockMetadataCache = {
+            getFileCache: vi.fn().mockReturnValue(null),
+        } as unknown as MetadataCache;
+
         mockSettingsService = {
             get: vi.fn().mockReturnValue({
                 excludeFolderPatterns: [],
+                excludeFrontmatterRules: [],
                 indexingDelaySeconds: 0, // Disable debounce for tests
             }),
         } as unknown as SettingsService;
-        
+
         // Create a new file change queue
         fileChangeQueue = new NoteChangeQueue(
             mockVault as unknown as Vault,
+            mockMetadataCache,
             mockMTimeStore,
             mockSettingsService,
             mockErroredStore
@@ -673,6 +680,7 @@ describe("FileChangeQueue", () => {
             });
             fileChangeQueue = new NoteChangeQueue(
                 mockVault as unknown as Vault,
+                mockMetadataCache,
                 mockMTimeStore,
                 mockSettingsService
             );
@@ -684,6 +692,7 @@ describe("FileChangeQueue", () => {
             // initialize the queue again (= plugin reload)
             fileChangeQueue = new NoteChangeQueue(
                 mockVault as unknown as Vault,
+                mockMetadataCache,
                 mockMTimeStore,
                 mockSettingsService
             );
@@ -692,6 +701,56 @@ describe("FileChangeQueue", () => {
             // because they were not marked as processed
             changes = fileChangeQueue.pollFileChanges(5);
             expect(changes).toHaveLength(2);
+        });
+    });
+
+    describe("frontmatter exclusion in sync analysis (frontmatter-exclusion spec §2)", () => {
+        beforeEach(() => {
+            mockSettingsService.get = vi.fn().mockReturnValue({
+                excludeFolderPatterns: [],
+                excludeFrontmatterRules: ["tags: noindex"],
+                indexingDelaySeconds: 0,
+            });
+            // file1.md carries the exclusion tag; file2.md has no frontmatter
+            mockMetadataCache.getFileCache = vi
+                .fn()
+                .mockImplementation((file: TFile) =>
+                    file.path === "file1.md"
+                        ? { frontmatter: { tags: ["noindex"] } }
+                        : null
+                );
+            fileChangeQueue = new NoteChangeQueue(
+                mockVault as unknown as Vault,
+                mockMetadataCache,
+                mockMTimeStore,
+                mockSettingsService,
+                mockErroredStore
+            );
+        });
+
+        test("initialize does not queue a frontmatter-excluded note for indexing", async () => {
+            await fileChangeQueue.initialize();
+            const changes = fileChangeQueue.pollFileChanges(5);
+            expect(changes).toEqual([
+                { path: "file2.md", reason: "new", mtime: 2000 },
+            ]);
+        });
+
+        test("an indexed note that is now frontmatter-excluded is queued for removal", async () => {
+            mockMTimeStore.getAllPaths = vi.fn(() => ["file1.md"]);
+            mockMTimeStore.getMTime = vi.fn(() => 1000);
+            await fileChangeQueue.initialize();
+            const changes = fileChangeQueue.pollFileChanges(5);
+            expect(changes).toContainEqual({
+                path: "file1.md",
+                reason: "deleted",
+            });
+        });
+
+        test("enqueueAllNotes skips frontmatter-excluded notes", async () => {
+            await fileChangeQueue.enqueueAllNotes();
+            const changes = fileChangeQueue.pollFileChanges(5);
+            expect(changes.map((c) => c.path)).toEqual(["file2.md"]);
         });
     });
 });

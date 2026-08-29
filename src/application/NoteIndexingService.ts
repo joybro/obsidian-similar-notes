@@ -6,6 +6,7 @@ import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { NoteChange, NoteChangeQueue } from "@/infrastructure/noteChangeQueue";
 import { showNoteErrorNotice } from "@/utils/errorHandling";
+import { shouldExcludeByFrontmatter } from "@/utils/frontmatterExclusion";
 import { applyExclusionPatterns } from "@/utils/indexableText";
 import { computeIndexableTextHash } from "@/utils/indexableTextHash";
 import log from "loglevel";
@@ -68,6 +69,40 @@ export class NoteIndexingService {
         log.info(`[NoteIndexingService] ===== Processing change: ${change.path} (${change.reason}) =====`);
 
         try {
+            // Authoritative frontmatter-exclusion check (frontmatter-exclusion
+            // spec §2). It runs here, not at event/queue time, because
+            // metadataCache lags vault events — by processing time the cache
+            // is warm. An excluded note ends up exactly like a path-excluded
+            // one: no chunks, no mtime/hash metadata.
+            if (
+                change.reason !== "deleted" &&
+                this.isFrontmatterExcluded(change.path)
+            ) {
+                log.info(
+                    `[NoteIndexingService] ${change.path} is frontmatter-excluded, removing from index`
+                );
+                if (change.reason === "renamed" && change.oldPath) {
+                    await this.noteChunkRepository.removeByPath(
+                        change.oldPath
+                    );
+                    await this.noteChangeQueue.markNoteChangeProcessed({
+                        path: change.oldPath,
+                        reason: "deleted",
+                    });
+                }
+                await this.removeIndexedChunksAndRefreshActiveNote(
+                    change.path
+                );
+                await this.noteChangeQueue.markNoteChangeProcessed({
+                    path: change.path,
+                    reason: "deleted",
+                });
+                if (this.erroredNoteStore.get(change.path)) {
+                    await this.erroredNoteStore.delete(change.path);
+                }
+                return;
+            }
+
             let indexableTextHash: string | undefined;
 
             if (change.reason === "deleted") {
@@ -304,6 +339,20 @@ export class NoteIndexingService {
         }
 
         return indexableTextHash;
+    }
+
+    private isFrontmatterExcluded(path: string): boolean {
+        const rules =
+            this.settingsService.get().excludeFrontmatterRules ?? [];
+        if (rules.length === 0) return false;
+
+        const file = this.app.vault.getFileByPath(path);
+        if (!file) return false;
+
+        return shouldExcludeByFrontmatter(
+            this.app.metadataCache.getFileCache(file)?.frontmatter,
+            rules
+        );
     }
 
     private async removeIndexedChunksAndRefreshActiveNote(

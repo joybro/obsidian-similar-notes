@@ -4,7 +4,17 @@ import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepositor
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import { computeIndexStatus, visibleErroredEntries } from "@/application/indexStatus";
-import { isValidGlobPattern, shouldExcludeFile } from "@/utils/folderExclusion";
+import {
+    isNoteExcluded,
+    noteExclusionSource,
+    type NoteExclusionSettings,
+} from "@/utils/noteExclusion";
+import {
+    buildExcludeFrontmatterSetting,
+    buildExcludePathsSetting,
+    renderExcludedFilesList,
+    type ExcludedFileEntry,
+} from "./fileExclusionSettings";
 import log from "loglevel";
 import type { App, Setting } from "obsidian";
 import { Notice, SettingGroup } from "obsidian";
@@ -43,6 +53,28 @@ export class IndexSettingsSection {
         this.regexpTester = new RegexpExclusionTester(props.settingsService);
     }
 
+    /** Current path-pattern + frontmatter-rule exclusion settings. */
+    private exclusionSettings(): NoteExclusionSettings {
+        const settings = this.props.settingsService.get();
+        return {
+            excludeFolderPatterns: settings.excludeFolderPatterns || [],
+            excludeFrontmatterRules: settings.excludeFrontmatterRules || [],
+        };
+    }
+
+    /** metadataCache-backed frontmatter lookup for the exclusion predicate. */
+    private getFrontmatter = (
+        path: string
+    ): Record<string, unknown> | undefined => {
+        const { app } = this.props;
+        const file = app.vault.getFileByPath(path);
+        if (!file) return undefined;
+        return app.metadataCache.getFileCache(file)?.frontmatter;
+    };
+
+    private isExcluded = (path: string): boolean =>
+        isNoteExcluded(path, this.exclusionSettings(), this.getFrontmatter);
+
     /**
      * Update just the statistics without rebuilding the entire section
      */
@@ -61,15 +93,14 @@ export class IndexSettingsSection {
      */
     private renderStats(indexedChunkCount: number): void {
         if (!this.indexedStat || !this.excludedStat) return;
-        const { app, settingsService } = this.props;
+        const { app } = this.props;
         const allPaths = app.vault.getMarkdownFiles().map((f) => f.path);
-        const patterns = settingsService.get().excludeFolderPatterns || [];
         const indexedPaths = this.props.mTimeStore?.getAllPaths() ?? [];
         const erroredPaths = this.props.erroredStore?.getAllPaths() ?? [];
 
         const status = computeIndexStatus(
             allPaths,
-            patterns,
+            this.isExcluded,
             indexedPaths,
             erroredPaths
         );
@@ -98,12 +129,13 @@ export class IndexSettingsSection {
         const indexGroup = new SettingGroup(this.sectionContainer!).setHeading("Index");
         this.getIndexSettingBuilders().forEach((builder) => indexGroup.addSetting(builder));
 
-        // Folder exclusion (which files are indexed) and content exclusion (what
-        // text within a file is indexed) are distinct concerns, so each gets its
-        // own group. SettingGroup can't nest and Setting-level sub-headings
-        // render poorly, so sibling groups are the clean way to separate them.
-        const folderExclusionGroup = new SettingGroup(this.sectionContainer!).setHeading("Exclude folders from index");
-        this.getFolderExclusionSettingBuilders().forEach((builder) => folderExclusionGroup.addSetting(builder));
+        // File exclusion (which files are indexed — path patterns and
+        // frontmatter rules) and content exclusion (what text within a file is
+        // indexed) are distinct concerns, so each gets its own group.
+        // SettingGroup can't nest and Setting-level sub-headings render
+        // poorly, so sibling groups are the clean way to separate them.
+        const fileExclusionGroup = new SettingGroup(this.sectionContainer!).setHeading("Exclude files from index");
+        this.getFileExclusionSettingBuilders().forEach((builder) => fileExclusionGroup.addSetting(builder));
 
         const contentExclusionGroup = new SettingGroup(this.sectionContainer!).setHeading("Exclude content from index");
         this.getContentExclusionSettingBuilders().forEach((builder) => contentExclusionGroup.addSetting(builder));
@@ -211,32 +243,36 @@ export class IndexSettingsSection {
     }
 
     /**
-     * Builders for the "Exclude folders from index" group — which files are
-     * indexed: the glob-pattern input, the preview of excluded files, and the
-     * Apply action that syncs the index (which acts on folder patterns only).
+     * Builders for the "Exclude files from index" group — which files are
+     * indexed: the path-glob input, the frontmatter-rule input, the preview of
+     * excluded files, and the Apply action that syncs the index against both.
      */
-    private getFolderExclusionSettingBuilders(): SettingBuilder[] {
+    private getFileExclusionSettingBuilders(): SettingBuilder[] {
         const { settingsService } = this.props;
         const settings = settingsService.get();
 
+        const onExclusionChanged = () => this.updateExcludedFilesList();
+
         return [
-            // Exclude folders
-            (setting) => this.buildExcludeFoldersSetting(setting, settings, settingsService),
+            // Exclude by path pattern
+            (setting) => buildExcludePathsSetting(setting, settings, settingsService, onExclusionChanged),
+            // Exclude by frontmatter rule
+            (setting) => buildExcludeFrontmatterSetting(setting, settings, settingsService, onExclusionChanged),
             // Excluded files preview
             (setting) => {
                 setting.setDesc("");
                 this.excludedFilesDescription = setting.descEl;
                 this.excludedFilesList = setting.controlEl.createDiv("similar-notes-excluded-files-list");
             },
-            // Apply exclusion patterns (acts on folder/glob patterns)
+            // Apply exclusion rules (path patterns + frontmatter rules)
             (setting) => {
                 setting
-                    .setName("Apply folder patterns")
-                    .setDesc("Add or remove files to match the current folder patterns, without a full reindex. Content patterns apply only on reindex or when a note is edited.")
+                    .setName("Apply exclusion rules")
+                    .setDesc("Add or remove files to match the current path patterns and frontmatter rules, without a full reindex. Content patterns apply only on reindex or when a note is edited.")
                     .addButton((button) => {
                         button
-                            .setButtonText("Apply Patterns")
-                            .setTooltip("Sync indexed files with the current folder patterns")
+                            .setButtonText("Apply Rules")
+                            .setTooltip("Sync indexed files with the current exclusion rules")
                             .onClick(async () => this.handleApplyExclusionPatterns());
                     });
             },
@@ -257,47 +293,6 @@ export class IndexSettingsSection {
             // RegExp tester (tests the content-exclusion patterns above)
             (setting) => this.regexpTester.render(setting),
         ];
-    }
-
-    private buildExcludeFoldersSetting(
-        setting: Setting,
-        settings: SimilarNotesSettings,
-        settingsService: SettingsService
-    ): void {
-        setting
-            .setName("Folder patterns")
-            .setDesc("Enter glob patterns to exclude folders/files from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes.")
-            .addTextArea((text) => {
-                text.inputEl.rows = 5;
-                text.inputEl.cols = 40;
-                text.setValue(settings.excludeFolderPatterns.join("\n"));
-                text.setPlaceholder("Templates/\nArchive/\n*.tmp\n**/drafts/*");
-
-                const errorClass = "similar-notes-regexp-error";
-
-                text.onChange(async (value) => {
-                    let hasError = false;
-                    text.inputEl.removeClass(errorClass);
-
-                    const patterns = value.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
-                    const validPatterns: string[] = [];
-
-                    for (const pattern of patterns) {
-                        if (isValidGlobPattern(pattern)) {
-                            validPatterns.push(pattern);
-                        } else {
-                            hasError = true;
-                        }
-                    }
-
-                    if (hasError) {
-                        text.inputEl.addClass(errorClass);
-                    }
-
-                    await settingsService.update({ excludeFolderPatterns: validPatterns });
-                    this.updateExcludedFilesList();
-                });
-            });
     }
 
     private buildExcludeContentSetting(
@@ -376,14 +371,17 @@ export class IndexSettingsSection {
     private updateErroredFilesList(): void {
         const allEntries = this.props.erroredStore?.getAll() ?? {};
         // Mirror the "Errored: N" stat's precedence: hide entries for files that
-        // are now excluded by a glob, or no longer present in the vault — so the
-        // list and its count never disagree with the stat.
+        // are now excluded (path pattern or frontmatter rule), or no longer
+        // present in the vault — so the list and its count never disagree with
+        // the stat.
         const vaultPaths = this.props.app.vault
             .getMarkdownFiles()
             .map((f) => f.path);
-        const patterns =
-            this.props.settingsService.get().excludeFolderPatterns || [];
-        const entries = visibleErroredEntries(allEntries, vaultPaths, patterns);
+        const entries = visibleErroredEntries(
+            allEntries,
+            vaultPaths,
+            this.isExcluded
+        );
 
         if (this.erroredFilesDescription) {
             this.erroredFilesDescription.empty();
@@ -405,30 +403,29 @@ export class IndexSettingsSection {
     private updateExcludedFilesList(): void {
         if (!this.excludedFilesDescription || !this.excludedFilesList) return;
 
-        const { app, settingsService } = this.props;
+        const { app } = this.props;
         const allFiles = app.vault.getMarkdownFiles();
-        const currentSettings = settingsService.get();
-        const patterns = currentSettings.excludeFolderPatterns;
+        const exclusionSettings = this.exclusionSettings();
 
-        const excludedFiles = allFiles.filter((file) => shouldExcludeFile(file.path, patterns));
-
-        this.excludedFilesDescription.innerHTML = `
-            <div>Excluded files:</div>
-            <div style="font-size: var(--font-ui-smaller); color: var(--text-muted);">${excludedFiles.length} files total</div>
-        `;
-
-        this.excludedFilesList.empty();
-
-        if (excludedFiles.length === 0) {
-            const emptyMessage = this.excludedFilesList.createDiv("similar-notes-excluded-empty");
-            emptyMessage.setText("No files excluded");
-        } else {
-            excludedFiles.slice(0, Math.min(100, excludedFiles.length)).forEach((file) => {
-                const fileItem = this.excludedFilesList!.createDiv("similar-notes-excluded-file-item");
-                fileItem.setText(file.path);
-                fileItem.title = file.path;
-            });
+        // Each excluded file is badged with the mechanism that excluded it
+        // (frontmatter-exclusion spec §3).
+        const excludedFiles: ExcludedFileEntry[] = [];
+        for (const file of allFiles) {
+            const source = noteExclusionSource(
+                file.path,
+                exclusionSettings,
+                this.getFrontmatter
+            );
+            if (source !== null) {
+                excludedFiles.push({ path: file.path, source });
+            }
         }
+
+        renderExcludedFilesList(
+            this.excludedFilesDescription,
+            this.excludedFilesList,
+            excludedFiles
+        );
     }
 
     private handleApplyExclusionPatterns(): void {

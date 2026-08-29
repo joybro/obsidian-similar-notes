@@ -74,9 +74,11 @@ src/
 
 8. **Honest indexing status**: Every markdown file is assigned to exactly one of Excluded / Errored / Pending / Indexed by precedence (`computeIndexStatus`, `src/application/indexStatus.ts`), replacing an old `total − indexed` guess that lumped errored files into "Excluded". Notes that fail processing retry in-session up to `MAX_ATTEMPTS` (3) before landing in a persistent `ErroredNoteStore`, and a terminally-errored note is not blindly re-queued on restart unless its content changed. See `docs/indexing-status-spec.md`.
 
-9. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
+9. **Frontmatter-based file exclusion**: Notes can opt out of indexing from inside the note via frontmatter rules (`key` / `key: value`, matched against the parsed `metadataCache` frontmatter, never raw YAML). The authoritative check runs at processing time in `NoteIndexingService` (metadataCache lags vault events), with `NoteChangeQueue.analyzeSyncNeeds` also applying it during bulk sync. See `docs/frontmatter-exclusion-spec.md`.
 
-   - **Sectioning**: The settings tab is divided into top-level sections using Obsidian's `SettingGroup` (`@since 1.11.0`) — one per area (e.g. Model, Index, Exclude folders from index, Exclude content from index, Display, Debug & Support). Each section is built by a `*SettingsSection` class (e.g. `IndexSettingsSection`) that returns `SettingBuilder` arrays.
+10. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
+
+   - **Sectioning**: The settings tab is divided into top-level sections using Obsidian's `SettingGroup` (`@since 1.11.0`) — one per area (e.g. Model, Index, Exclude files from index, Exclude content from index, Display, Debug & Support). Each section is built by a `*SettingsSection` class (e.g. `IndexSettingsSection`) that returns `SettingBuilder` arrays.
    - **Use sibling groups, not sub-headings.** `SettingGroup` cannot nest, and inserting `Setting.setHeading()` divider rows *inside* a group renders poorly (tried more than once and reverted). To break a crowded section into sub-areas, add another sibling top-level `SettingGroup` instead of nesting or in-group headings.
 
 10. **Content Exclusion**: Supports RegExp patterns to exclude content from indexing (e.g., frontmatter, code blocks).

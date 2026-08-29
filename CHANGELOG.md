@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+-   **Frontmatter-based note exclusion** (#42): Notes can now opt out of indexing from inside the note. Settings → Exclude files from index gains a **Frontmatter properties** input (one rule per line): `key` excludes notes where the property exists, `key: value` excludes notes where the property equals the value or the list contains it — so `tags: noindex`, `categories: [[Private]]`, and `embed: false` all work. The excluded-files preview badges each file with what excluded it (`path` / `frontmatter`), and the **Apply Rules** button syncs the index against both path patterns and frontmatter rules.
+
+### Changed
+
+-   **"Folder patterns" setting renamed to "Path patterns"**: the glob patterns have always matched full file paths (e.g. `Private/secret.md`, `**/drafts/*`), not just folders. The setting's stored value is unchanged.
+
 ## [1.7.0] - 2026-08-29
 
 ### Improved

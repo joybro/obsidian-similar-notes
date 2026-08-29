@@ -211,6 +211,29 @@
     text-overflow: ellipsis;
     max-width: 100%;
     text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.similar-notes-excluded-file-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.similar-notes-exclusion-badge {
+    flex-shrink: 0;
+    font-size: var(--font-ui-smaller);
+    border-radius: 4px;
+    padding: 0 0.4em;
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+}
+
+.similar-notes-exclusion-badge-frontmatter {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-accent);
 }
 
 .similar-notes-excluded-file-item:hover {

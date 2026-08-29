@@ -742,3 +742,111 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
         );
     });
 });
+
+describe("frontmatter exclusion at processing time (frontmatter-exclusion spec §2)", () => {
+    // Simulate a warm metadataCache for a file carrying the exclusion tag.
+    function armExclusion(
+        mocks: ReturnType<typeof makeService>,
+        excludedPaths: string[]
+    ) {
+        mocks.settingsService.get.mockReturnValue({
+            includeFrontmatter: false,
+            excludeRegexPatterns: [],
+            excludeFrontmatterRules: ["tags: noindex"],
+        });
+        const appMock = mocks.app as unknown as {
+            vault: { getFileByPath: ReturnType<typeof vi.fn> };
+            metadataCache: { getFileCache: ReturnType<typeof vi.fn> };
+        };
+        appMock.vault = {
+            getFileByPath: vi.fn((path: string) => ({ path })),
+        };
+        appMock.metadataCache = {
+            getFileCache: vi.fn((file: { path: string }) =>
+                excludedPaths.includes(file.path)
+                    ? { frontmatter: { tags: ["noindex"] } }
+                    : null
+            ),
+        };
+    }
+
+    test("a modified note that is frontmatter-excluded is removed from the index instead of embedded", async () => {
+        const mocks = makeService();
+        const { service, queue, noteChunkRepository, embeddingService, noteRepository } =
+            mocks;
+        armExclusion(mocks, ["note.md"]);
+
+        const change: NoteChange = {
+            path: "note.md",
+            reason: "modified",
+            mtime: 1000,
+        };
+        await (service as unknown as ChangeProcessor).processChange(change);
+
+        expect(noteChunkRepository.removeByPath).toHaveBeenCalledWith("note.md");
+        expect(embeddingService.embedTexts).not.toHaveBeenCalled();
+        expect(noteRepository.findByPath).not.toHaveBeenCalled();
+        // Metadata is dropped like a deletion, so the note leaves the mtime store.
+        expect(queue.markNoteChangeProcessed).toHaveBeenCalledWith({
+            path: "note.md",
+            reason: "deleted",
+        });
+    });
+
+    test("a renamed note that is frontmatter-excluded drops chunks and metadata for BOTH paths", async () => {
+        const mocks = makeService();
+        const { service, queue, noteChunkRepository } = mocks;
+        armExclusion(mocks, ["new.md"]);
+
+        const change: NoteChange = {
+            path: "new.md",
+            oldPath: "old.md",
+            reason: "renamed",
+            mtime: 1000,
+        };
+        await (service as unknown as ChangeProcessor).processChange(change);
+
+        expect(noteChunkRepository.removeByPath).toHaveBeenCalledWith("new.md");
+        expect(noteChunkRepository.removeByPath).toHaveBeenCalledWith("old.md");
+        expect(queue.markNoteChangeProcessed).toHaveBeenCalledWith({
+            path: "old.md",
+            reason: "deleted",
+        });
+        expect(queue.markNoteChangeProcessed).toHaveBeenCalledWith({
+            path: "new.md",
+            reason: "deleted",
+        });
+    });
+
+    test("a note without matching frontmatter still goes through normal processing", async () => {
+        const mocks = makeService();
+        const { service, noteRepository } = mocks;
+        armExclusion(mocks, []); // rules configured, but this file has no frontmatter
+        noteRepository.findByPath.mockResolvedValue(null);
+
+        const change: NoteChange = {
+            path: "note.md",
+            reason: "modified",
+            mtime: 1000,
+        };
+        await (service as unknown as ChangeProcessor).processChange(change);
+
+        expect(noteRepository.findByPath).toHaveBeenCalled();
+    });
+
+    test("a prior errored entry is cleared when the note is now excluded", async () => {
+        const mocks = makeService();
+        const { service, erroredStore } = mocks;
+        armExclusion(mocks, ["note.md"]);
+        erroredStore.get.mockReturnValue({ error: "boom" });
+
+        const change: NoteChange = {
+            path: "note.md",
+            reason: "modified",
+            mtime: 1000,
+        };
+        await (service as unknown as ChangeProcessor).processChange(change);
+
+        expect(erroredStore.delete).toHaveBeenCalledWith("note.md");
+    });
+});
