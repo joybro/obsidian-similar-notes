@@ -6,6 +6,7 @@ import log from "loglevel";
 export interface MTimeEntry {
     path: string; // Primary key
     mtime: number; // Last modified timestamp
+    indexableTextHash?: string; // Hash of text used for embedding
 }
 
 /**
@@ -77,7 +78,7 @@ export class IndexedDBMTimeStorage {
     /**
      * Get modification time for a specific path
      */
-    async get(path: string): Promise<number | undefined> {
+    async get(path: string): Promise<MTimeEntry | undefined> {
         this.ensureInitialized();
         const db = this.db;
         if (!db) {
@@ -94,7 +95,7 @@ export class IndexedDBMTimeStorage {
 
             request.onsuccess = () => {
                 const entry = request.result as MTimeEntry | undefined;
-                resolve(entry?.mtime);
+                resolve(entry);
             };
 
             request.onerror = () => {
@@ -107,7 +108,11 @@ export class IndexedDBMTimeStorage {
     /**
      * Set modification time for a specific path
      */
-    async set(path: string, mtime: number): Promise<void> {
+    async set(
+        path: string,
+        mtime: number,
+        indexableTextHash?: string
+    ): Promise<void> {
         this.ensureInitialized();
         const db = this.db;
         if (!db) {
@@ -121,15 +126,58 @@ export class IndexedDBMTimeStorage {
             );
             const store = transaction.objectStore(this.mtimesStoreName);
             const entry: MTimeEntry = { path, mtime };
+            if (indexableTextHash !== undefined) {
+                entry.indexableTextHash = indexableTextHash;
+            }
             const request = store.put(entry);
 
-            request.onsuccess = () => {
-                resolve();
-            };
+            transaction.oncomplete = () => resolve();
 
             request.onerror = () => {
                 log.error("Failed to set mtime:", request.error);
                 reject(request.error);
+            };
+            transaction.onabort = () => reject(transaction.error);
+        });
+    }
+
+    /**
+     * Move metadata to a new path in a single transaction
+     */
+    async move(
+        oldPath: string,
+        newPath: string,
+        mtime: number,
+        indexableTextHash?: string
+    ): Promise<void> {
+        this.ensureInitialized();
+        const db = this.db;
+        if (!db) {
+            throw new Error("Database not initialized");
+        }
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(
+                [this.mtimesStoreName],
+                "readwrite"
+            );
+            const store = transaction.objectStore(this.mtimesStoreName);
+            const entry: MTimeEntry = { path: newPath, mtime };
+            if (indexableTextHash !== undefined) {
+                entry.indexableTextHash = indexableTextHash;
+            }
+
+            store.delete(oldPath);
+            store.put(entry);
+
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => {
+                log.error("Failed to move note metadata:", transaction.error);
+                reject(transaction.error);
+            };
+            transaction.onabort = () => {
+                log.error("Failed to move note metadata:", transaction.error);
+                reject(transaction.error);
             };
         });
     }
@@ -152,21 +200,20 @@ export class IndexedDBMTimeStorage {
             const store = transaction.objectStore(this.mtimesStoreName);
             const request = store.delete(path);
 
-            request.onsuccess = () => {
-                resolve();
-            };
+            transaction.oncomplete = () => resolve();
 
             request.onerror = () => {
                 log.error("Failed to delete mtime:", request.error);
                 reject(request.error);
             };
+            transaction.onabort = () => reject(transaction.error);
         });
     }
 
     /**
      * Get all modification times as a map
      */
-    async getAll(): Promise<Record<string, number>> {
+    async getAll(): Promise<Record<string, MTimeEntry>> {
         this.ensureInitialized();
         const db = this.db;
         if (!db) {
@@ -183,9 +230,9 @@ export class IndexedDBMTimeStorage {
 
             request.onsuccess = () => {
                 const entries = request.result as MTimeEntry[];
-                const mtimes: Record<string, number> = {};
+                const mtimes: Record<string, MTimeEntry> = {};
                 for (const entry of entries) {
-                    mtimes[entry.path] = entry.mtime;
+                    mtimes[entry.path] = entry;
                 }
                 resolve(mtimes);
             };
@@ -215,7 +262,7 @@ export class IndexedDBMTimeStorage {
             const store = transaction.objectStore(this.mtimesStoreName);
             const request = store.clear();
 
-            request.onsuccess = () => {
+            transaction.oncomplete = () => {
                 log.info("Cleared all mtimes from IndexedDB");
                 resolve();
             };
@@ -224,6 +271,7 @@ export class IndexedDBMTimeStorage {
                 log.error("Failed to clear mtimes:", request.error);
                 reject(request.error);
             };
+            transaction.onabort = () => reject(transaction.error);
         });
     }
 

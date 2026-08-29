@@ -1,9 +1,12 @@
 import log from "loglevel";
 import { BehaviorSubject, type Observable } from "rxjs";
-import { IndexedDBMTimeStorage } from "./IndexedDBMTimeStorage";
+import {
+    IndexedDBMTimeStorage,
+    type MTimeEntry,
+} from "./IndexedDBMTimeStorage";
 
 export class IndexedNoteMTimeStore {
-    private mtimes: Record<string, number> = {};
+    private entries: Record<string, MTimeEntry> = {};
     private indexedNoteCount$ = new BehaviorSubject<number>(0);
     private storage: IndexedDBMTimeStorage;
     private vaultId = "";
@@ -22,9 +25,9 @@ export class IndexedNoteMTimeStore {
         // Initialize IndexedDB storage
         await this.storage.init(vaultId);
 
-        // Load all mtimes from IndexedDB to memory cache
-        this.mtimes = await this.storage.getAll();
-        const noteCount = Object.keys(this.mtimes).length;
+        // Load all note metadata from IndexedDB to memory cache
+        this.entries = await this.storage.getAll();
+        const noteCount = Object.keys(this.entries).length;
         this.indexedNoteCount$.next(noteCount);
         log.info("Loaded", noteCount, "modification times from IndexedDB");
     }
@@ -34,46 +37,78 @@ export class IndexedNoteMTimeStore {
      * Used when reindexing all notes
      */
     async clear(): Promise<void> {
-        this.mtimes = {};
-        this.indexedNoteCount$.next(0);
         await this.storage.clear();
+        this.entries = {};
+        this.indexedNoteCount$.next(0);
         log.info("Cleared all stored modification times");
     }
 
     getMTime(path: string): number {
-        return this.mtimes[path];
+        return this.entries[path]?.mtime;
+    }
+
+    getIndexableTextHash(path: string): string | undefined {
+        return this.entries[path]?.indexableTextHash;
     }
 
     async setMTime(path: string, mtime: number): Promise<void> {
-        const isNewPath = this.mtimes[path] === undefined;
-        this.mtimes[path] = mtime;
+        await this.setMetadata(
+            path,
+            mtime,
+            this.entries[path]?.indexableTextHash
+        );
+    }
+
+    async setMetadata(
+        path: string,
+        mtime: number,
+        indexableTextHash?: string
+    ): Promise<void> {
+        const entry: MTimeEntry = { path, mtime };
+        if (indexableTextHash !== undefined) {
+            entry.indexableTextHash = indexableTextHash;
+        }
 
         // Save to IndexedDB
-        await this.storage.set(path, mtime);
+        await this.storage.set(path, mtime, indexableTextHash);
+        this.entries[path] = entry;
+        this.indexedNoteCount$.next(Object.keys(this.entries).length);
+    }
 
-        // If this is a new path, increment the count
-        if (isNewPath) {
-            const currentCount = this.indexedNoteCount$.getValue();
-            this.indexedNoteCount$.next(currentCount + 1);
+    async moveMetadata(
+        oldPath: string,
+        newPath: string,
+        mtime: number,
+        hashOverride?: string
+    ): Promise<void> {
+        const indexableTextHash =
+            hashOverride ?? this.entries[oldPath]?.indexableTextHash;
+
+        await this.storage.move(
+            oldPath,
+            newPath,
+            mtime,
+            indexableTextHash
+        );
+
+        const entry: MTimeEntry = { path: newPath, mtime };
+        if (indexableTextHash !== undefined) {
+            entry.indexableTextHash = indexableTextHash;
         }
+        delete this.entries[oldPath];
+        this.entries[newPath] = entry;
+        this.indexedNoteCount$.next(Object.keys(this.entries).length);
     }
 
     async deleteMTime(path: string): Promise<void> {
-        const existed = this.mtimes[path] !== undefined;
-        delete this.mtimes[path];
-
         // Delete from IndexedDB
         await this.storage.delete(path);
-
-        // If the path existed, decrement the count
-        if (existed) {
-            const currentCount = this.indexedNoteCount$.getValue();
-            this.indexedNoteCount$.next(currentCount - 1);
-        }
+        delete this.entries[path];
+        this.indexedNoteCount$.next(Object.keys(this.entries).length);
     }
 
     getAllPaths(): string[] {
-        return Object.keys(this.mtimes);
+        return Object.keys(this.entries);
     }
 
     /**

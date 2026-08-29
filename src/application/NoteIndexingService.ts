@@ -6,6 +6,7 @@ import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { NoteChange, NoteChangeQueue } from "@/services/noteChangeQueue";
 import { showNoteErrorNotice } from "@/utils/errorHandling";
+import { computeIndexableTextHash } from "@/utils/indexableTextHash";
 import log from "loglevel";
 import type { App } from "obsidian";
 import { type Observable, BehaviorSubject } from "rxjs";
@@ -66,16 +67,24 @@ export class NoteIndexingService {
         log.info(`[NoteIndexingService] ===== Processing change: ${change.path} (${change.reason}) =====`);
 
         try {
+            let indexableTextHash: string | undefined;
+
             if (change.reason === "deleted") {
                 await this.processDeletedNote(change.path);
             } else if (change.reason === "renamed") {
-                await this.processRenamedNote(change);
+                indexableTextHash = await this.processRenamedNote(change);
             } else {
-                await this.processUpdatedNote(change.path);
+                indexableTextHash = await this.processUpdatedNote(
+                    change.path,
+                    change.forceReindex
+                );
             }
 
             // Success: mark processed and clear any prior errored entry.
-            await this.noteChangeQueue.markNoteChangeProcessed(change);
+            await this.noteChangeQueue.markNoteChangeProcessed(
+                change,
+                indexableTextHash
+            );
             if (this.erroredNoteStore.get(change.path)) {
                 await this.erroredNoteStore.delete(change.path);
             }
@@ -137,7 +146,9 @@ export class NoteIndexingService {
         await this.noteChunkRepository.removeByPath(path);
     }
 
-    private async processRenamedNote(change: NoteChange) {
+    private async processRenamedNote(
+        change: NoteChange
+    ): Promise<string | undefined> {
         const { oldPath, path: newPath } = change;
         if (!oldPath) {
             // Defensive: a "renamed" change without oldPath is malformed.
@@ -145,8 +156,7 @@ export class NoteIndexingService {
             log.warn(
                 `[NoteIndexingService] Renamed change missing oldPath, falling back to full embed: ${newPath}`
             );
-            await this.processUpdatedNote(newPath);
-            return;
+            return this.processUpdatedNote(newPath, change.forceReindex);
         }
 
         const carried = await this.noteChunkRepository.renamePath(
@@ -159,8 +169,7 @@ export class NoteIndexingService {
             log.info(
                 `[NoteIndexingService] No prior chunks for ${oldPath}, embedding ${newPath} fresh`
             );
-            await this.processUpdatedNote(newPath);
-            return;
+            return this.processUpdatedNote(newPath, change.forceReindex);
         }
 
         log.info(
@@ -168,20 +177,20 @@ export class NoteIndexingService {
         );
 
         // If the renamed file is the currently active one, refresh the sidebar.
-        const activeFile = this.app.workspace.getActiveFile();
-        if (activeFile && activeFile.path === newPath) {
-            this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(
-                newPath
-            );
-        }
+        this.refreshActiveNote(newPath);
+
+        return undefined;
     }
 
-    private async processUpdatedNote(path: string) {
+    private async processUpdatedNote(
+        path: string,
+        forceReindex = false
+    ): Promise<string | undefined> {
         const note = await this.noteRepository.findByPath(
             path,
             !this.settingsService.get().includeFrontmatter
         );
-        if (!note || !note.content) {
+        if (!note) {
             return;
         }
 
@@ -189,12 +198,9 @@ export class NoteIndexingService {
         const settings = this.settingsService.get();
         const patterns = settings.excludeRegexPatterns || [];
 
-        // Create a copy of the note with filtered content
-        const filteredNote = { ...note };
-
         // Apply each regex pattern to exclude matching content
+        let filteredContent = note.content ?? "";
         if (patterns.length > 0) {
-            let filteredContent = note.content;
             for (const pattern of patterns) {
                 try {
                     const regex = new RegExp(pattern, "gm");
@@ -203,12 +209,35 @@ export class NoteIndexingService {
                     log.warn(`Invalid RegExp pattern: ${pattern}`, e);
                 }
             }
-            filteredNote.content = filteredContent;
+        }
+
+        const indexableTextHash = await computeIndexableTextHash(
+            filteredContent
+        );
+        const storedHash = await this.noteChangeQueue.getIndexableTextHash(
+            path
+        );
+
+        if (!forceReindex && storedHash === indexableTextHash) {
+            log.info(
+                `[NoteIndexingService] Indexable text unchanged for ${path}, skipping re-embedding`
+            );
+            this.refreshActiveNoteMetadata(path);
+            return indexableTextHash;
+        }
+
+        // Create a copy of the note with exactly the content used for hashing.
+        const filteredNote = { ...note, content: filteredContent };
+
+        if (!filteredContent) {
+            await this.removeIndexedChunksAndRefreshActiveNote(note.path);
+            return indexableTextHash;
         }
 
         const splitted = await this.noteChunkingService.split(filteredNote);
         if (splitted.length === 0) {
-            return;
+            await this.removeIndexedChunksAndRefreshActiveNote(note.path);
+            return indexableTextHash;
         }
 
         log.info(`[NoteIndexingService] Generating embeddings for ${splitted.length} chunks (for indexing)`);
@@ -246,11 +275,44 @@ export class NoteIndexingService {
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile.path === note.path) {
             log.info(`[NoteIndexingService] File is currently active, triggering similar note search`);
-            this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(
-                note.path
-            );
+            this.refreshActiveNote(note.path);
         } else {
             log.info(`[NoteIndexingService] File is not currently active, skipping similar note search`);
         }
+
+        return indexableTextHash;
+    }
+
+    private async removeIndexedChunksAndRefreshActiveNote(
+        path: string
+    ): Promise<void> {
+        await this.noteChunkRepository.removeByPath(path);
+
+        this.refreshActiveNote(path);
+    }
+
+    private refreshActiveNote(path: string): void {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile || activeFile.path !== path) {
+            return;
+        }
+
+        void this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(path);
+    }
+
+    private refreshActiveNoteMetadata(path: string): void {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile || activeFile.path !== path) {
+            return;
+        }
+
+        void this.similarNoteCoordinator
+            .refreshCachedNoteMetadataFromPath(path)
+            .catch((error) =>
+                log.warn(
+                    `[NoteIndexingService] Failed to refresh cached metadata for ${path}`,
+                    error
+                )
+            );
     }
 }

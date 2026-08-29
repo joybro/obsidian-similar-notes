@@ -108,6 +108,71 @@ export class SimilarNoteCoordinator {
         await this.emitNoteBottomViewModel(file);
     }
 
+    /**
+     * Refresh metadata derived from the active note without repeating vector
+     * search. Used when indexing proves the effective embedding text is
+     * unchanged but excluded content may have changed links.
+     */
+    async refreshCachedNoteMetadataFromPath(path: string): Promise<boolean> {
+        const file = this.vault.getFileByPath(path);
+        if (!file) {
+            return false;
+        }
+
+        const settings = this.settingsService.get();
+        const cacheKey = file.path;
+        const currentView = this.noteBottomViewModel$.value;
+        if (
+            !this.cache.has(cacheKey) &&
+            currentView.currentFile?.path !== file.path
+        ) {
+            return false;
+        }
+
+        const note = await this.noteRepository.findByFile(
+            file,
+            !settings.includeFrontmatter
+        );
+        const linkedPaths = new Set(note.links);
+        const updateLinks = (entries: SimilarNoteEntry[]) =>
+            entries.map((entry) => ({
+                ...entry,
+                isLinked: linkedPaths.has(entry.file.path),
+            }));
+
+        const cached = this.cache.get(cacheKey);
+        if (cached) {
+            const updatedNotes = updateLinks(cached.notes);
+            this.cache.set(cacheKey, {
+                mtime: file.stat.mtime,
+                notes: updatedNotes,
+            });
+
+            const latestView = this.noteBottomViewModel$.value;
+            if (latestView.currentFile?.path === file.path) {
+                const threshold = this.settingsService.get()
+                    .minSimilarityThreshold;
+                this.noteBottomViewModel$.next({
+                    ...latestView,
+                    similarNoteEntries: updatedNotes.filter(
+                        (entry) => entry.similarity >= threshold
+                    ),
+                });
+            }
+            return true;
+        }
+
+        const latestView = this.noteBottomViewModel$.value;
+        if (latestView.currentFile?.path !== file.path) {
+            return false;
+        }
+        this.noteBottomViewModel$.next({
+            ...latestView,
+            similarNoteEntries: updateLinks(latestView.similarNoteEntries),
+        });
+        return true;
+    }
+
     async emitNoteBottomViewModel(file: TFile) {
         const similarNotes = await this.getSimilarNotes(file);
         const settings = this.settingsService.get();

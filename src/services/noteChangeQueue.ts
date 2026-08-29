@@ -16,6 +16,8 @@ export type NoteChange = {
     // How many processing attempts this change has already had. Used to cap
     // in-session retries before a note is moved to the terminal Errored state.
     attempts?: number;
+    // Explicit reindex requests must bypass the unchanged-content hash check.
+    forceReindex?: boolean;
 };
 
 interface FileInfo {
@@ -254,6 +256,7 @@ export class NoteChangeQueue {
                 path: file.path,
                 reason: "modified",
                 mtime: file.stat.mtime,
+                forceReindex: true,
             });
         }
         
@@ -278,6 +281,7 @@ export class NoteChangeQueue {
                     path,
                     reason: "modified",
                     mtime: file.stat.mtime,
+                    forceReindex: true,
                 });
             }
         }
@@ -312,6 +316,13 @@ export class NoteChangeQueue {
      */
     getFileChangeCount(): number {
         return this.queue.length;
+    }
+
+    /**
+     * Returns the hash of the indexable text persisted for a note, if any.
+     */
+    getIndexableTextHash(path: string): string | undefined {
+        return this.mTimeStore.getIndexableTextHash(path);
     }
 
     /**
@@ -423,19 +434,35 @@ export class NoteChangeQueue {
      * This should be called after processing a file change to ensure it's not reprocessed
      * if the application restarts before the hash store is updated
      */
-    async markNoteChangeProcessed(change: NoteChange): Promise<void> {
+    async markNoteChangeProcessed(
+        change: NoteChange,
+        indexableTextHash?: string
+    ): Promise<void> {
         if (change.reason === "deleted") {
             await this.mTimeStore.deleteMTime(change.path);
         } else if (change.reason === "renamed") {
-            if (change.oldPath) {
+            if (change.oldPath && change.mtime !== undefined) {
+                await this.mTimeStore.moveMetadata(
+                    change.oldPath,
+                    change.path,
+                    change.mtime,
+                    indexableTextHash
+                );
+            } else if (change.mtime !== undefined) {
+                await this.mTimeStore.setMetadata(
+                    change.path,
+                    change.mtime,
+                    indexableTextHash
+                );
+            } else if (change.oldPath) {
                 await this.mTimeStore.deleteMTime(change.oldPath);
             }
-            if (change.mtime) {
-                await this.mTimeStore.setMTime(change.path, change.mtime);
-            }
-        } else if (change.mtime) {
-            // Update the hash store with the processed hash
-            await this.mTimeStore.setMTime(change.path, change.mtime);
+        } else if (change.mtime !== undefined) {
+            await this.mTimeStore.setMetadata(
+                change.path,
+                change.mtime,
+                indexableTextHash
+            );
         }
     }
 

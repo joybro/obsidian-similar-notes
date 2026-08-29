@@ -272,4 +272,171 @@ describe("SimilarNoteCoordinator", () => {
             expect(seen.at(-1)).toBe(2); // high + mid pass; low is dropped
         });
     });
+
+    describe("#51: unchanged indexable text", () => {
+        test("refreshes cached linked state without repeating similarity search", async () => {
+            const activeFile = makeFile("open.md", 1);
+            const updatedFile = makeFile("open.md", 2);
+            (vault.getFileByPath as ReturnType<typeof vi.fn>)
+                .mockImplementation((path: string) =>
+                    path === "open.md" ? updatedFile : makeFile(path)
+                );
+            (
+                similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>
+            ).mockResolvedValue([
+                {
+                    title: "Linked",
+                    path: "linked.md",
+                    similarity: 0.9,
+                    similarChunk: "related",
+                    sourceChunk: "source",
+                    isLinked: false,
+                },
+            ]);
+
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService
+            );
+            await coord.onFileOpen(activeFile);
+
+            (noteRepository.findByFile as ReturnType<typeof vi.fn>)
+                .mockResolvedValue({
+                    path: "open.md",
+                    title: "open",
+                    content: "body",
+                    links: ["linked.md"],
+                });
+
+            await expect(
+                coord.refreshCachedNoteMetadataFromPath("open.md")
+            ).resolves.toBe(true);
+
+            expect(similarNoteFinder.findSimilarNotes).toHaveBeenCalledOnce();
+            expect(
+                coord["noteBottomViewModel$"].value.similarNoteEntries[0]
+                    .isLinked
+            ).toBe(true);
+        });
+
+        test("refreshes visible linked state after settings clear the cache", async () => {
+            const activeFile = makeFile("open.md", 1);
+            const updatedFile = makeFile("open.md", 2);
+            (vault.getFileByPath as ReturnType<typeof vi.fn>)
+                .mockImplementation((path: string) =>
+                    path === "open.md" ? updatedFile : makeFile(path)
+                );
+            (
+                similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>
+            ).mockResolvedValue([
+                {
+                    title: "Linked",
+                    path: "linked.md",
+                    similarity: 0.9,
+                    similarChunk: "related",
+                    sourceChunk: "source",
+                    isLinked: false,
+                },
+            ]);
+
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService
+            );
+            await coord.onFileOpen(activeFile);
+            settingsChange$.next({ includeFrontmatter: false });
+
+            (noteRepository.findByFile as ReturnType<typeof vi.fn>)
+                .mockResolvedValue({
+                    path: "open.md",
+                    title: "open",
+                    content: "body",
+                    links: ["linked.md"],
+                });
+
+            await expect(
+                coord.refreshCachedNoteMetadataFromPath("open.md")
+            ).resolves.toBe(true);
+
+            expect(similarNoteFinder.findSimilarNotes).toHaveBeenCalledOnce();
+            expect(
+                coord["noteBottomViewModel$"].value.similarNoteEntries[0]
+                    .isLinked
+            ).toBe(true);
+        });
+
+        test("does not replace a newly opened note while metadata refresh awaits", async () => {
+            const activeFile = makeFile("open.md", 1);
+            const updatedFile = makeFile("open.md", 2);
+            const nextFile = makeFile("next.md", 3);
+            (vault.getFileByPath as ReturnType<typeof vi.fn>)
+                .mockImplementation((path: string) =>
+                    path === "open.md" ? updatedFile : makeFile(path)
+                );
+            (
+                similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>
+            ).mockResolvedValue([
+                {
+                    title: "Linked",
+                    path: "linked.md",
+                    similarity: 0.9,
+                    similarChunk: "related",
+                    sourceChunk: "source",
+                    isLinked: false,
+                },
+            ]);
+
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService
+            );
+            await coord.onFileOpen(activeFile);
+
+            let resolveActiveRead: ((value: {
+                path: string;
+                title: string;
+                content: string;
+                links: string[];
+            }) => void) | undefined;
+            const activeRead = new Promise<{
+                path: string;
+                title: string;
+                content: string;
+                links: string[];
+            }>((resolve) => {
+                resolveActiveRead = resolve;
+            });
+            (noteRepository.findByFile as ReturnType<typeof vi.fn>)
+                .mockImplementation((file: TFile) =>
+                    file.path === "open.md"
+                        ? activeRead
+                        : Promise.resolve({
+                            path: file.path,
+                            title: file.basename,
+                            content: "next body",
+                            links: [],
+                        })
+                );
+
+            const refresh = coord.refreshCachedNoteMetadataFromPath("open.md");
+            await coord.onFileOpen(nextFile);
+            resolveActiveRead?.({
+                path: "open.md",
+                title: "open",
+                content: "body",
+                links: ["linked.md"],
+            });
+            await refresh;
+
+            expect(
+                coord["noteBottomViewModel$"].value.currentFile?.path
+            ).toBe("next.md");
+        });
+    });
 });
