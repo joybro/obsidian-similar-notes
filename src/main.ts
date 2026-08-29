@@ -206,6 +206,7 @@ export default class MainPlugin extends Plugin {
         // Initialize file change queue
         this.noteChangeQueue = new NoteChangeQueue(
             this.app.vault,
+            this.app.metadataCache,
             this.indexedNotesMTimeStore,
             this.settingsService,
             this.erroredNoteStore

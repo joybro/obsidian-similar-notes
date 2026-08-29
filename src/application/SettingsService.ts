@@ -43,6 +43,7 @@ export interface SimilarNotesSettings {
     useGPU: boolean; // Whether to use GPU acceleration for model inference
     excludeFolderPatterns: string[]; // Glob patterns to exclude folders/files from indexing
     excludeRegexPatterns: string[]; // Regular expressions to exclude content from indexing
+    excludeFrontmatterRules: string[]; // Frontmatter rules ("key" or "key: value") to exclude notes from indexing
     regexpTestInputText: string; // Saved test input for RegExp testing
     noteDisplayMode: "title" | "path" | "smart"; // How to display note names in results
     showAtBottom: boolean; // Whether to show similar notes at the bottom of notes
@@ -66,6 +67,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     // new installs; existing users' saved patterns are untouched by the merge.
     excludeFolderPatterns: ["Templates/", "Archive/", ".trash/", "Excalidraw/"], // Default exclusion patterns
     excludeRegexPatterns: [], // Default to no exclusion patterns
+    excludeFrontmatterRules: [], // Default to no frontmatter exclusion rules
     regexpTestInputText: "", // Default to empty test input
     noteDisplayMode: "smart", // Default to smart mode (show path when duplicates exist)
     showAtBottom: true, // Show similar notes at the bottom by default

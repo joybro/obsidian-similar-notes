@@ -2,9 +2,10 @@ import type { SettingsService } from "@/application/SettingsService";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import { filterMarkdownFiles } from "@/utils/folderExclusion";
+import { isNoteExcluded } from "@/utils/noteExclusion";
 import log from "loglevel";
 import { TFile } from "obsidian";
-import type { EventRef, TAbstractFile, Vault } from "obsidian";
+import type { EventRef, MetadataCache, TAbstractFile, Vault } from "obsidian";
 
 export type NoteChange = {
     path: string;
@@ -56,10 +57,31 @@ export class NoteChangeQueue {
      */
     constructor(
         private vault: Vault,
+        private metadataCache: MetadataCache,
         private mTimeStore: IndexedNoteMTimeStore,
         private settingsService: SettingsService,
         private erroredNoteStore: ErroredNoteStore
     ) {}
+
+    /**
+     * Combined path-pattern + frontmatter-rule inclusion check. Used only for
+     * bulk sync passes (initialize / apply / reindex) — live event handlers
+     * keep the path-only filter, because metadataCache can lag vault events;
+     * the authoritative frontmatter check runs at processing time in
+     * NoteIndexingService (frontmatter-exclusion spec §2).
+     */
+    private isFileIncluded(file: TFile): boolean {
+        const settings = this.settingsService.get();
+        return !isNoteExcluded(
+            file.path,
+            {
+                excludeFolderPatterns: settings.excludeFolderPatterns,
+                excludeFrontmatterRules:
+                    settings.excludeFrontmatterRules ?? [],
+            },
+            () => this.metadataCache.getFileCache(file)?.frontmatter
+        );
+    }
 
     /**
      * Initializes the file change queue by comparing the vault with the previous state
@@ -243,11 +265,12 @@ export class NoteChangeQueue {
      * Adds all files to the queue regardless of whether they've changed
      */
     async enqueueAllNotes(): Promise<void> {
-        // Get all files that should be indexed according to current patterns
+        // Get all files that should be indexed according to current rules
         const allFiles = this.vault.getMarkdownFiles();
-        const settings = this.settingsService.get();
-        const filteredFiles = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
-        
+        const filteredFiles = allFiles.filter((file) =>
+            this.isFileIncluded(file)
+        );
+
         // Create "modified" changes for all valid files (force reprocessing of everything)
         const newQueue: NoteChange[] = [];
         
@@ -342,12 +365,14 @@ export class NoteChangeQueue {
      * @returns Analysis of files that need to be added, removed, or updated
      */
     private analyzeSyncNeeds(checkMtime = true): SyncAnalysis {
-        // Get all markdown files and apply current exclusion patterns
+        // Get all markdown files and apply current exclusion rules (path
+        // patterns + frontmatter rules)
         const allFiles = this.vault.getMarkdownFiles();
-        const settings = this.settingsService.get();
-        const filteredFiles = filterMarkdownFiles(allFiles, settings.excludeFolderPatterns);
-        
-        // Create map of files that should be indexed (according to current patterns)
+        const filteredFiles = allFiles.filter((file) =>
+            this.isFileIncluded(file)
+        );
+
+        // Create map of files that should be indexed (according to current rules)
         const shouldBeIndexed = new Map<string, number>();
         for (const file of filteredFiles) {
             shouldBeIndexed.set(file.path, file.stat.mtime);
