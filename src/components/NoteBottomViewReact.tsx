@@ -1,8 +1,9 @@
 import { getNoteDisplayText } from "@/utils/displayUtils";
-import type { MarkdownView, TFile, Workspace } from "obsidian";
+import type { HoverParent, MarkdownView, TFile, Workspace } from "obsidian";
 import { Menu } from "obsidian";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Observable } from "rxjs";
+import { triggerHoverLink } from "./hoverLinkPreview";
 
 export interface SimilarNoteEntry {
     file: TFile;
@@ -97,12 +98,14 @@ const SearchResultPreview = ({
 const SearchResult = ({
     note,
     onNoteClick,
+    onNoteHover,
     onContextMenu,
     noteDisplayMode,
     allSimilarNotes,
 }: {
     note: SimilarNoteEntry;
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
+    onNoteHover: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
     noteDisplayMode: "title" | "path" | "smart";
     allSimilarNotes: SimilarNoteEntry[];
@@ -174,6 +177,7 @@ const SearchResult = ({
                 draggable="true"
                 onDragStart={handleDragStart}
                 onClick={(e) => onNoteClick(e, note.file)}
+                onMouseOver={(e) => onNoteHover(e, note.file)}
                 onKeyDown={undefined}
                 onContextMenu={(e) => onContextMenu(e, note.file)}
             >
@@ -239,11 +243,13 @@ const SearchResult = ({
 const SearchResultsContainer = ({
     similarNotes,
     onNoteClick,
+    onNoteHover,
     onContextMenu,
     noteDisplayMode,
 }: {
     similarNotes: SimilarNoteEntry[];
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
+    onNoteHover: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
     noteDisplayMode: "title" | "path" | "smart";
 }) => {
@@ -265,6 +271,7 @@ const SearchResultsContainer = ({
                         key={note.file.path}
                         note={note}
                         onNoteClick={onNoteClick}
+                        onNoteHover={onNoteHover}
                         onContextMenu={onContextMenu}
                         noteDisplayMode={noteDisplayMode}
                         allSimilarNotes={similarNotes}
@@ -313,6 +320,20 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
         openNote(file, e.ctrlKey || e.metaKey);
     };
 
+    // Page Preview only reads/writes `.hoverPopover` on the parent, so a plain
+    // stable object is a sufficient HoverParent for this React component.
+    const hoverParentRef = useRef<HoverParent>({ hoverPopover: null });
+
+    const handleNoteHover = (e: React.MouseEvent, file: TFile) => {
+        triggerHoverLink(
+            workspace,
+            e.nativeEvent,
+            hoverParentRef.current,
+            e.currentTarget as HTMLElement,
+            file.path
+        );
+    };
+
     const handleContextMenu = (e: React.MouseEvent, file: TFile) => {
         e.preventDefault();
         const menu = new Menu();
@@ -352,6 +373,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                     <SearchResultsContainer
                         similarNotes={similarNotes}
                         onNoteClick={handleNoteClick}
+                        onNoteHover={handleNoteHover}
                         onContextMenu={handleContextMenu}
                         noteDisplayMode={noteDisplayMode}
                     />
