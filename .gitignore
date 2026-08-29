@@ -18,6 +18,7 @@ data.json
 # claude code settings
 .claude/*
 !.claude/skills/
+CLAUDE.local.md
 
 # local development
 scripts/install-local.sh
