@@ -54,6 +54,9 @@ IndexedDB schema.
   chunks, perform no embedding, and persist the empty-content hash.
 - Explicit full reindex and errored-note retry are forced changes. They do not
   short-circuit on a matching hash.
+- The note no longer exists when its change is processed: write no metadata at
+  all. Advancing mtime with an absent hash would erase a stored hash and keep a
+  ghost "indexed" entry; the corresponding delete change owns the cleanup.
 
 ## Persistence and Compatibility
 
@@ -73,6 +76,18 @@ Hashing, embedding, or chunk-repository failures must not advance processed
 metadata. Existing retry and terminal-error handling remains responsible for
 those failures. A metadata-write failure happens after chunk persistence and is
 retried without claiming durable completion.
+
+Before the chunk index is mutated (chunk removal or replacement), the stored
+hash for the note is dropped while keeping its mtime. Otherwise a failed chunk
+write would leave a hash that still matches previously-indexed content while
+the chunks are gone: reverting the note to that content would then hash-match,
+skip re-embedding, and leave the note permanently absent from search while
+reported as indexed. A skip decision itself never clears the hash.
+
+The per-note similarity cache is stamped with the mtime of the change whose
+content was hash-verified, never the live file stat. A real edit landing
+between the hash check and the metadata refresh would otherwise mark pre-edit
+results fresh under the newer stat and serve them indefinitely.
 
 Existing cross-note parallelism remains unchanged. Queue debouncing normally
 prevents same-path overlap; adding a per-path lock is outside this change.

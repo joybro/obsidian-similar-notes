@@ -33,6 +33,7 @@ function makeService() {
     const queue = {
         requeue: vi.fn(),
         getIndexableTextHash: vi.fn().mockReturnValue(undefined),
+        clearIndexableTextHash: vi.fn().mockResolvedValue(undefined),
         markNoteChangeProcessed: vi.fn().mockResolvedValue(undefined),
     };
     const erroredStore = {
@@ -222,7 +223,7 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
         ).not.toHaveBeenCalled();
         expect(
             similarNoteCoordinator.refreshCachedNoteMetadataFromPath
-        ).toHaveBeenCalledWith("note.md");
+        ).toHaveBeenCalledWith("note.md", 1234);
         expect(queue.markNoteChangeProcessed).toHaveBeenCalledWith(
             change,
             "hash:hello world"
@@ -569,6 +570,90 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
         expect(noteChunkingService.split).not.toHaveBeenCalled();
         expect(queue.requeue).toHaveBeenCalledWith({ ...change, attempts: 1 });
         expect(queue.markNoteChangeProcessed).not.toHaveBeenCalled();
+    });
+
+    test("clears the stored hash before mutating chunks so a failed write cannot leave a matching hash with no chunks", async () => {
+        const {
+            service,
+            queue,
+            noteRepository,
+            noteChunkRepository,
+            noteChunkingService,
+            embeddingService,
+        } = makeService();
+        const change: NoteChange = {
+            path: "note.md",
+            reason: "modified",
+            mtime: 1234,
+        };
+        const { chunk } = makeChunk();
+        const callOrder: string[] = [];
+
+        noteRepository.findByPath.mockResolvedValue({
+            path: "note.md",
+            content: "hello world",
+        });
+        queue.getIndexableTextHash.mockReturnValue("old-hash");
+        noteChunkingService.split.mockResolvedValue([chunk]);
+        embeddingService.embedTexts.mockResolvedValue([[0.25]]);
+        queue.clearIndexableTextHash.mockImplementation(async () => {
+            callOrder.push("clearHash");
+        });
+        noteChunkRepository.removeByPath.mockImplementation(async () => {
+            callOrder.push("removeByPath");
+        });
+        noteChunkRepository.putMulti.mockImplementation(async () => {
+            callOrder.push("putMulti");
+            throw new Error("write failed");
+        });
+
+        await (service as unknown as ChangeProcessor).processChange(change);
+
+        // The hash must be gone BEFORE any chunk mutation: if putMulti fails
+        // and the user later reverts to previously-indexed content, a
+        // surviving hash would match and skip re-embedding a note whose
+        // chunks were already removed (permanently absent from search).
+        expect(callOrder).toEqual(["clearHash", "removeByPath", "putMulti"]);
+        expect(queue.markNoteChangeProcessed).not.toHaveBeenCalled();
+    });
+
+    test("skipping via a matching hash does not clear the stored hash", async () => {
+        const { service, queue, noteRepository } = makeService();
+
+        noteRepository.findByPath.mockResolvedValue({
+            path: "note.md",
+            content: "hello world",
+        });
+        queue.getIndexableTextHash.mockReturnValue("hash:hello world");
+
+        await (service as unknown as ChangeProcessor).processChange({
+            path: "note.md",
+            reason: "modified",
+            mtime: 1234,
+        });
+
+        expect(queue.clearIndexableTextHash).not.toHaveBeenCalled();
+    });
+
+    test("a note that vanished before processing is not marked processed (no ghost entry, hash preserved)", async () => {
+        const { service, queue, noteRepository, erroredStore } = makeService();
+        const change: NoteChange = {
+            path: "note.md",
+            reason: "modified",
+            mtime: 1234,
+        };
+
+        // The file was deleted between queueing and processing.
+        noteRepository.findByPath.mockResolvedValue(null);
+
+        await (service as unknown as ChangeProcessor).processChange(change);
+
+        // Marking would setMetadata(path, mtime, undefined): erase the stored
+        // hash and keep a ghost "indexed" entry for a file that no longer
+        // exists. The delete change owns the metadata cleanup.
+        expect(queue.markNoteChangeProcessed).not.toHaveBeenCalled();
+        expect(queue.requeue).not.toHaveBeenCalled();
+        expect(erroredStore.set).not.toHaveBeenCalled();
     });
 
     test("a chunk repository failure is retried and never marked processed", async () => {

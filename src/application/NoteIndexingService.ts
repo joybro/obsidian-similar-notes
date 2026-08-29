@@ -6,6 +6,7 @@ import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { NoteChange, NoteChangeQueue } from "@/infrastructure/noteChangeQueue";
 import { showNoteErrorNotice } from "@/utils/errorHandling";
+import { applyExclusionPatterns } from "@/utils/indexableText";
 import { computeIndexableTextHash } from "@/utils/indexableTextHash";
 import log from "loglevel";
 import type { App } from "obsidian";
@@ -72,12 +73,25 @@ export class NoteIndexingService {
             if (change.reason === "deleted") {
                 await this.processDeletedNote(change.path);
             } else if (change.reason === "renamed") {
-                indexableTextHash = await this.processRenamedNote(change);
+                const result = await this.processRenamedNote(change);
+                if (result === null) {
+                    return;
+                }
+                indexableTextHash = result;
             } else {
-                indexableTextHash = await this.processUpdatedNote(
+                const result = await this.processUpdatedNote(
                     change.path,
-                    change.forceReindex
+                    change.forceReindex,
+                    change.mtime
                 );
+                if (result === null) {
+                    // The file vanished between queueing and processing (a
+                    // delete event is on its way, or was lost). Do NOT write
+                    // metadata: setMetadata here would erase the stored hash
+                    // and keep a ghost "indexed" entry for a missing file.
+                    return;
+                }
+                indexableTextHash = result;
             }
 
             // Success: mark processed and clear any prior errored entry.
@@ -146,9 +160,10 @@ export class NoteIndexingService {
         await this.noteChunkRepository.removeByPath(path);
     }
 
+    /** Returns null when the file vanished before processing (do not mark). */
     private async processRenamedNote(
         change: NoteChange
-    ): Promise<string | undefined> {
+    ): Promise<string | null | undefined> {
         const { oldPath, path: newPath } = change;
         if (!oldPath) {
             // Defensive: a "renamed" change without oldPath is malformed.
@@ -156,7 +171,11 @@ export class NoteIndexingService {
             log.warn(
                 `[NoteIndexingService] Renamed change missing oldPath, falling back to full embed: ${newPath}`
             );
-            return this.processUpdatedNote(newPath, change.forceReindex);
+            return this.processUpdatedNote(
+                newPath,
+                change.forceReindex,
+                change.mtime
+            );
         }
 
         const carried = await this.noteChunkRepository.renamePath(
@@ -169,7 +188,11 @@ export class NoteIndexingService {
             log.info(
                 `[NoteIndexingService] No prior chunks for ${oldPath}, embedding ${newPath} fresh`
             );
-            return this.processUpdatedNote(newPath, change.forceReindex);
+            return this.processUpdatedNote(
+                newPath,
+                change.forceReindex,
+                change.mtime
+            );
         }
 
         log.info(
@@ -182,34 +205,27 @@ export class NoteIndexingService {
         return undefined;
     }
 
+    /** Returns null when the file vanished before processing (do not mark). */
     private async processUpdatedNote(
         path: string,
-        forceReindex = false
-    ): Promise<string | undefined> {
+        forceReindex = false,
+        changeMtime?: number
+    ): Promise<string | null | undefined> {
         const note = await this.noteRepository.findByPath(
             path,
             !this.settingsService.get().includeFrontmatter
         );
         if (!note) {
-            return;
+            return null;
         }
 
-        // Apply RegExp exclusion patterns before chunking
+        // Apply RegExp exclusion patterns before chunking. Shared with the
+        // settings-tab tester so the preview matches what is hashed/embedded.
         const settings = this.settingsService.get();
-        const patterns = settings.excludeRegexPatterns || [];
-
-        // Apply each regex pattern to exclude matching content
-        let filteredContent = note.content ?? "";
-        if (patterns.length > 0) {
-            for (const pattern of patterns) {
-                try {
-                    const regex = new RegExp(pattern, "gm");
-                    filteredContent = filteredContent.replace(regex, "");
-                } catch (e) {
-                    log.warn(`Invalid RegExp pattern: ${pattern}`, e);
-                }
-            }
-        }
+        const filteredContent = applyExclusionPatterns(
+            note.content ?? "",
+            settings.excludeRegexPatterns || []
+        );
 
         const indexableTextHash = await computeIndexableTextHash(
             filteredContent
@@ -222,9 +238,16 @@ export class NoteIndexingService {
             log.info(
                 `[NoteIndexingService] Indexable text unchanged for ${path}, skipping re-embedding`
             );
-            this.refreshActiveNoteMetadata(path);
+            this.refreshActiveNoteMetadata(path, changeMtime);
             return indexableTextHash;
         }
+
+        // The chunk index is about to be mutated: drop the stored hash first,
+        // so a failed write below can never leave a hash that matches
+        // previously-indexed content while its chunks are gone (a revert
+        // would then hash-match and skip re-embedding a note that is absent
+        // from search).
+        await this.noteChangeQueue.clearIndexableTextHash(path);
 
         // Create a copy of the note with exactly the content used for hashing.
         const filteredNote = { ...note, content: filteredContent };
@@ -300,14 +323,17 @@ export class NoteIndexingService {
         void this.similarNoteCoordinator.emitNoteBottomViewModelFromPath(path);
     }
 
-    private refreshActiveNoteMetadata(path: string): void {
+    private refreshActiveNoteMetadata(
+        path: string,
+        verifiedMtime?: number
+    ): void {
         const activeFile = this.app.workspace.getActiveFile();
         if (!activeFile || activeFile.path !== path) {
             return;
         }
 
         void this.similarNoteCoordinator
-            .refreshCachedNoteMetadataFromPath(path)
+            .refreshCachedNoteMetadataFromPath(path, verifiedMtime)
             .catch((error) =>
                 log.warn(
                     `[NoteIndexingService] Failed to refresh cached metadata for ${path}`,

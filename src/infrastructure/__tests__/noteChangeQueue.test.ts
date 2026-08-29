@@ -79,7 +79,7 @@ describe("FileChangeQueue", () => {
         mockMTimeStore = {
             getMTime: vi.fn().mockReturnValue(undefined),
             getIndexableTextHash: vi.fn().mockReturnValue(undefined),
-            setMTime: vi.fn(),
+            clearIndexableTextHash: vi.fn().mockResolvedValue(undefined),
             setMetadata: vi.fn(),
             moveMetadata: vi.fn(),
             deleteMTime: vi.fn(),
@@ -655,7 +655,7 @@ describe("FileChangeQueue", () => {
             mockMTimeStore = {
                 getMTime: vi.fn(),
                 getIndexableTextHash: vi.fn(),
-                setMTime: vi.fn(),
+                clearIndexableTextHash: vi.fn().mockResolvedValue(undefined),
                 setMetadata: vi.fn(),
                 moveMetadata: vi.fn(),
                 deleteMTime: vi.fn(),

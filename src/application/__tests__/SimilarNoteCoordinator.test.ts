@@ -66,6 +66,7 @@ describe("SimilarNoteCoordinator", () => {
                 links: [],
             }),
             findByPath: vi.fn(),
+            getLinkedPaths: vi.fn().mockResolvedValue([]),
         } as unknown as NoteRepository;
 
         similarNoteFinder = {
@@ -302,19 +303,17 @@ describe("SimilarNoteCoordinator", () => {
             );
             await coord.onFileOpen(activeFile);
 
-            (noteRepository.findByFile as ReturnType<typeof vi.fn>)
-                .mockResolvedValue({
-                    path: "open.md",
-                    title: "open",
-                    content: "body",
-                    links: ["linked.md"],
-                });
+            (noteRepository.getLinkedPaths as ReturnType<typeof vi.fn>)
+                .mockResolvedValue(["linked.md"]);
 
             await expect(
                 coord.refreshCachedNoteMetadataFromPath("open.md")
             ).resolves.toBe(true);
 
             expect(similarNoteFinder.findSimilarNotes).toHaveBeenCalledOnce();
+            // Metadata refresh must not read note content — links come from
+            // the metadata cache alone.
+            expect(noteRepository.findByFile).toHaveBeenCalledOnce(); // initial open only
             expect(
                 coord["noteBottomViewModel$"].value.similarNoteEntries[0]
                     .isLinked
@@ -350,13 +349,8 @@ describe("SimilarNoteCoordinator", () => {
             await coord.onFileOpen(activeFile);
             settingsChange$.next({ includeFrontmatter: false });
 
-            (noteRepository.findByFile as ReturnType<typeof vi.fn>)
-                .mockResolvedValue({
-                    path: "open.md",
-                    title: "open",
-                    content: "body",
-                    links: ["linked.md"],
-                });
+            (noteRepository.getLinkedPaths as ReturnType<typeof vi.fn>)
+                .mockResolvedValue(["linked.md"]);
 
             await expect(
                 coord.refreshCachedNoteMetadataFromPath("open.md")
@@ -398,45 +392,65 @@ describe("SimilarNoteCoordinator", () => {
             );
             await coord.onFileOpen(activeFile);
 
-            let resolveActiveRead: ((value: {
-                path: string;
-                title: string;
-                content: string;
-                links: string[];
-            }) => void) | undefined;
-            const activeRead = new Promise<{
-                path: string;
-                title: string;
-                content: string;
-                links: string[];
-            }>((resolve) => {
-                resolveActiveRead = resolve;
+            let resolveLinksRead: ((value: string[]) => void) | undefined;
+            const linksRead = new Promise<string[]>((resolve) => {
+                resolveLinksRead = resolve;
             });
-            (noteRepository.findByFile as ReturnType<typeof vi.fn>)
-                .mockImplementation((file: TFile) =>
-                    file.path === "open.md"
-                        ? activeRead
-                        : Promise.resolve({
-                            path: file.path,
-                            title: file.basename,
-                            content: "next body",
-                            links: [],
-                        })
+            (noteRepository.getLinkedPaths as ReturnType<typeof vi.fn>)
+                .mockImplementation((path: string) =>
+                    path === "open.md" ? linksRead : Promise.resolve([])
                 );
 
             const refresh = coord.refreshCachedNoteMetadataFromPath("open.md");
             await coord.onFileOpen(nextFile);
-            resolveActiveRead?.({
-                path: "open.md",
-                title: "open",
-                content: "body",
-                links: ["linked.md"],
-            });
+            resolveLinksRead?.(["linked.md"]);
             await refresh;
 
             expect(
                 coord["noteBottomViewModel$"].value.currentFile?.path
             ).toBe("next.md");
+        });
+
+        test("stamps the verified mtime, not the live stat, so a concurrent real edit still re-searches", async () => {
+            // The note is opened at mtime 1; a hash-verified skip for the
+            // change at mtime 1 races with a real edit that bumps the live
+            // stat to 2. If the refresh stamped the live stat (2), the
+            // pre-edit results would be served as fresh for mtime 2 forever.
+            const activeFile = makeFile("open.md", 1);
+            const editedFile = makeFile("open.md", 2);
+            (vault.getFileByPath as ReturnType<typeof vi.fn>)
+                .mockImplementation((path: string) =>
+                    path === "open.md" ? editedFile : makeFile(path)
+                );
+            (
+                similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>
+            ).mockResolvedValue([
+                {
+                    path: "neighbor.md",
+                    title: "neighbor",
+                    similarity: 0.9,
+                    similarChunk: "chunk",
+                    sourceChunk: "source",
+                    isLinked: false,
+                },
+            ]);
+
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService
+            );
+            await coord.onFileOpen(activeFile); // caches results at mtime 1
+
+            // Hash-skip refresh for the change observed at mtime 1, while the
+            // live stat already advanced to 2.
+            await coord.refreshCachedNoteMetadataFromPath("open.md", 1);
+
+            // Viewing the edited file (stat mtime 2) must miss the cache and
+            // re-run the similarity search.
+            await coord.getSimilarNotes(editedFile);
+            expect(similarNoteFinder.findSimilarNotes).toHaveBeenCalledTimes(2);
         });
     });
 });

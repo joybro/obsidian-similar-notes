@@ -326,6 +326,16 @@ export class NoteChangeQueue {
     }
 
     /**
+     * Drops the persisted hash for a note (keeping its mtime). Called by the
+     * indexing service right before it mutates the chunk index, so that a
+     * failed write can never leave a stored hash that matches
+     * previously-indexed content while the chunks themselves are gone.
+     */
+    async clearIndexableTextHash(path: string): Promise<void> {
+        await this.mTimeStore.clearIndexableTextHash(path);
+    }
+
+    /**
      * Analyzes what files need to be synchronized between vault and index
      * 
      * @param checkMtime Whether to check modification times for existing indexed files

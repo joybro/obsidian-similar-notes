@@ -1,4 +1,5 @@
 import type { SettingsService } from "@/application/SettingsService";
+import { applyExclusionPatterns } from "@/utils/indexableText";
 import type { Setting } from "obsidian";
 
 /**
@@ -63,16 +64,21 @@ export class RegexpExclusionTester {
         const output = this.outputTextArea;
         if (!input || !output) return;
 
-        let outputText = input.value || "";
-        try {
-            for (const pattern of this.settingsService.get()
-                .excludeRegexPatterns) {
-                outputText = outputText.replace(new RegExp(pattern, "gm"), "");
-            }
-            output.value = outputText;
-        } catch (e) {
-            output.value = `Error processing RegExp: ${(e as Error).message}`;
-        }
+        // Same transformation as indexing (applyExclusionPatterns skips an
+        // invalid pattern and applies the rest), so the preview shows exactly
+        // what will be indexed — plus a note for each skipped pattern.
+        const errors: string[] = [];
+        const filtered = applyExclusionPatterns(
+            input.value || "",
+            this.settingsService.get().excludeRegexPatterns,
+            (pattern, e) =>
+                errors.push(
+                    `Skipped invalid RegExp "${pattern}": ${(e as Error).message}`
+                )
+        );
+        output.value = errors.length
+            ? `${errors.join("\n")}\n---\n${filtered}`
+            : filtered;
     }
 
     reset(): void {

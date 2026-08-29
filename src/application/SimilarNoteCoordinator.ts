@@ -112,8 +112,17 @@ export class SimilarNoteCoordinator {
      * Refresh metadata derived from the active note without repeating vector
      * search. Used when indexing proves the effective embedding text is
      * unchanged but excluded content may have changed links.
+     *
+     * @param verifiedMtime The stat mtime of the change whose content was
+     * hash-verified as unchanged. The cache is stamped with THIS mtime, never
+     * the live stat: a real edit landing between the hash check and this
+     * refresh would otherwise mark the pre-edit results fresh for the new
+     * mtime, and getSimilarNotes would keep serving them after re-embedding.
      */
-    async refreshCachedNoteMetadataFromPath(path: string): Promise<boolean> {
+    async refreshCachedNoteMetadataFromPath(
+        path: string,
+        verifiedMtime?: number
+    ): Promise<boolean> {
         const file = this.vault.getFileByPath(path);
         if (!file) {
             return false;
@@ -129,11 +138,10 @@ export class SimilarNoteCoordinator {
             return false;
         }
 
-        const note = await this.noteRepository.findByFile(
-            file,
-            !settings.includeFrontmatter
+        // Only the resolved links are needed — no file content read.
+        const linkedPaths = new Set(
+            await this.noteRepository.getLinkedPaths(file.path)
         );
-        const linkedPaths = new Set(note.links);
         const updateLinks = (entries: SimilarNoteEntry[]) =>
             entries.map((entry) => ({
                 ...entry,
@@ -144,14 +152,13 @@ export class SimilarNoteCoordinator {
         if (cached) {
             const updatedNotes = updateLinks(cached.notes);
             this.cache.set(cacheKey, {
-                mtime: file.stat.mtime,
+                mtime: verifiedMtime ?? cached.mtime,
                 notes: updatedNotes,
             });
 
             const latestView = this.noteBottomViewModel$.value;
             if (latestView.currentFile?.path === file.path) {
-                const threshold = this.settingsService.get()
-                    .minSimilarityThreshold;
+                const threshold = settings.minSimilarityThreshold;
                 this.noteBottomViewModel$.next({
                     ...latestView,
                     similarNoteEntries: updatedNotes.filter(
