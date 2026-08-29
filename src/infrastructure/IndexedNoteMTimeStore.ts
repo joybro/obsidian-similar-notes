@@ -51,12 +51,18 @@ export class IndexedNoteMTimeStore {
         return this.entries[path]?.indexableTextHash;
     }
 
-    async setMTime(path: string, mtime: number): Promise<void> {
-        await this.setMetadata(
-            path,
-            mtime,
-            this.entries[path]?.indexableTextHash
-        );
+    /**
+     * Drops the stored hash while keeping the entry's mtime. Called before the
+     * chunk index is mutated so a failed chunk write can never leave a hash
+     * that matches previously-indexed content while its chunks are gone.
+     */
+    async clearIndexableTextHash(path: string): Promise<void> {
+        const entry = this.entries[path];
+        if (!entry || entry.indexableTextHash === undefined) {
+            return;
+        }
+        await this.storage.set(path, entry.mtime);
+        this.entries[path] = { path, mtime: entry.mtime };
     }
 
     async setMetadata(
@@ -72,7 +78,7 @@ export class IndexedNoteMTimeStore {
         // Save to IndexedDB
         await this.storage.set(path, mtime, indexableTextHash);
         this.entries[path] = entry;
-        this.indexedNoteCount$.next(Object.keys(this.entries).length);
+        this.emitCountIfChanged();
     }
 
     async moveMetadata(
@@ -97,14 +103,27 @@ export class IndexedNoteMTimeStore {
         }
         delete this.entries[oldPath];
         this.entries[newPath] = entry;
-        this.indexedNoteCount$.next(Object.keys(this.entries).length);
+        this.emitCountIfChanged();
     }
 
     async deleteMTime(path: string): Promise<void> {
         // Delete from IndexedDB
         await this.storage.delete(path);
         delete this.entries[path];
-        this.indexedNoteCount$.next(Object.keys(this.entries).length);
+        this.emitCountIfChanged();
+    }
+
+    /**
+     * Emits the indexed-note count only when it actually changed. Subscribers
+     * do real work per emission (the settings tab awaits a worker-side chunk
+     * count), so a same-count re-emit on every metadata write would add a
+     * per-note round trip to bulk indexing passes.
+     */
+    private emitCountIfChanged(): void {
+        const count = Object.keys(this.entries).length;
+        if (count !== this.indexedNoteCount$.getValue()) {
+            this.indexedNoteCount$.next(count);
+        }
     }
 
     getAllPaths(): string[] {

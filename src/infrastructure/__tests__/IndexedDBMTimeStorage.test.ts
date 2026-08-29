@@ -26,7 +26,7 @@ function deleteDatabase(name: string): Promise<void> {
     });
 }
 
-describe("IndexedDBMTimeStorage", () => {
+describe("MTime store hash persistence (indexable-text-hash-spec §Persistence/Compatibility, #51)", () => {
     let vaultId: string;
     let storages: IndexedDBMTimeStorage[];
     let stores: IndexedNoteMTimeStore[];
@@ -142,20 +142,52 @@ describe("IndexedDBMTimeStorage", () => {
         expect(store.getCurrentIndexedNoteCount()).toBe(2);
     });
 
-    it("keeps a stored hash when the compatibility mtime API is used", async () => {
+    it("clears a stored hash while keeping the mtime, in memory and storage", async () => {
         const store = createStore();
         await store.init(vaultId);
         await store.setMetadata("note.md", 10, "v1:hash");
 
-        await store.setMTime("note.md", 20);
+        await store.clearIndexableTextHash("note.md");
 
-        expect(store.getMTime("note.md")).toBe(20);
-        expect(store.getIndexableTextHash("note.md")).toBe("v1:hash");
+        expect(store.getMTime("note.md")).toBe(10);
+        expect(store.getIndexableTextHash("note.md")).toBeUndefined();
         expect(await getBackingStorage(store).get("note.md")).toEqual({
             path: "note.md",
-            mtime: 20,
-            indexableTextHash: "v1:hash",
+            mtime: 10,
         });
+    });
+
+    it("clearing the hash of an unknown or hashless entry is a no-op write", async () => {
+        const store = createStore();
+        await store.init(vaultId);
+        await store.setMetadata("legacy.md", 10);
+        const storage = getBackingStorage(store);
+        const setSpy = vi.spyOn(storage, "set");
+
+        await store.clearIndexableTextHash("missing.md");
+        await store.clearIndexableTextHash("legacy.md");
+
+        expect(setSpy).not.toHaveBeenCalled();
+        expect(store.getMTime("legacy.md")).toBe(10);
+    });
+
+    it("emits the indexed-note count only when it changes (no same-count re-emit per write)", async () => {
+        const store = createStore();
+        await store.init(vaultId);
+        const emissions: number[] = [];
+        const sub = store
+            .getIndexedNoteCount$()
+            .subscribe((count) => emissions.push(count));
+
+        await store.setMetadata("a.md", 1, "v1:a"); // 0 -> 1
+        await store.setMetadata("a.md", 2, "v1:a2"); // same count: no emit
+        await store.setMetadata("b.md", 3, "v1:b"); // 1 -> 2
+        await store.moveMetadata("b.md", "c.md", 4); // same count: no emit
+        await store.deleteMTime("c.md"); // 2 -> 1
+        sub.unsubscribe();
+
+        // First emission is the BehaviorSubject replay of the initial 0.
+        expect(emissions).toEqual([0, 1, 2, 1]);
     });
 
     it("carries or overrides hashes while moving store metadata", async () => {

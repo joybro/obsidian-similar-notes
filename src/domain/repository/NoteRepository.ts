@@ -11,4 +11,10 @@ export interface NoteRepository {
         path: string,
         readContentWithoutFrontmatter?: boolean
     ): Promise<Note | null>;
+
+    /**
+     * Resolved outgoing link targets for a note. Served from the metadata
+     * cache — no file content read.
+     */
+    getLinkedPaths(path: string): Promise<string[]>;
 }
