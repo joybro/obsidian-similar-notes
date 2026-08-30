@@ -167,6 +167,27 @@ describe("SemanticLinkSuggest.selectSuggestion (spec item: insert)", () => {
     });
 });
 
+describe("SemanticLinkSuggest hover popover stacking (issue #55 follow-up)", () => {
+    it("tags popovers it owns so CSS can lift them above the suggestion popup", () => {
+        const suggest = makeSuggest();
+        const hoverEl = document.createElement("div");
+        const popover = { hoverEl } as never;
+
+        suggest.hoverPopover = popover;
+
+        expect(suggest.hoverPopover).toBe(popover);
+        expect(hoverEl.classList.contains("similar-notes-suggest-popover")).toBe(
+            true
+        );
+    });
+
+    it("accepts null without throwing (popover dismissed)", () => {
+        const suggest = makeSuggest();
+        suggest.hoverPopover = null;
+        expect(suggest.hoverPopover).toBeNull();
+    });
+});
+
 describe("SemanticLinkSuggest.renderSuggestion hover preview (issue #55)", () => {
     it("emits hover-link for Page Preview when a suggestion is hovered", () => {
         const trigger = vi.fn();

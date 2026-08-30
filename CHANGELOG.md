@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [1.7.0] - 2026-08-29
 
+### Fixed
+
+-   **Hover preview hidden behind the `;;` suggestion popup** (#55): the page preview opened from a link suggestion rendered underneath the popup itself, so the previewed note's content peeked out from behind the list instead of showing on top. Previews spawned from the suggestion popup now stack above it.
+
 ### Added
 
 -   **Hover preview on similar-note results** (#55): Hovering a note in the Similar notes bottom panel, the sidebar view, or the `;;` link-suggestion popup while holding Ctrl (Cmd on macOS) now shows Obsidian's native page preview, just like hovering a regular link. Uses the Page Preview core plugin, which gains a "Similar Notes" toggle in its settings to control whether the modifier key is required.
