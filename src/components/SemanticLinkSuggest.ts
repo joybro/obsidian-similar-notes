@@ -31,12 +31,30 @@ export const DEBOUNCE_MS = 300;
  * the selected note. Uses a non-`[[` trigger on purpose: Obsidian's built-in
  * link suggester is index 0 of `editorSuggest.suggests` and always wins on `[[`.
  */
+/**
+ * Class added to hover popovers spawned from the suggestion popup. The popup
+ * (`.suggestion-container`) sits above the default popover layer, so an
+ * untagged preview would render behind it — styles.css lifts this class above
+ * the popup.
+ */
+export const SUGGEST_POPOVER_CLASS = "similar-notes-suggest-popover";
+
 export class SemanticLinkSuggest
     extends EditorSuggest<SimilarNote>
     implements HoverParent
 {
+    private ownedHoverPopover: HoverPopover | null = null;
+
     /** Lets this suggester own the Page Preview popovers it triggers. */
-    hoverPopover: HoverPopover | null = null;
+    get hoverPopover(): HoverPopover | null {
+        return this.ownedHoverPopover;
+    }
+
+    /** Page Preview assigns here on creation; tag the element for stacking. */
+    set hoverPopover(popover: HoverPopover | null) {
+        this.ownedHoverPopover = popover;
+        popover?.hoverEl?.classList.add(SUGGEST_POPOVER_CLASS);
+    }
 
     /**
      * Trailing debounce over the expensive embedding search. Each keystroke

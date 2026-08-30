@@ -458,3 +458,11 @@ select option:disabled {
 .similar-notes-mobile-warning .setting-item-name {
     color: var(--text-warning);
 }
+
+/* Hover previews spawned from the inline suggestion popup (issue #55): the
+   popup (.suggestion-container) renders at z-index 60 while hover popovers
+   default to --layer-popover (30), so an untagged preview would be hidden
+   behind the popup. Lift only our suggest-owned popovers above it. */
+.hover-popover.similar-notes-suggest-popover {
+    z-index: var(--layer-menu);
+}
