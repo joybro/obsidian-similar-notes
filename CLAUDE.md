@@ -41,6 +41,10 @@ behavior, focus handling, anything not coverable by Vitest):
 
 This is the canonical manual-verification path.
 
+The **Test_local vault is disposable test data**: freely edit, create, or delete
+notes in it during verification (e.g. CDP typing tests) — do NOT spend effort
+restoring notes to their prior content afterwards.
+
 #### Self-driven verification via the Obsidian CLI (command features)
 
 For **command**-type features (anything triggered from the command palette) you don't
@@ -91,6 +95,9 @@ obsidian dev:cdp method=Input.insertText params='{"text":";;query"}'  # real typ
   trusting a negative result.
 - `eval` gotcha: a literal `\n` inside `code=` is translated by the CLI and breaks the
   JS — use `String.fromCharCode(10)`.
+- For stacking/occlusion bugs (element hidden behind another), `document.elementFromPoint(x, y)`
+  in the overlap region is an exact oracle: compare which element wins before vs after the fix
+  (verified on the #55 popover-behind-popup fix).
 
 ## GitHub Interactions
 
