@@ -2,11 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.7.0] - 2026-08-29
-
-### Fixed
-
--   **Hover preview hidden behind the `;;` suggestion popup** (#55): the page preview opened from a link suggestion rendered underneath the popup itself, so the previewed note's content peeked out from behind the list instead of showing on top. Previews spawned from the suggestion popup now stack above it.
+## [1.7.0] - 2026-09-05
 
 ### Added
 
