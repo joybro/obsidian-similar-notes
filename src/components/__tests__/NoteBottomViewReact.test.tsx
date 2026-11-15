@@ -228,49 +228,36 @@ describe("SimilarNotesViewReact", () => {
         );
     });
 
-    test.each(["sidebar", "bottom"] as const)(
-        "adds a generated link to the source editor in the %s without opening the result",
-        async (viewType) => {
-            const editor = {
-                lastLine: vi.fn(() => 1),
-                getLine: vi.fn(() => "Unsaved text"),
-                replaceRange: vi.fn(),
-            };
-            const generateMarkdownLink = vi.fn(() => "[Target](folder/Target.md)");
-            const activeView = {
-                file: currentFile,
-                getMode: () => "source",
-                editor,
-            };
-            Object.assign(mockLeaf, {
-                app: { fileManager: { generateMarkdownLink } },
-                ...activeView,
-            });
-            mockWorkspace.getActiveViewOfType = vi.fn().mockReturnValue(activeView);
-            render(
-                <NoteBottomViewReact
-                    workspace={mockWorkspace as Workspace}
-                    leaf={mockLeaf}
-                    bottomViewModelSubject$={bottomViewModelSubject$}
-                    vaultName="test-vault"
-                    viewType={viewType}
-                />
-            );
-
-            fireEvent.click(await screen.findByRole("button", { name: "Add link to Similar Note 1" }));
-            expect(generateMarkdownLink).toHaveBeenCalledWith(
-                bottomViewModelSubject$.value.similarNoteEntries[0].file,
-                currentFile.path
-            );
-            expect(editor.replaceRange).toHaveBeenCalledWith(
-                "\n[Target](folder/Target.md)\n",
-                { line: 1, ch: 12 }
-            );
-            expect(mockOpenLinkText).not.toHaveBeenCalled();
-            expect(screen.getByLabelText("Already linked")).toBeInTheDocument();
-            expect(screen.queryByRole("button", { name: "Add link to Similar Note 1" })).not.toBeInTheDocument();
-        }
+    const renderLinkAction = (viewType: "sidebar" | "bottom") => render(
+        <NoteBottomViewReact
+            workspace={mockWorkspace as Workspace}
+            leaf={mockLeaf}
+            bottomViewModelSubject$={bottomViewModelSubject$}
+            vaultName="test-vault"
+            viewType={viewType}
+        />
     );
+    const linkButton = () => screen.findByRole("button", { name: "Add link to Similar Note 1" });
+
+    test.each(["sidebar", "bottom"] as const)("links from the %s editor without opening the result", async (viewType) => {
+        const editor = {
+            lastLine: () => 1,
+            getLine: () => "Unsaved text",
+            replaceRange: vi.fn(),
+        };
+        const generateMarkdownLink = vi.fn(() => "[Target](folder/Target.md)");
+        const activeView = { file: currentFile, getMode: () => "source", editor };
+        Object.assign(mockLeaf, { app: { fileManager: { generateMarkdownLink } }, ...activeView });
+        mockWorkspace.getActiveViewOfType = vi.fn().mockReturnValue(activeView);
+        renderLinkAction(viewType);
+
+        fireEvent.click(await linkButton());
+        expect(generateMarkdownLink).toHaveBeenCalledWith(bottomViewModelSubject$.value.similarNoteEntries[0].file, currentFile.path);
+        expect(editor.replaceRange).toHaveBeenCalledWith("\n[Target](folder/Target.md)\n", { line: 1, ch: 12 });
+        expect(mockOpenLinkText).not.toHaveBeenCalled();
+        expect(screen.getByLabelText("Already linked")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Add link to Similar Note 1" })).not.toBeInTheDocument();
+    });
 
     test("appends atomically in reading mode and prevents duplicate clicks while saving", async () => {
         let finish: (() => void) | undefined;
@@ -287,16 +274,8 @@ describe("SimilarNotesViewReact", () => {
             },
             getMode: () => "preview",
         });
-        render(
-            <NoteBottomViewReact
-                workspace={mockWorkspace as Workspace}
-                leaf={mockLeaf}
-                bottomViewModelSubject$={bottomViewModelSubject$}
-                vaultName="test-vault"
-                viewType="bottom"
-            />
-        );
-        const button = await screen.findByRole("button", { name: "Add link to Similar Note 1" });
+        renderLinkAction("bottom");
+        const button = await linkButton();
         fireEvent.click(button);
         fireEvent.click(button);
         expect(process).toHaveBeenCalledTimes(1);
@@ -308,16 +287,8 @@ describe("SimilarNotesViewReact", () => {
     test("does not add a link to a different note when the displayed results are stale", async () => {
         const generateMarkdownLink = vi.fn();
         Object.assign(mockLeaf, { app: { fileManager: { generateMarkdownLink } } });
-        render(
-            <NoteBottomViewReact
-                workspace={mockWorkspace as Workspace}
-                leaf={mockLeaf}
-                bottomViewModelSubject$={bottomViewModelSubject$}
-                vaultName="test-vault"
-                viewType="bottom"
-            />
-        );
-        const button = await screen.findByRole("button", { name: "Add link to Similar Note 1" });
+        renderLinkAction("bottom");
+        const button = await linkButton();
         mockLeaf.file = createMockTFile("other.md");
         fireEvent.click(button);
         expect(generateMarkdownLink).not.toHaveBeenCalled();
