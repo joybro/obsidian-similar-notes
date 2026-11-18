@@ -6,7 +6,7 @@ Find semantically similar notes using AI. Choose local models for privacy or clo
 
 ### Similar Notes View
 
-As you write, similar notes appear at the bottom of your current note.
+When you open a note, similar notes appear at the bottom of it, and they refresh as you edit.
 
 ![Similar Notes Demo](images/demo.gif)
 
@@ -19,10 +19,10 @@ Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not jus
 ## Features
 
 - **Flexible Options**: Run locally (100% private) or use cloud APIs like OpenAI
-- **Mobile & Desktop**: Built-in models work on iOS, Android, and all desktop platforms
+- **Mobile & Desktop**: Works on iOS, Android, and all desktop platforms (on mobile, a cloud API is the default; see Getting Started)
 - **OpenAI Support**: Use OpenAI embedding models or any OpenAI-compatible API
-- **Ollama Support**: Connect to custom models via Ollama (desktop only)
-- **No Setup Required**: Built-in models work out of the box, no API keys needed
+- **Ollama Support**: Connect to custom models via Ollama (desktop; on mobile only with an Ollama server your phone can reach over the network)
+- **No Setup Required on Desktop**: Built-in models work out of the box, no API keys needed
 
 ## Getting Started
 
@@ -32,6 +32,8 @@ Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not jus
 4. Similar notes will appear at the bottom of your current note
 
 Progress appears in the status bar.
+
+> **On mobile**: new installs start with the OpenAI provider, because built-in models can crash Obsidian on phones with little memory. Add an OpenAI (or OpenAI-compatible) API key in settings, or switch to Gemini. You can still choose a built-in model in settings if your device has enough memory.
 
 ## Model Options
 
@@ -70,9 +72,9 @@ Supports any OpenAI-compatible embedding API.
 
 > **Privacy note**: OpenRouter routes your note content to the model vendor, and each vendor has its own data retention policy. OpenRouter accounts have a Zero Data Retention (ZDR) option that restricts routing to providers who confirmed they do not store your data; requests that would hit a non-ZDR endpoint fail with an error instead of going through silently. If your vault contains sensitive material, enable it once at [openrouter.ai/settings/privacy](https://openrouter.ai/settings/privacy) (Data Policies, Zero Data Retention) before indexing. It applies account-wide, so no plugin configuration is needed. (Thanks to David Torrens for testing OpenRouter and researching the ZDR setting.)
 
-### Ollama (Desktop Only)
+### Ollama (Desktop)
 
-Supports any Ollama embedding model.
+Supports any Ollama embedding model. Ollama runs on your computer, so on mobile it works only if you point the server URL at an Ollama server your phone can reach over the network.
 
 **Recommended:**
 
@@ -115,19 +117,21 @@ For driving the command from an agent (CLI flow, validation tips, drop-in skill 
 - **Transformers.js**: Runs Hugging Face models directly in Obsidian
 - **WebGPU**: GPU acceleration on desktop, automatic CPU fallback
 - **Orama**: Built-in vector database for fast search
-- **Web Workers**: All processing runs in background threads
+- **Web Workers**: Built-in model inference and vector search run in background threads
 
 ## Multi-Device Usage
 
-This plugin stores all data locally in IndexedDB, which is device-specific storage that **does not sync** across devices.
+This plugin stores its index locally in IndexedDB, which is device-specific storage that **does not sync** across devices.
 
 **What this means:**
 
 - Each device maintains its own independent index
-- Obsidian Sync, iCloud, Syncthing, or any other file sync tool will **not sync the plugin's data**
+- Obsidian Sync, iCloud, Syncthing, or any other file sync tool will **not sync the index**
 - When you open your vault on a new device, the plugin will automatically index your notes from scratch
 
 This is by design - IndexedDB provides fast, reliable local storage that doesn't interfere with vault syncing.
+
+**Settings are different**: the plugin's settings, including any OpenAI or Gemini API key, are saved in plain text in `.obsidian/plugins/similar-notes/data.json` inside your vault. A vault sync tool can copy that file to your other devices (and to wherever your vault is backed up).
 
 ## License
 

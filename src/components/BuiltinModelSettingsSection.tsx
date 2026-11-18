@@ -44,7 +44,7 @@ export function getBuiltinModelSettingBuilders(
                     setting
                         .setName("⚠️ Built-in models on mobile")
                         .setDesc(
-                            "Built-in models run entirely on-device and need a lot of memory. On low-memory phones this can crash Obsidian. For mobile, a remote provider (Ollama, OpenAI, or Gemini) is recommended."
+                            "Built-in models process your notes on-device (the model itself is downloaded once from Hugging Face) and need a lot of memory. On low-memory phones this can crash Obsidian. For mobile, a cloud provider (OpenAI or Gemini) is recommended."
                         )
                         .setClass("similar-notes-mobile-warning");
                 },
