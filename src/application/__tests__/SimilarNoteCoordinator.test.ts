@@ -453,4 +453,32 @@ describe("SimilarNoteCoordinator", () => {
             expect(similarNoteFinder.findSimilarNotes).toHaveBeenCalledTimes(2);
         });
     });
+
+    describe("sim1: regex exclusion applies to the ad-hoc query embedding", () => {
+        test("content removed by excludeRegexPatterns never reaches the finder", async () => {
+            settings = makeSettings({ excludeRegexPatterns: ["^secret:.*$"] });
+            (noteRepository.findByFile as ReturnType<typeof vi.fn>).mockResolvedValue({
+                path: "open.md",
+                title: "open",
+                content: "visible line\nsecret: hunter2\n",
+                links: ["a.md"],
+            });
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService
+            );
+
+            await coord.getSimilarNotes(makeFile("open.md"));
+
+            const finder = similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>;
+            expect(finder).toHaveBeenCalledTimes(1);
+            const passed = finder.mock.calls[0][0];
+            expect(passed.content).toContain("visible line");
+            expect(passed.content).not.toContain("hunter2");
+            expect(passed.path).toBe("open.md");
+            expect(passed.links).toEqual(["a.md"]);
+        });
+    });
 });

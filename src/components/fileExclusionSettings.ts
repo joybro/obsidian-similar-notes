@@ -19,7 +19,7 @@ export function buildExcludePathsSetting(
 ): void {
     setting
         .setName("Path patterns")
-        .setDesc("Enter glob patterns to exclude folders/files from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes.")
+        .setDesc("Enter glob patterns to exclude folders/files from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes. Excluded notes (by path or frontmatter) never appear in other notes' results, but opening one still embeds its text to find similar notes, which sends it to the provider when you use a cloud API.")
         .addTextArea((text) => {
             text.inputEl.rows = 5;
             text.inputEl.cols = 40;
