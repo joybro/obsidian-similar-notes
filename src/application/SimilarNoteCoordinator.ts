@@ -32,7 +32,11 @@ export class SimilarNoteCoordinator {
         private readonly vault: Vault,
         private readonly noteRepository: NoteRepository,
         private readonly similarNoteFinder: SimilarNoteFinder,
-        private readonly settingsService: SettingsService
+        private readonly settingsService: SettingsService,
+        // Whether a note is excluded from the index (path patterns or
+        // frontmatter rules). Defaults to "never" for callers/tests that
+        // don't care about exclusion.
+        private readonly isExcluded: (path: string) => boolean = () => false
     ) {
         // Initialize with current settings
         const settings = this.settingsService.get();
@@ -223,9 +227,20 @@ export class SimilarNoteCoordinator {
             rawNote.links
         );
         const maxResultCount = Math.max(settings.sidebarResultCount, settings.bottomResultCount);
+        // Excluded notes have no indexed chunks, so opening one would embed
+        // its text on the fly. With a cloud provider that sends it off the
+        // device, which the user opted out of by excluding it
+        // (frontmatter-exclusion spec §2.1). Local providers keep the panel.
+        const isCloudProvider =
+            settings.modelProvider === "openai" ||
+            settings.modelProvider === "gemini";
+        const allowAdHocEmbedding = !(
+            isCloudProvider && this.isExcluded(file.path)
+        );
         const similarNotes = await this.similarNoteFinder.findSimilarNotes(
             note,
-            maxResultCount
+            maxResultCount,
+            { allowAdHocEmbedding }
         );
 
         const showSourceChunk = settings.showSourceChunk;

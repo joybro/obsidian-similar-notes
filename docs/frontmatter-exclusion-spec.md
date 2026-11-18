@@ -82,10 +82,15 @@ Two consequences of keeping this behavior (QA ledger sim1, 2026-11-19):
   first (`SimilarNoteCoordinator.getSimilarNotes`), so regex-excluded content
   is never embedded on either side. Before 2026-11-19 the query side embedded
   the raw text.
-- The "Path patterns" setting description says that opening an excluded note
-  still embeds its text and, for a cloud provider, sends it. Whether to skip
-  the ad-hoc embedding for excluded notes on remote providers is an open owner
-  decision (similar-notes-dev desk `decisions.md`).
+- With a cloud provider (`openai`, `gemini`) the ad-hoc embedding is skipped
+  for excluded notes: `SimilarNoteCoordinator` passes
+  `allowAdHocEmbedding: false` to `SimilarNoteFinder`, which returns no results
+  instead of embedding. The excluded note's own panel is empty; its text never
+  leaves the device. Local providers (`builtin`, `ollama`) keep the panel as
+  before. An `openai` provider pointed at a local OpenAI-compatible server is
+  still treated as cloud (the URL is not inspected). The "Path patterns"
+  setting description states this. Owner decision: similar-notes-dev desk
+  `decisions.md`, 2026-11-19 request.
 
 ## §3 Status accounting
 

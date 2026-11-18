@@ -14,7 +14,17 @@ export class SimilarNoteFinder {
         private readonly modelService: EmbeddingService
     ) {}
 
-    async findSimilarNotes(note: Note, limit = 5): Promise<SimilarNote[]> {
+    /**
+     * @param options.allowAdHocEmbedding When false and the note has no
+     * indexed chunks, return no results instead of embedding the note on the
+     * fly. Used for excluded notes with a cloud provider, so their text never
+     * leaves the device (frontmatter-exclusion spec §2.1).
+     */
+    async findSimilarNotes(
+        note: Note,
+        limit = 5,
+        options: { allowAdHocEmbedding: boolean } = { allowAdHocEmbedding: true }
+    ): Promise<SimilarNote[]> {
         if (!note.content) {
             return [];
         }
@@ -26,6 +36,10 @@ export class SimilarNoteFinder {
 
         // If not found in repository, generate new embeddings
         if (!noteChunks || noteChunks.length === 0) {
+            if (!options.allowAdHocEmbedding) {
+                log.info(`[SimilarNoteFinder] No indexed chunks and ad-hoc embedding disallowed for: ${note.path}`);
+                return [];
+            }
             log.info(`[SimilarNoteFinder] No indexed chunks found, generating new embeddings for: ${note.path}`);
             const splitted = await this.noteChunkingService.split(note);
             if (splitted.length === 0) {
