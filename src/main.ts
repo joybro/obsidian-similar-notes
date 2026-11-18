@@ -244,6 +244,14 @@ export default class MainPlugin extends Plugin {
         );
 
         // noteIndexingService is now initialized
+        this.register(
+            (() => {
+                const sub = this.similarNoteCoordinator.watchPendingIndexCount(
+                    this.noteIndexingService.getNoteChangeCount$()
+                );
+                return () => sub.unsubscribe();
+            })()
+        );
 
         this.statusBarView = new StatusBarView({
             plugin: this,

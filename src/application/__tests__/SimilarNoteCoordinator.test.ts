@@ -1,7 +1,7 @@
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
 import type { TFile, Vault } from "obsidian";
-import { Subject } from "rxjs";
+import { BehaviorSubject, Subject, firstValueFrom } from "rxjs";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { SimilarNoteCoordinator } from "../SimilarNoteCoordinator";
 import type {
@@ -69,8 +69,17 @@ describe("SimilarNoteCoordinator", () => {
             getLinkedPaths: vi.fn().mockResolvedValue([]),
         } as unknown as NoteRepository;
 
+        const findSimilarNotes = vi.fn().mockResolvedValue([]);
         similarNoteFinder = {
-            findSimilarNotes: vi.fn().mockResolvedValue([]),
+            findSimilarNotes,
+            // Tests stub findSimilarNotes; the status variant reports "ok"
+            // around it unless a test overrides it.
+            findSimilarNotesWithStatus: vi.fn(
+                async (...args: unknown[]) => ({
+                    notes: await findSimilarNotes(...args),
+                    status: "ok",
+                })
+            ),
         } as unknown as SimilarNoteFinder;
 
         settingsService = {
@@ -592,6 +601,108 @@ describe("SimilarNoteCoordinator", () => {
 
             excluded = true;
             expect(await coord.getSimilarNotes(diary)).toEqual([]);
+        });
+    });
+
+    describe("empty panel reasons (panel-empty-states spec)", () => {
+        const neighbor = (similarity: number) => ({
+            path: "neighbor.md",
+            title: "neighbor",
+            similarity,
+            similarChunk: "chunk",
+            sourceChunk: "source",
+            isLinked: false,
+        });
+        const withStatus = (status: string, notes: unknown[] = []) =>
+            (
+                similarNoteFinder.findSimilarNotesWithStatus as ReturnType<typeof vi.fn>
+            ).mockResolvedValue({ notes, status });
+        const reasonAfterOpen = async (
+            coord: SimilarNoteCoordinator,
+            path = "open.md"
+        ) => {
+            await coord.onFileOpen(makeFile(path));
+            const view = await firstValueFrom(
+                coord.getNoteBottomViewModelObservable()
+            );
+            return view.emptyReason;
+        };
+        const make = (isExcluded?: (p: string) => boolean) =>
+            new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService,
+                isExcluded
+            );
+
+        test("(a) a note with no text says to write a few lines", async () => {
+            withStatus("empty-content");
+            expect(await reasonAfterOpen(make())).toEqual({ kind: "unwritten" });
+        });
+
+        test("(b) an excluded note with a cloud provider names the provider", async () => {
+            settings = makeSettings({ modelProvider: "gemini" });
+            withStatus("ad-hoc-disallowed");
+            expect(await reasonAfterOpen(make(() => true))).toEqual({
+                kind: "excluded-cloud",
+                provider: "Gemini",
+            });
+        });
+
+        test("(c) a failed embedding is reported and not cached", async () => {
+            withStatus("embedding-failed");
+            const coord = make();
+            expect(await reasonAfterOpen(coord)).toEqual({
+                kind: "embedding-failed",
+            });
+            withStatus("ok", [neighbor(0.9)]);
+            expect(await reasonAfterOpen(coord)).toBeUndefined();
+        });
+
+        test("(d) results hidden by the threshold say so with the value", async () => {
+            settings = makeSettings({ minSimilarityThreshold: 0.5 });
+            withStatus("ok", [neighbor(0.3)]);
+            expect(await reasonAfterOpen(make())).toEqual({
+                kind: "below-threshold",
+                threshold: 0.5,
+            });
+        });
+
+        test("(e) no results while notes are queued shows the live count, then searches again", async () => {
+            const pending$ = new BehaviorSubject(1240);
+            const coord = make();
+            coord.watchPendingIndexCount(pending$);
+            withStatus("ok", []);
+            expect(await reasonAfterOpen(coord)).toEqual({
+                kind: "indexing",
+                remaining: 1240,
+            });
+
+            pending$.next(7);
+            let view = await firstValueFrom(coord.getNoteBottomViewModelObservable());
+            expect(view.emptyReason).toEqual({ kind: "indexing", remaining: 7 });
+
+            withStatus("ok", [neighbor(0.9)]);
+            pending$.next(0);
+            await vi.waitFor(async () => {
+                view = await firstValueFrom(coord.getNoteBottomViewModelObservable());
+                expect(view.similarNoteEntries).toHaveLength(1);
+            });
+            expect(view.emptyReason).toBeUndefined();
+        });
+
+        test("results during indexing show normally (no indexing line)", async () => {
+            const pending$ = new BehaviorSubject(50);
+            const coord = make();
+            coord.watchPendingIndexCount(pending$);
+            withStatus("ok", [neighbor(0.9)]);
+            expect(await reasonAfterOpen(coord)).toBeUndefined();
+        });
+
+        test("nothing found after indexing keeps the plain line", async () => {
+            withStatus("ok", []);
+            expect(await reasonAfterOpen(make())).toEqual({ kind: "none" });
         });
     });
 });

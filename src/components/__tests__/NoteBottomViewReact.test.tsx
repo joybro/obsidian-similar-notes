@@ -145,6 +145,50 @@ describe("SimilarNotesViewReact", () => {
         });
     });
 
+    test.each([
+        [{ kind: "unwritten" }, "Write a few lines and similar notes will appear here."],
+        [
+            { kind: "excluded-cloud", provider: "OpenAI" },
+            "This note is excluded from the index, so it isn't sent to OpenAI.",
+        ],
+        [
+            { kind: "embedding-failed" },
+            "Couldn't analyze this note. Check the model in Settings, then reopen the note.",
+        ],
+        [
+            { kind: "below-threshold", threshold: 0.5 },
+            "No notes above the minimum similarity (0.50).",
+        ],
+        [
+            { kind: "indexing", remaining: 1240 },
+            "Indexing your vault: 1,240 notes left. Results fill in as notes are indexed.",
+        ],
+        [
+            { kind: "indexing", remaining: 1 },
+            "Indexing your vault: 1 note left. Results fill in as notes are indexed.",
+        ],
+        [{ kind: "none" }, "No similar notes found."],
+    ] as const)("empty panel says why: %o", async (emptyReason, text) => {
+        bottomViewModelSubject$.next({
+            currentFile,
+            similarNoteEntries: [],
+            emptyReason,
+            noteDisplayMode: "title",
+            sidebarResultCount: 10,
+            bottomResultCount: 5,
+        });
+        render(
+            <NoteBottomViewReact
+                workspace={mockWorkspace as unknown as Workspace}
+                leaf={mockLeaf as unknown as MarkdownView}
+                bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
+                viewType="bottom"
+            />
+        );
+        expect(await screen.findByText(text)).toBeInTheDocument();
+    });
+
     test("calls openFile when note is clicked", async () => {
         render(
             <NoteBottomViewReact

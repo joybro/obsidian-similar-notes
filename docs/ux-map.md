@@ -38,13 +38,17 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
 
 - 오류에서: every surface stays usable; an embedding or provider failure shows an Obsidian Notice and the status bar error state, and the user leaves by fixing the provider in settings, then Retry errored notes or reopening the note.
 
-- screen: note-footer | states: empty, empty-excluded-note, partial-not-indexed, ideal, ideal-linked, ideal-collapsed, error-embedding
+- screen: note-footer | states: empty, empty-unwritten, empty-below-threshold, empty-excluded-note, loading-indexing, partial-not-indexed, ideal, ideal-linked, ideal-collapsed, error-embedding
   - 무엇을 보여주나: under the open note, the top similar notes with score, optional source chunk, "linked" tag for notes already linked
   - 행동: open, open in new tab (Cmd-click), hover preview (Cmd+hover), drag into editor, right-click menu (Open link, Open in new tab, Copy Obsidian URL), collapse
-  - empty: "No similar notes found" (nothing above the Minimum similarity threshold, or an empty vault)
-  - empty-excluded-note: the open note is excluded and the provider is OpenAI or Gemini, so it is not embedded on the fly and the list is empty (frontmatter-exclusion spec §2.1); with a local provider it shows results like partial-not-indexed
+  - Each empty state is one grey line in the same place; only the text differs (`docs/panel-empty-states-spec.md`).
+  - empty: "No similar notes found." (the search ran, nothing came back, nothing is waiting to be indexed)
+  - empty-unwritten: the note has no text (after exclusion patterns): "Write a few lines and similar notes will appear here."
+  - empty-below-threshold: results exist but all are under Minimum similarity: "No notes above the minimum similarity (0.50)."
+  - empty-excluded-note: the open note is excluded and the provider is OpenAI or Gemini, so it is not embedded on the fly (frontmatter-exclusion spec §2.1): "This note is excluded from the index, so it isn't sent to OpenAI." (or Gemini); with a local provider it shows results like partial-not-indexed
+  - loading-indexing: the search found nothing while notes are queued for indexing: "Indexing your vault: N notes left. Results fill in as notes are indexed." N follows the status bar's "N to index"; when the queue empties the panel searches again
   - partial-not-indexed: the open note has no indexed chunks yet; results come from an on-the-fly embedding
-  - error-embedding: on-the-fly embedding failed; Notice and empty list
+  - error-embedding: on-the-fly embedding failed; Notice plus "Couldn't analyze this note. Check the model in Settings, then reopen the note."
   - → hover-preview (overlay): Cmd+hover a result
   - → note-footer (replace): open a result
 
@@ -112,7 +116,10 @@ obsidian vault=Test_local eval code="document.querySelectorAll('.search-result-f
 | Pair | How | Kind |
 |---|---|---|
 | note-footer ideal, ideal-linked | two related notes as above; for linked add `[[ux-coffee-b]]` to note a | auto |
-| note-footer empty | Minimum similarity = 1 in settings, reopen the note | auto (settings via `data.json` + plugin:reload) |
+| note-footer empty | a note about a topic no other note shares, after indexing finishes | auto |
+| note-footer empty-below-threshold | Minimum similarity = 1 in settings, reopen the note | auto (settings via `data.json` + plugin:reload) |
+| note-footer empty-unwritten | create an empty note and open it | auto |
+| note-footer loading-indexing | Reindex, then open a note right away (large vault so the queue is still long) | auto (timing-dependent) |
 | note-footer empty-excluded-note | Path patterns `ux-*` and provider OpenAI (any key; no call is made), Reindex, open note a | auto |
 | note-footer partial-not-indexed | same with the built-in model | auto |
 | note-footer error-embedding | provider OpenAI with an invalid key | manual (key entry) |

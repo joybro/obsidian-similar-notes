@@ -7,6 +7,22 @@ import type { NoteChunkRepository } from "../repository/NoteChunkRepository";
 import type { EmbeddingService } from "./EmbeddingService";
 import type { NoteChunkingService } from "./NoteChunkingService";
 
+/**
+ * Why a search came back the way it did. "ok" covers both "found some" and
+ * "searched and found nothing"; the others are searches that never ran, so
+ * the panel can say why it is empty instead of "No similar notes found."
+ */
+export type SimilarNoteSearchStatus =
+    | "ok"
+    | "empty-content"
+    | "ad-hoc-disallowed"
+    | "embedding-failed";
+
+export interface SimilarNoteSearchResult {
+    notes: SimilarNote[];
+    status: SimilarNoteSearchStatus;
+}
+
 export class SimilarNoteFinder {
     constructor(
         private readonly noteChunkRepository: NoteChunkRepository,
@@ -25,8 +41,17 @@ export class SimilarNoteFinder {
         limit = 5,
         options: { allowAdHocEmbedding: boolean } = { allowAdHocEmbedding: true }
     ): Promise<SimilarNote[]> {
+        return (await this.findSimilarNotesWithStatus(note, limit, options))
+            .notes;
+    }
+
+    async findSimilarNotesWithStatus(
+        note: Note,
+        limit = 5,
+        options: { allowAdHocEmbedding: boolean } = { allowAdHocEmbedding: true }
+    ): Promise<SimilarNoteSearchResult> {
         if (!note.content) {
-            return [];
+            return { notes: [], status: "empty-content" };
         }
 
         log.info(`[SimilarNoteFinder] ===== Finding similar notes for: ${note.path} =====`);
@@ -38,12 +63,12 @@ export class SimilarNoteFinder {
         if (!noteChunks || noteChunks.length === 0) {
             if (!options.allowAdHocEmbedding) {
                 log.info(`[SimilarNoteFinder] No indexed chunks and ad-hoc embedding disallowed for: ${note.path}`);
-                return [];
+                return { notes: [], status: "ad-hoc-disallowed" };
             }
             log.info(`[SimilarNoteFinder] No indexed chunks found, generating new embeddings for: ${note.path}`);
             const splitted = await this.noteChunkingService.split(note);
             if (splitted.length === 0) {
-                return [];
+                return { notes: [], status: "empty-content" };
             }
 
             try {
@@ -61,7 +86,7 @@ export class SimilarNoteFinder {
             } catch (error) {
                 log.error("Failed to generate embeddings for note:", note.path, error);
                 showNoteErrorNotice(note.path, error);
-                return [];
+                return { notes: [], status: "embedding-failed" };
             }
         } else {
             log.debug(`[SimilarNoteFinder] Using ${noteChunks.length} pre-indexed chunks for: ${note.path}`);
@@ -127,6 +152,6 @@ export class SimilarNoteFinder {
                 )
         );
 
-        return similarNotes.slice(0, limit);
+        return { notes: similarNotes.slice(0, limit), status: "ok" };
     }
 }
