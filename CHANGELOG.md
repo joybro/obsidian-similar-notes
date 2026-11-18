@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+-   **Regex-excluded content no longer leaves the vault when you open a note that isn't indexed yet**: when a note has no indexed chunks (not indexed yet, or excluded by path or frontmatter), the plugin embeds it on the fly to find similar notes. That on-the-fly embedding now strips text matched by the **Exclude content from index** patterns first, just like indexing does, so that text is never sent to a cloud provider.
+
+### Changed
+
+-   **Path patterns setting explains what exclusion covers**: the description now says that excluded notes still get embedded when you open them, and that with a cloud API that means their text is sent to the provider.
+
 ## [1.7.0] - 2026-09-05
 
 ### Added

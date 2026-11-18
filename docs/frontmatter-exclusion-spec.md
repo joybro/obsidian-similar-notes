@@ -76,6 +76,17 @@ have always behaved. Note the consequence for remote providers: viewing an
 excluded note still sends its content to the embedding API for the query-side
 embedding.
 
+Two consequences of keeping this behavior (QA ledger sim1, 2026-11-19):
+
+- The ad-hoc query embedding applies `excludeRegexPatterns` to the note text
+  first (`SimilarNoteCoordinator.getSimilarNotes`), so regex-excluded content
+  is never embedded on either side. Before 2026-11-19 the query side embedded
+  the raw text.
+- The "Path patterns" setting description says that opening an excluded note
+  still embeds its text and, for a cloud provider, sends it. Whether to skip
+  the ad-hoc embedding for excluded notes on remote providers is an open owner
+  decision (similar-notes-dev desk `decisions.md`).
+
 ## §3 Status accounting
 
 `computeIndexStatus` and `visibleErroredEntries` take an

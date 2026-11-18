@@ -3,7 +3,9 @@ import type {
     SimilarNoteEntry,
 } from "@/components/NoteBottomViewReact";
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
+import { Note } from "@/domain/model/Note";
 import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
+import { applyExclusionPatterns } from "@/utils/indexableText";
 import log from "loglevel";
 import type { TFile, Vault } from "obsidian";
 import { BehaviorSubject } from "rxjs";
@@ -202,9 +204,23 @@ export class SimilarNoteCoordinator {
         }
 
         const settings = this.settingsService.get();
-        const note = await this.noteRepository.findByFile(
+        const rawNote = await this.noteRepository.findByFile(
             file,
             !settings.includeFrontmatter
+        );
+        // When the note has no indexed chunks (not yet indexed, or excluded
+        // from the index), the finder embeds this content on the fly — for a
+        // remote provider that means sending it to the API. Strip
+        // regex-excluded content first so the query side never embeds text
+        // the index side would have removed (frontmatter-exclusion spec §2.1).
+        const note = new Note(
+            rawNote.path,
+            rawNote.title,
+            applyExclusionPatterns(
+                rawNote.content ?? "",
+                settings.excludeRegexPatterns || []
+            ),
+            rawNote.links
         );
         const maxResultCount = Math.max(settings.sidebarResultCount, settings.bottomResultCount);
         const similarNotes = await this.similarNoteFinder.findSimilarNotes(
