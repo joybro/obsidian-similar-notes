@@ -517,4 +517,81 @@ describe("SimilarNoteCoordinator", () => {
             expect(finder.mock.calls[0][2]).toEqual({ allowAdHocEmbedding: true });
         });
     });
+
+    describe("sim6: results cache respects exclusion added after caching", () => {
+        test("a target excluded after caching disappears without the source mtime changing", async () => {
+            let excluded = false;
+            (
+                similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>
+            ).mockResolvedValue([
+                {
+                    path: "Private/secret.md",
+                    title: "secret",
+                    similarity: 0.9,
+                    similarChunk: "chunk",
+                    sourceChunk: "source",
+                    isLinked: false,
+                },
+                {
+                    path: "other.md",
+                    title: "other",
+                    similarity: 0.8,
+                    similarChunk: "chunk",
+                    sourceChunk: "source",
+                    isLinked: false,
+                },
+            ]);
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService,
+                (path) => excluded && path.startsWith("Private/")
+            );
+            const publicFile = makeFile("public.md", 1);
+            const before = await coord.getSimilarNotes(publicFile);
+            expect(before.map((e) => e.file.path)).toEqual([
+                "Private/secret.md",
+                "other.md",
+            ]);
+
+            excluded = true; // excludeFolderPatterns = Private/** applied
+            const after = await coord.getSimilarNotes(publicFile);
+            expect(after.map((e) => e.file.path)).toEqual(["other.md"]);
+        });
+
+        test("a source excluded after caching with a cloud provider shows an empty panel", async () => {
+            settings = makeSettings({ modelProvider: "openai" });
+            let excluded = false;
+            (
+                similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>
+            ).mockImplementation(
+                async (_note: unknown, _n: number, opts?: { allowAdHocEmbedding?: boolean }) =>
+                    opts?.allowAdHocEmbedding === false
+                        ? []
+                        : [
+                            {
+                                path: "other.md",
+                                title: "other",
+                                similarity: 0.8,
+                                similarChunk: "chunk",
+                                sourceChunk: "source",
+                                isLinked: false,
+                            },
+                        ]
+            );
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService,
+                (path) => excluded && path.startsWith("Private/")
+            );
+            const diary = makeFile("Private/diary.md", 1);
+            expect(await coord.getSimilarNotes(diary)).toHaveLength(1);
+
+            excluded = true;
+            expect(await coord.getSimilarNotes(diary)).toEqual([]);
+        });
+    });
 });
