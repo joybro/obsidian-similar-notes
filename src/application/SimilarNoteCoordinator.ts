@@ -1,19 +1,29 @@
 import type {
+    EmptyReason,
     NoteBottomViewModel,
     SimilarNoteEntry,
 } from "@/components/NoteBottomViewReact";
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import { Note } from "@/domain/model/Note";
-import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
+import type {
+    SimilarNoteFinder,
+    SimilarNoteSearchStatus,
+} from "@/domain/service/SimilarNoteFinder";
 import { applyExclusionPatterns } from "@/utils/indexableText";
 import log from "loglevel";
 import type { TFile, Vault } from "obsidian";
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, type Observable } from "rxjs";
 import type { SettingsService } from "./SettingsService";
 
 interface SimilarNoteCacheEntry {
     mtime: number;
     notes: SimilarNoteEntry[];
+    status: SimilarNoteSearchStatus;
+}
+
+interface SimilarNotesWithStatus {
+    notes: SimilarNoteEntry[];
+    status: SimilarNoteSearchStatus;
 }
 
 const MAX_CACHE_SIZE = 20;
@@ -27,6 +37,8 @@ export class SimilarNoteCoordinator {
         bottomResultCount: 5,     // Will be properly initialized in constructor
     });
     private cache = new Map<string, SimilarNoteCacheEntry>(); // file path -> entry
+    // Notes still waiting to be indexed (the status bar's "N to index").
+    private pendingIndexCount = 0;
 
     constructor(
         private readonly vault: Vault,
@@ -81,6 +93,32 @@ export class SimilarNoteCoordinator {
                     bottomResultCount: settings.bottomResultCount,
                 });
             });
+    }
+
+    /**
+     * Follow the live count of notes waiting to be indexed (the status bar's
+     * "N to index"), so an empty panel during indexing can say so instead of
+     * "No similar notes found." Wired after the indexing service exists.
+     */
+    watchPendingIndexCount(pendingIndexCount$: Observable<number>) {
+        return pendingIndexCount$.subscribe((count) => {
+            const wasPending = this.pendingIndexCount > 0;
+            this.pendingIndexCount = count;
+            const view = this.noteBottomViewModel$.value;
+            if (view.emptyReason?.kind !== "indexing" || !view.currentFile) {
+                return;
+            }
+            if (count > 0) {
+                this.noteBottomViewModel$.next({
+                    ...view,
+                    emptyReason: { kind: "indexing", remaining: count },
+                });
+            } else if (wasPending) {
+                // Indexing finished while this note showed the indexing
+                // line: search again now that the index is complete.
+                void this.emitNoteBottomViewModel(view.currentFile);
+            }
+        });
     }
 
     getNoteBottomViewModelObservable() {
@@ -160,6 +198,7 @@ export class SimilarNoteCoordinator {
             this.cache.set(cacheKey, {
                 mtime: verifiedMtime ?? cached.mtime,
                 notes: updatedNotes,
+                status: cached.status,
             });
 
             const latestView = this.noteBottomViewModel$.value;
@@ -189,21 +228,63 @@ export class SimilarNoteCoordinator {
     }
 
     async emitNoteBottomViewModel(file: TFile) {
-        const similarNotes = await this.getSimilarNotes(file);
+        const { notes, status } = await this.getSimilarNotesWithStatus(file);
         const settings = this.settingsService.get();
-        const filtered = similarNotes.filter(
-            (entry) => entry.similarity >= settings.minSimilarityThreshold
-        );
+        const threshold = settings.minSimilarityThreshold;
+        const filtered = notes.filter((entry) => entry.similarity >= threshold);
         this.noteBottomViewModel$.next({
             currentFile: file,
             similarNoteEntries: filtered,
+            emptyReason:
+                filtered.length > 0
+                    ? undefined
+                    : this.emptyReasonFor(status, notes.length, threshold),
             noteDisplayMode: settings.noteDisplayMode,
             sidebarResultCount: settings.sidebarResultCount,
             bottomResultCount: settings.bottomResultCount,
         });
     }
 
+    /**
+     * Why the panel is empty (panel-empty-states spec). Order matters: a
+     * search that never ran explains itself first; "indexing" only when the
+     * search ran and found nothing while notes are still queued; the
+     * threshold only when it hid results that exist.
+     */
+    private emptyReasonFor(
+        status: SimilarNoteSearchStatus,
+        rawCount: number,
+        threshold: number
+    ): EmptyReason {
+        if (status === "empty-content") {
+            return { kind: "unwritten" };
+        }
+        if (status === "ad-hoc-disallowed") {
+            const provider = this.settingsService.get().modelProvider;
+            return {
+                kind: "excluded-cloud",
+                provider: provider === "gemini" ? "Gemini" : "OpenAI",
+            };
+        }
+        if (status === "embedding-failed") {
+            return { kind: "embedding-failed" };
+        }
+        if (rawCount > 0) {
+            return { kind: "below-threshold", threshold };
+        }
+        if (this.pendingIndexCount > 0) {
+            return { kind: "indexing", remaining: this.pendingIndexCount };
+        }
+        return { kind: "none" };
+    }
+
     async getSimilarNotes(file: TFile): Promise<SimilarNoteEntry[]> {
+        return (await this.getSimilarNotesWithStatus(file)).notes;
+    }
+
+    private async getSimilarNotesWithStatus(
+        file: TFile
+    ): Promise<SimilarNotesWithStatus> {
         const settings = this.settingsService.get();
         // Excluded notes have no indexed chunks, so opening one would embed
         // its text on the fly. With a cloud provider that sends it off the
@@ -226,7 +307,10 @@ export class SimilarNoteCoordinator {
             cacheEntry.mtime === file.stat.mtime &&
             allowAdHocEmbedding
         ) {
-            return this.withoutExcludedTargets(cacheEntry.notes);
+            return {
+                notes: this.withoutExcludedTargets(cacheEntry.notes),
+                status: cacheEntry.status,
+            };
         }
 
         const rawNote = await this.noteRepository.findByFile(
@@ -248,11 +332,12 @@ export class SimilarNoteCoordinator {
             rawNote.links
         );
         const maxResultCount = Math.max(settings.sidebarResultCount, settings.bottomResultCount);
-        const similarNotes = await this.similarNoteFinder.findSimilarNotes(
-            note,
-            maxResultCount,
-            { allowAdHocEmbedding }
-        );
+        const { notes: similarNotes, status } =
+            await this.similarNoteFinder.findSimilarNotesWithStatus(
+                note,
+                maxResultCount,
+                { allowAdHocEmbedding }
+            );
 
         const showSourceChunk = settings.showSourceChunk;
 
@@ -280,16 +365,31 @@ export class SimilarNoteCoordinator {
             })
             .map(({ path: _path, ...rest }) => rest) as SimilarNoteEntry[];
 
-        this.cache.set(file.path, {
-            mtime: file.stat.mtime,
-            notes: similarNoteEntries,
-        });
-        if (this.cache.size > MAX_CACHE_SIZE) {
-            const oldestKey = this.cache.keys().next().value;
-            this.cache.delete(oldestKey);
+        // Don't cache a failed embedding (reopening the note should retry, as
+        // the panel tells the user) or an empty search while notes are still
+        // being indexed (results fill in as indexing progresses).
+        // Nor a skipped search for an excluded note: the cache is bypassed
+        // while it stays excluded, and once included again it must search.
+        const cacheable =
+            status !== "embedding-failed" &&
+            status !== "ad-hoc-disallowed" &&
+            !(similarNoteEntries.length === 0 && this.pendingIndexCount > 0);
+        if (cacheable) {
+            this.cache.set(file.path, {
+                mtime: file.stat.mtime,
+                notes: similarNoteEntries,
+                status,
+            });
+            if (this.cache.size > MAX_CACHE_SIZE) {
+                const oldestKey = this.cache.keys().next().value;
+                this.cache.delete(oldestKey);
+            }
         }
 
-        return this.withoutExcludedTargets(similarNoteEntries);
+        return {
+            notes: this.withoutExcludedTargets(similarNoteEntries),
+            status,
+        };
     }
 
     // A target excluded after its chunks were indexed can still come back

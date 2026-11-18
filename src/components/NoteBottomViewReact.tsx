@@ -14,9 +14,43 @@ export interface SimilarNoteEntry {
     isLinked: boolean;
 }
 
+/**
+ * Why the results list is empty, so the panel can say something true
+ * (docs/panel-empty-states-spec.md). Undefined means "not computed" and
+ * reads like "none".
+ */
+export type EmptyReason =
+    | { kind: "unwritten" }
+    | { kind: "excluded-cloud"; provider: "OpenAI" | "Gemini" }
+    | { kind: "embedding-failed" }
+    | { kind: "below-threshold"; threshold: number }
+    | { kind: "indexing"; remaining: number }
+    | { kind: "none" };
+
+export function emptyStateText(reason: EmptyReason | undefined): string {
+    switch (reason?.kind) {
+        case "unwritten":
+            return "Write a few lines and similar notes will appear here.";
+        case "excluded-cloud":
+            return `This note is excluded from the index, so it isn't sent to ${reason.provider}.`;
+        case "embedding-failed":
+            return "Couldn't analyze this note. Check the model in Settings, then reopen the note.";
+        case "below-threshold":
+            return `No notes above the minimum similarity (${reason.threshold.toFixed(2)}).`;
+        case "indexing": {
+            const n = reason.remaining.toLocaleString("en-US");
+            const noun = reason.remaining === 1 ? "note" : "notes";
+            return `Indexing your vault: ${n} ${noun} left. Results fill in as notes are indexed.`;
+        }
+        default:
+            return "No similar notes found.";
+    }
+}
+
 export interface NoteBottomViewModel {
     currentFile: TFile | null;
     similarNoteEntries: SimilarNoteEntry[];
+    emptyReason?: EmptyReason;
     noteDisplayMode: "title" | "path" | "smart";
     sidebarResultCount: number;
     bottomResultCount: number;
@@ -242,12 +276,14 @@ const SearchResult = ({
 
 const SearchResultsContainer = ({
     similarNotes,
+    emptyReason,
     onNoteClick,
     onNoteHover,
     onContextMenu,
     noteDisplayMode,
 }: {
     similarNotes: SimilarNoteEntry[];
+    emptyReason?: EmptyReason;
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
     onNoteHover: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
@@ -257,7 +293,7 @@ const SearchResultsContainer = ({
         return (
             <div className="search-result-container">
                 <div className="search-empty-state">
-                    No similar notes found.
+                    {emptyStateText(emptyReason)}
                 </div>
             </div>
         );
@@ -292,6 +328,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
 }) => {
     const [collapsed, setCollapsed] = useState(false);
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
+    const [emptyReason, setEmptyReason] = useState<EmptyReason | undefined>();
     const [noteDisplayMode, setNoteDisplayMode] = useState<
         "title" | "path" | "smart"
     >("title");
@@ -306,6 +343,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 ? model.sidebarResultCount
                 : model.bottomResultCount;
             setSimilarNotes(model.similarNoteEntries.slice(0, limit));
+            setEmptyReason(model.emptyReason);
             setNoteDisplayMode(model.noteDisplayMode);
         });
         return () => sub.unsubscribe();
@@ -372,6 +410,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 {!collapsed && (
                     <SearchResultsContainer
                         similarNotes={similarNotes}
+                        emptyReason={emptyReason}
                         onNoteClick={handleNoteClick}
                         onNoteHover={handleNoteHover}
                         onContextMenu={handleContextMenu}

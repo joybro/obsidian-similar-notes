@@ -86,3 +86,54 @@ describe("SimilarNoteFinder ad-hoc embedding guard (frontmatter-exclusion spec Â
         expect(embedding.embedText).toHaveBeenCalledTimes(1);
     });
 });
+
+describe("SimilarNoteFinder search status (panel-empty-states spec)", () => {
+    function makeFinder(embedText: () => Promise<number[]>) {
+        const repo: Partial<NoteChunkRepository> = {
+            getByPath: vi.fn(async () => []),
+            findSimilarChunks: vi.fn(async () => []),
+        };
+        const chunking: Partial<NoteChunkingService> = {
+            split: vi.fn(async (n: Note) => [chunk(n.path, n.content)]),
+        };
+        const embedding: Partial<EmbeddingService> = {
+            embedText: vi.fn(embedText),
+        };
+        return new SimilarNoteFinder(
+            repo as NoteChunkRepository,
+            chunking as NoteChunkingService,
+            embedding as EmbeddingService
+        );
+    }
+    const ok = async () => [1, 0, 0];
+
+    it("reports empty content", async () => {
+        const r = await makeFinder(ok).findSimilarNotesWithStatus(
+            new Note("Blank.md", "Blank", "", [])
+        );
+        expect(r).toEqual({ notes: [], status: "empty-content" });
+    });
+
+    it("reports a skipped ad-hoc embedding", async () => {
+        const r = await makeFinder(ok).findSimilarNotesWithStatus(
+            new Note("Private/d.md", "d", "body", []),
+            5,
+            { allowAdHocEmbedding: false }
+        );
+        expect(r.status).toBe("ad-hoc-disallowed");
+    });
+
+    it("reports a failed embedding", async () => {
+        const r = await makeFinder(async () => {
+            throw new Error("model not loaded");
+        }).findSimilarNotesWithStatus(new Note("N.md", "N", "body", []));
+        expect(r).toEqual({ notes: [], status: "embedding-failed" });
+    });
+
+    it("reports ok when the search ran, even with no results", async () => {
+        const r = await makeFinder(ok).findSimilarNotesWithStatus(
+            new Note("N.md", "N", "body", [])
+        );
+        expect(r).toEqual({ notes: [], status: "ok" });
+    });
+});
