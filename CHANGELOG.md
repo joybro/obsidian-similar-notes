@@ -6,12 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **Excluded notes are no longer sent to a cloud API when you open them**: with OpenAI or Gemini as the provider, opening a note excluded by path or frontmatter no longer embeds its text on the fly, so it never leaves your device. That note's own Similar notes panel stays empty. With a built-in model or Ollama nothing changes.
 -   **Regex-excluded content no longer leaves the vault when you open a note that isn't indexed yet**: when a note has no indexed chunks (not indexed yet, or excluded by path or frontmatter), the plugin embeds it on the fly to find similar notes. That on-the-fly embedding now strips text matched by the **Exclude content from index** patterns first, just like indexing does, so that text is never sent to a cloud provider.
 
 ### Changed
 
 -   **README and settings text now match what the plugin does**: the README says mobile installs start with a cloud API (key needed), that Ollama on mobile needs a server the phone can reach, and that settings including API keys live in plain text in the plugin's `data.json` inside the vault. The mobile warning for built-in models now recommends OpenAI or Gemini and mentions the one-time model download from Hugging Face.
--   **Path patterns setting explains what exclusion covers**: the description now says that excluded notes still get embedded when you open them, and that with a cloud API that means their text is sent to the provider.
+-   **Path patterns setting explains what exclusion covers**: the description now says how excluded notes behave when you open them with a cloud API versus a local model.
 
 ## [1.7.0] - 2026-09-05
 

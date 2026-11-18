@@ -48,3 +48,41 @@ describe("SimilarNoteFinder linked-note handling (show-linked-notes-marked spec)
         expect(capturedExclude).toEqual(["Active.md"]);
     });
 });
+
+describe("SimilarNoteFinder ad-hoc embedding guard (frontmatter-exclusion spec §2.1)", () => {
+    function makeFinder(indexed: NoteChunk[]) {
+        const repo: Partial<NoteChunkRepository> = {
+            getByPath: vi.fn(async () => indexed),
+            findSimilarChunks: vi.fn(async () => []),
+        };
+        const chunking: Partial<NoteChunkingService> = {
+            split: vi.fn(async (n: Note) => [chunk(n.path, n.content)]),
+        };
+        const embedding: Partial<EmbeddingService> = {
+            embedText: vi.fn(async () => [1, 0, 0]),
+        };
+        const finder = new SimilarNoteFinder(
+            repo as NoteChunkRepository,
+            chunking as NoteChunkingService,
+            embedding as EmbeddingService
+        );
+        return { finder, embedding };
+    }
+
+    it("does not embed on the fly when ad-hoc embedding is disallowed", async () => {
+        const { finder, embedding } = makeFinder([]);
+        const note = new Note("Private/diary.md", "diary", "SECRET BODY", []);
+        const results = await finder.findSimilarNotes(note, 5, {
+            allowAdHocEmbedding: false,
+        });
+        expect(results).toEqual([]);
+        expect(embedding.embedText).not.toHaveBeenCalled();
+    });
+
+    it("still embeds on the fly by default", async () => {
+        const { finder, embedding } = makeFinder([]);
+        const note = new Note("New.md", "New", "body", []);
+        await finder.findSimilarNotes(note, 5);
+        expect(embedding.embedText).toHaveBeenCalledTimes(1);
+    });
+});

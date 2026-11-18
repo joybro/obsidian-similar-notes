@@ -1,4 +1,5 @@
 import log from "loglevel";
+import { isNoteExcluded } from "@/utils/noteExclusion";
 import { Notice, Plugin } from "obsidian";
 import { OramaNoteChunkRepository } from "./adapter/orama/OramaNoteChunkRepository";
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
@@ -195,7 +196,23 @@ export default class MainPlugin extends Plugin {
             this.app.vault,
             this.noteRepository,
             this.similarNoteFinder,
-            this.settingsService
+            this.settingsService,
+            (path) =>
+                isNoteExcluded(
+                    path,
+                    {
+                        excludeFolderPatterns:
+                            this.settingsService.get().excludeFolderPatterns,
+                        excludeFrontmatterRules:
+                            this.settingsService.get().excludeFrontmatterRules ?? [],
+                    },
+                    (p) => {
+                        const f = this.app.vault.getFileByPath(p);
+                        return f
+                            ? this.app.metadataCache.getFileCache(f)?.frontmatter
+                            : undefined;
+                    }
+                )
         );
 
         this.leafViewCoordinator = new LeafViewCoordinator(

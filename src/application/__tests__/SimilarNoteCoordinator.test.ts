@@ -481,4 +481,40 @@ describe("SimilarNoteCoordinator", () => {
             expect(passed.links).toEqual(["a.md"]);
         });
     });
+
+    describe("excluded notes are not sent to a cloud provider on open", () => {
+        const cases: Array<[SimilarNotesSettings["modelProvider"], boolean]> = [
+            ["openai", false],
+            ["gemini", false],
+            ["builtin", true],
+            ["ollama", true],
+        ];
+        test.each(cases)("provider %s → allowAdHocEmbedding %s", async (provider, allowed) => {
+            settings = makeSettings({ modelProvider: provider });
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService,
+                (path) => path.startsWith("Private/")
+            );
+            await coord.getSimilarNotes(makeFile("Private/diary.md"));
+            const finder = similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>;
+            expect(finder.mock.calls[0][2]).toEqual({ allowAdHocEmbedding: allowed });
+        });
+
+        test("included notes keep ad-hoc embedding with a cloud provider", async () => {
+            settings = makeSettings({ modelProvider: "openai" });
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService,
+                (path) => path.startsWith("Private/")
+            );
+            await coord.getSimilarNotes(makeFile("Notes/open.md"));
+            const finder = similarNoteFinder.findSimilarNotes as ReturnType<typeof vi.fn>;
+            expect(finder.mock.calls[0][2]).toEqual({ allowAdHocEmbedding: true });
+        });
+    });
 });
