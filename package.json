@@ -58,7 +58,7 @@
         "esbuild-plugin-polyfill-node": "^0.3.0",
         "loglevel": "^1.9.2",
         "obsidian": "latest",
-        "picomatch": "^4.0.3",
+        "picomatch": "^4.0.7",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "rxjs": "^7.8.2"
