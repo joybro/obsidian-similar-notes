@@ -42,7 +42,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - 무엇을 보여주나: under the open note, the top similar notes with score, optional source chunk, "linked" tag for notes already linked
   - 행동: open, open in new tab (Cmd-click), hover preview (Cmd+hover), drag into editor, right-click menu (Open link, Open in new tab, Copy Obsidian URL), collapse
   - empty: "No similar notes found" (nothing above the Minimum similarity threshold, or an empty vault)
-  - empty-excluded-note: the open note is excluded; today it still embeds on the fly (frontmatter-exclusion spec §2.1, owner decision pending for cloud providers)
+  - empty-excluded-note: the open note is excluded and the provider is OpenAI or Gemini, so it is not embedded on the fly and the list is empty (frontmatter-exclusion spec §2.1); with a local provider it shows results like partial-not-indexed
   - partial-not-indexed: the open note has no indexed chunks yet; results come from an on-the-fly embedding
   - error-embedding: on-the-fly embedding failed; Notice and empty list
   - → hover-preview (overlay): Cmd+hover a result
@@ -113,7 +113,8 @@ obsidian vault=Test_local eval code="document.querySelectorAll('.search-result-f
 |---|---|---|
 | note-footer ideal, ideal-linked | two related notes as above; for linked add `[[ux-coffee-b]]` to note a | auto |
 | note-footer empty | Minimum similarity = 1 in settings, reopen the note | auto (settings via `data.json` + plugin:reload) |
-| note-footer empty-excluded-note, partial-not-indexed | Path patterns `ux-*` in settings, Reindex, open note a | auto |
+| note-footer empty-excluded-note | Path patterns `ux-*` and provider OpenAI (any key; no call is made), Reindex, open note a | auto |
+| note-footer partial-not-indexed | same with the built-in model | auto |
 | note-footer error-embedding | provider OpenAI with an invalid key | manual (key entry) |
 | note-footer ideal-collapsed, hover-preview | click the header; CDP `Input.dispatchMouseEvent` with Cmd (`CLAUDE.md` § UI verification) | auto (CDP) |
 | sidebar * | command `similar-notes:show-similar-notes` then as note-footer | auto |
