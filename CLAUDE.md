@@ -41,6 +41,11 @@ behavior, focus handling, anything not coverable by Vitest):
 
 This is the canonical manual-verification path.
 
+`docs/ux-map.md` lists the plugin's user tasks and every (surface, state) pair
+with how to open it in Test_local (auto via CLI/CDP, manual, or not
+reproducible). `scripts/install-local.sh` is gitignored, so a fresh clone
+lacks it: the map gives the equivalent `cp` into the Test_local plugin folder.
+
 The **Test_local vault is disposable test data**: freely edit, create, or delete
 notes in it during verification (e.g. CDP typing tests) — do NOT spend effort
 restoring notes to their prior content afterwards.
