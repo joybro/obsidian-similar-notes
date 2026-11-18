@@ -91,6 +91,12 @@ Two consequences of keeping this behavior (QA ledger sim1, 2026-11-19):
   still treated as cloud (the URL is not inspected). The "Path patterns"
   setting description states this. Owner decision: similar-notes-dev desk
   `decisions.md`, 2026-11-19 request.
+- The results cache (`SimilarNoteCoordinator`, keyed on the source note's
+  mtime) does not decide exclusion. Every read and every refresh drops targets
+  that are excluded *now* (path patterns or frontmatter rules), and an
+  excluded source under a cloud provider bypasses the cache, so an exclusion
+  applied after results were cached takes effect on the next open without
+  editing the source (QA sim6, 2026-11-19).
 
 ## §3 Status accounting
 

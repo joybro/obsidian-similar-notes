@@ -167,9 +167,9 @@ export class SimilarNoteCoordinator {
                 const threshold = settings.minSimilarityThreshold;
                 this.noteBottomViewModel$.next({
                     ...latestView,
-                    similarNoteEntries: updatedNotes.filter(
-                        (entry) => entry.similarity >= threshold
-                    ),
+                    similarNoteEntries: this.withoutExcludedTargets(
+                        updatedNotes
+                    ).filter((entry) => entry.similarity >= threshold),
                 });
             }
             return true;
@@ -181,7 +181,9 @@ export class SimilarNoteCoordinator {
         }
         this.noteBottomViewModel$.next({
             ...latestView,
-            similarNoteEntries: updateLinks(latestView.similarNoteEntries),
+            similarNoteEntries: this.withoutExcludedTargets(
+                updateLinks(latestView.similarNoteEntries)
+            ),
         });
         return true;
     }
@@ -202,12 +204,31 @@ export class SimilarNoteCoordinator {
     }
 
     async getSimilarNotes(file: TFile): Promise<SimilarNoteEntry[]> {
+        const settings = this.settingsService.get();
+        // Excluded notes have no indexed chunks, so opening one would embed
+        // its text on the fly. With a cloud provider that sends it off the
+        // device, which the user opted out of by excluding it
+        // (frontmatter-exclusion spec §2.1). Local providers keep the panel.
+        const isCloudProvider =
+            settings.modelProvider === "openai" ||
+            settings.modelProvider === "gemini";
+        const allowAdHocEmbedding = !(
+            isCloudProvider && this.isExcluded(file.path)
+        );
+
+        // The cache is keyed on the source's mtime only, so an exclusion
+        // applied after caching (path pattern saved, frontmatter rule matched
+        // on another note) does not invalidate it. Re-check exclusion on every
+        // read instead (frontmatter-exclusion spec §2.1, QA sim6).
         const cacheEntry = this.cache.get(file.path);
-        if (cacheEntry && cacheEntry.mtime === file.stat.mtime) {
-            return cacheEntry.notes;
+        if (
+            cacheEntry &&
+            cacheEntry.mtime === file.stat.mtime &&
+            allowAdHocEmbedding
+        ) {
+            return this.withoutExcludedTargets(cacheEntry.notes);
         }
 
-        const settings = this.settingsService.get();
         const rawNote = await this.noteRepository.findByFile(
             file,
             !settings.includeFrontmatter
@@ -227,16 +248,6 @@ export class SimilarNoteCoordinator {
             rawNote.links
         );
         const maxResultCount = Math.max(settings.sidebarResultCount, settings.bottomResultCount);
-        // Excluded notes have no indexed chunks, so opening one would embed
-        // its text on the fly. With a cloud provider that sends it off the
-        // device, which the user opted out of by excluding it
-        // (frontmatter-exclusion spec §2.1). Local providers keep the panel.
-        const isCloudProvider =
-            settings.modelProvider === "openai" ||
-            settings.modelProvider === "gemini";
-        const allowAdHocEmbedding = !(
-            isCloudProvider && this.isExcluded(file.path)
-        );
         const similarNotes = await this.similarNoteFinder.findSimilarNotes(
             note,
             maxResultCount,
@@ -278,6 +289,15 @@ export class SimilarNoteCoordinator {
             this.cache.delete(oldestKey);
         }
 
-        return similarNoteEntries;
+        return this.withoutExcludedTargets(similarNoteEntries);
+    }
+
+    // A target excluded after its chunks were indexed can still come back
+    // from the finder until the index removal lands, and from the cache
+    // afterwards. Filter both so excluded notes never appear as results.
+    private withoutExcludedTargets(
+        entries: SimilarNoteEntry[]
+    ): SimilarNoteEntry[] {
+        return entries.filter((entry) => !this.isExcluded(entry.file.path));
     }
 }
