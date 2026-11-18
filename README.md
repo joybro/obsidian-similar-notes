@@ -27,7 +27,7 @@ Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not jus
 ## Getting Started
 
 1. Install the plugin
-2. The default model will download automatically (one-time, ~30MB)
+2. On desktop, the default model downloads automatically (one-time, about 90 MB)
 3. Your notes will be indexed in the background
 4. Similar notes will appear at the bottom of your current note
 
