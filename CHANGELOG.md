@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **Token usage "Today" follows your local day**: the usage counter for OpenAI and Gemini now starts a new day at your local midnight instead of midnight UTC.
 -   **Similar notes refresh sooner after edits**: once a saved edit's indexing delay has passed, indexing starts without waiting for the next polling interval. Your delay setting stays the same. Stopping or reloading the indexer also no longer leaves an old processing loop running alongside the new one.
 -   **Excluded notes are no longer sent to a cloud API when you open them**: with OpenAI or Gemini as the provider, opening a note excluded by path or frontmatter no longer embeds its text on the fly, so it never leaves your device. That note's own Similar notes panel shows a line saying it is excluded instead of results. With a built-in model or Ollama nothing changes.
 -   **Path patterns now also stop notes that were already waiting to be indexed**: a note that was edited just before you added a matching path pattern, or that you retry from the errored list, is now removed from the index instead of embedded. With OpenAI or Gemini, its text is no longer sent in those cases.

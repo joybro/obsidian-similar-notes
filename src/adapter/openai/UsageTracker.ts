@@ -4,6 +4,7 @@ import type {
     TotalUsage,
     UsageStats,
 } from "@/application/SettingsService";
+import { localDateKey } from "@/utils/localDate";
 
 /**
  * Tracks OpenAI API usage (tokens and requests)
@@ -87,7 +88,7 @@ export class UsageTracker {
      */
     private getTodayKey(): string {
         const now = new Date();
-        return now.toISOString().split("T")[0];
+        return localDateKey(now);
     }
 
     /**
@@ -110,7 +111,7 @@ export class UsageTracker {
     private cleanupOldEntries(stats: UsageStats): void {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - 30);
-        const cutoffKey = cutoffDate.toISOString().split("T")[0];
+        const cutoffKey = localDateKey(cutoffDate);
 
         for (const dateKey of Object.keys(stats.daily)) {
             if (dateKey < cutoffKey) {
