@@ -125,7 +125,7 @@ export class EmbeddingService {
             this.setupProviderSubscriptions();
             await this.loadModel(settings.geminiModel || "gemini-embedding-001", geminiConfig);
         } else {
-            throw new Error(`Unknown provider type: ${newProviderType}`);
+            throw new Error(`Unknown provider type: ${String(newProviderType)}`);
         }
 
         this.currentProviderType = newProviderType;

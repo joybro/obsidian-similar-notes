@@ -45,7 +45,7 @@ const createMockPipeline = () => {
             texts = text;
         }
 
-        const embeddings = texts.map(() => new Array(384).fill(0));
+        const embeddings: number[][] = texts.map(() => new Array<number>(384).fill(0));
         return {
             tolist: () => embeddings,
         };
@@ -54,7 +54,7 @@ const createMockPipeline = () => {
         model: {
             max_position_embeddings: 512,
         },
-        encode: (text: string) => new Array(Math.ceil(text.length / 4)).fill(0), // Rough mock implementation
+        encode: (text: string): number[] => new Array<number>(Math.ceil(text.length / 4)).fill(0), // Rough mock implementation
     };
 
     return {
@@ -161,12 +161,12 @@ class TransformersWorker {
             pooling: "mean",
             normalize: true,
         });
-        const testEmbedding = tensor.tolist();
+        const testEmbedding = tensor.tolist() as number[][];
         tensor.dispose();
         this.vectorSize = testEmbedding[0].length;
 
         // Get max tokens from the tokenizer
-        this.maxTokens = this.extractor.tokenizer.model_max_length ?? 512;
+        this.maxTokens = (this.extractor.tokenizer.model_max_length as number | undefined) ?? 512;
 
         if (this.vectorSize === null || this.maxTokens === null) {
             throw new Error("Failed to initialize model parameters");
@@ -194,14 +194,14 @@ class TransformersWorker {
         }
 
         const extractor = this.extractor; // Create a local reference to avoid null check issues
-        return this.enqueue(async () => {
+        return this.enqueue(async (): Promise<number[]> => {
             try {
                 const tensor = await extractor(text, {
                     pooling: "mean",
                     normalize: true,
                 });
 
-                const result = tensor.tolist()[0];
+                const result = (tensor.tolist() as number[][])[0];
                 tensor.dispose();
                 return result;
             } catch (error) {
@@ -229,7 +229,7 @@ class TransformersWorker {
                             pooling: "mean",
                             normalize: true,
                         });
-                        const embeddings = tensor.tolist();
+                        const embeddings = tensor.tolist() as number[][];
                         tensor.dispose();
                         return embeddings;
                     }

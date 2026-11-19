@@ -28,9 +28,10 @@ export class WorkerManager<T> {
 
         const rawWorker = new WorkerConstructor();
         this.rawWorker = rawWorker;
-        const WorkerWrapper = Comlink.wrap(rawWorker);
-        // @ts-expect-error - Comlink typing issue with constructor proxy
-        this.worker = await new WorkerWrapper();
+        // The worker exposes its class, so the wrapped proxy is a remote constructor.
+        const WorkerWrapper = Comlink.wrap<new () => T>(rawWorker);
+        // Comlink can't resolve Remote<new () => T> for a generic T, so name the result.
+        this.worker = (await new WorkerWrapper()) as Comlink.Remote<T>;
         
         log.info(`${this.workerName} initialized`, this.worker);
         

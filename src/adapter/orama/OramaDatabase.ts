@@ -73,9 +73,10 @@ export class OramaWorker {
             }
 
             // Create empty Orama database
-            this.db = await create({
+            const db = create({
                 schema: this.schema,
             });
+            this.db = db;
 
             if (loadExistingData) {
                 // Load data from IndexedDB in batches
@@ -91,8 +92,7 @@ export class OramaWorker {
                                 chunk.path
                             );
                         }
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- db is created before this batch loop starts
-                        await insertMultiple(this.db!, batch as Doc[]);
+                        await insertMultiple(db, batch as Doc[]);
                     },
                     (processed, total) => {
                         loadedCount = processed;

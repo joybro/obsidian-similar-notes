@@ -471,7 +471,7 @@ export class SimilarNoteCoordinator {
                 status,
             });
             if (this.cache.size > MAX_CACHE_SIZE) {
-                const oldestKey = this.cache.keys().next().value;
+                const oldestKey = this.cache.keys().next().value as string | undefined;
                 if (oldestKey !== undefined) this.cache.delete(oldestKey);
             }
         }

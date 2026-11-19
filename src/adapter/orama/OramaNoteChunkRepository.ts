@@ -5,8 +5,12 @@ import log from "loglevel";
 import type { Vault } from "obsidian";
 import type { OramaWorker } from "./OramaDatabase";
 // @ts-expect-error - Worker import handled by bundler
-import InlineWorker from "./orama.worker";
+import InlineWorkerModule from "./orama.worker";
 import { logRejection } from "@/utils/logRejection";
+
+// The bundler's inline-worker plugin turns the import into a Worker constructor;
+// TypeScript only sees the worker module, so type the constructor here once.
+const InlineWorker = InlineWorkerModule as unknown as new () => Worker;
 
 export class OramaNoteChunkRepository implements NoteChunkRepository {
     private workerManager: WorkerManager<OramaWorker>;

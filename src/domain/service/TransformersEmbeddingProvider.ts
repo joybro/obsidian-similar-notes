@@ -13,8 +13,12 @@ import { type Observable, Subject } from "rxjs";
 import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 import type { TransformersWorker } from "./transformers.worker";
 // @ts-expect-error - Worker import handled by bundler
-import InlineWorker from "./transformers.worker";
+import InlineWorkerModule from "./transformers.worker";
 import { logRejection } from "@/utils/logRejection";
+
+// The bundler's inline-worker plugin turns the import into a Worker constructor;
+// TypeScript only sees the worker module, so type the constructor here once.
+const InlineWorker = InlineWorkerModule as unknown as new () => Worker;
 
 export interface TransformersConfig {
     useGPU: boolean;
