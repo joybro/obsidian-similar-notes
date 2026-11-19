@@ -74,7 +74,7 @@ Supports any OpenAI-compatible embedding API.
 
 ### Ollama (Desktop)
 
-Supports any Ollama embedding model. Ollama runs on your computer, so on mobile it works only if you point the server URL at an Ollama server your phone can reach over the network.
+Supports any Ollama embedding model. Ollama runs on your computer, so on mobile it works only if you point the server URL at an Ollama server your phone can reach over the network. Since 1.8.0 the plugin calls Ollama through Obsidian's own request API, so you don't need to set `OLLAMA_ORIGINS` for a server on another computer.
 
 **Recommended:**
 
