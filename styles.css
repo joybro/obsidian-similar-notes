@@ -45,6 +45,11 @@
     font-size: max(var(--font-ui-small), var(--font-smaller));
 }
 
+/* Only a real failure that won't clear by itself (embedding-failed) is red */
+.similar-notes-pane .search-empty-state.is-error {
+    color: var(--text-error);
+}
+
 /* Note title/path display with truncation */
 .similar-notes-pane .tree-item-inner {
     overflow: hidden;

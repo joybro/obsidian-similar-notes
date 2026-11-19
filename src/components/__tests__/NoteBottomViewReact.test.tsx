@@ -186,7 +186,10 @@ describe("SimilarNotesViewReact", () => {
                 viewType="bottom"
             />
         );
-        expect(await screen.findByText(text)).toBeInTheDocument();
+        const el = await screen.findByText(text);
+        expect(el).toBeInTheDocument();
+        // Only the confirmed failure is styled as an error (CDO ET2)
+        expect(el.classList.contains("is-error")).toBe(emptyReason.kind === "embedding-failed");
     });
 
     test("calls openFile when note is clicked", async () => {

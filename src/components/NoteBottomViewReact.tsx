@@ -292,7 +292,15 @@ const SearchResultsContainer = ({
     if (similarNotes.length === 0) {
         return (
             <div className="search-result-container">
-                <div className="search-empty-state">
+                <div
+                    className={
+                        // A confirmed failure that won't clear by itself reads red;
+                        // fixed guidance and self-resolving states stay grey.
+                        emptyReason?.kind === "embedding-failed"
+                            ? "search-empty-state is-error"
+                            : "search-empty-state"
+                    }
+                >
                     {emptyStateText(emptyReason)}
                 </div>
             </div>
