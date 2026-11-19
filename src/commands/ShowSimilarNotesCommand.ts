@@ -1,6 +1,7 @@
 import type { Plugin } from "obsidian";
 import MainPlugin from "../main";
 import type { Command } from "./Command";
+import { logRejection } from "@/utils/logRejection";
 
 export class ShowSimilarNotesCommand implements Command {
     id = "show-similar-notes";
@@ -13,7 +14,7 @@ export class ShowSimilarNotesCommand implements Command {
             id: this.id,
             name: this.name,
             callback: () => {
-                this.mainPlugin.activateSimilarNotesView();
+                logRejection(this.mainPlugin.activateSimilarNotesView(), "open Similar Notes view");
             },
         });
     }

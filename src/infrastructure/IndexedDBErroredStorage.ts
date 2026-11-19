@@ -1,4 +1,5 @@
 import log from "loglevel";
+import { idbError } from "./idbError";
 
 /**
  * A note that failed indexing terminally (after exhausting retries).
@@ -36,7 +37,7 @@ export class IndexedDBErroredStorage {
 
             request.onerror = () => {
                 log.error("Failed to open errored IndexedDB:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
 
             request.onsuccess = () => {
@@ -66,7 +67,7 @@ export class IndexedDBErroredStorage {
             request.onsuccess = () => resolve();
             request.onerror = () => {
                 log.error("Failed to set errored entry:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -82,7 +83,7 @@ export class IndexedDBErroredStorage {
             request.onsuccess = () => resolve();
             request.onerror = () => {
                 log.error("Failed to delete errored entry:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -105,7 +106,7 @@ export class IndexedDBErroredStorage {
             };
             request.onerror = () => {
                 log.error("Failed to get all errored entries:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -124,7 +125,7 @@ export class IndexedDBErroredStorage {
             };
             request.onerror = () => {
                 log.error("Failed to clear errored entries:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }

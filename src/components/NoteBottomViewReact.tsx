@@ -4,6 +4,7 @@ import { Menu } from "obsidian";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Observable } from "rxjs";
 import { triggerHoverLink } from "./hoverLinkPreview";
+import { logRejection } from "@/utils/logRejection";
 
 export interface SimilarNoteEntry {
     file: TFile;
@@ -358,7 +359,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     }, [bottomViewModelSubject$, leaf.file, viewType]);
 
     const openNote = (file: TFile, newTab = false) => {
-        workspace.openLinkText(file.path, "", newTab);
+        logRejection(workspace.openLinkText(file.path, "", newTab), "open note");
     };
 
     const handleNoteClick = (e: React.MouseEvent, file: TFile) => {
@@ -397,7 +398,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
         menu.addItem((item) =>
             item.setTitle("Copy Obsidian URL").onClick(() => {
                 const uri = `obsidian://open?vault=${vaultName}&file=${file.path}`;
-                navigator.clipboard.writeText(uri);
+                logRejection(navigator.clipboard.writeText(uri), "copy Obsidian URL");
             })
         );
         menu.showAtMouseEvent(e.nativeEvent);

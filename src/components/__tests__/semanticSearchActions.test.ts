@@ -42,7 +42,7 @@ function makeApp(overrides = {}) {
     return {
         workspace: {
             getActiveFile: vi.fn(() => new TFile("src.md")),
-            openLinkText: vi.fn(),
+            openLinkText: vi.fn(async () => undefined),
         },
         vault: {
             getAbstractFileByPath: vi.fn(() => null),

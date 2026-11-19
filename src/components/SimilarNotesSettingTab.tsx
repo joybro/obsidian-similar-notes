@@ -10,6 +10,7 @@ import type MainPlugin from "../main";
 import { ModelSettingsSection } from "./ModelSettingsSection";
 import { IndexSettingsSection } from "./IndexSettingsSection";
 import type { SettingBuilder } from "./OpenAISettingsSection";
+import { logRejection } from "@/utils/logRejection";
 
 const GITHUB_ISSUES_URL = "https://github.com/joybro/obsidian-similar-notes/issues";
 
@@ -213,7 +214,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     .setDesc("Display similar notes section at the bottom of each note")
                     .addToggle((toggle) => {
                         toggle.setValue(settings.showAtBottom).onChange((value) => {
-                            this.settingsService.update({ showAtBottom: value });
+                            logRejection(this.settingsService.update({ showAtBottom: value }), "save setting");
                         });
                     });
             },
@@ -389,8 +390,11 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                                 settings
                             );
                             const markdown = formatEnvironmentInfoAsMarkdown(envInfo);
-                            navigator.clipboard.writeText(markdown);
-                            new Notice("Environment info copied to clipboard");
+                            navigator.clipboard.writeText(markdown).then(
+                                () => new Notice("Environment info copied to clipboard"),
+                                (error: unknown) =>
+                                    log.error("Failed to copy environment info:", error)
+                            );
                         });
                     });
             },

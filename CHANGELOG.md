@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 -   **Excluded notes are no longer sent to a cloud API when you open them**: with OpenAI or Gemini as the provider, opening a note excluded by path or frontmatter no longer embeds its text on the fly, so it never leaves your device. That note's own Similar notes panel shows a line saying it is excluded instead of results. With a built-in model or Ollama nothing changes.
 -   **Newly excluded notes disappear from results right away**: after you exclude a note (path pattern or frontmatter rule), it no longer shows up in other notes' Similar notes panels, even ones whose results were already shown before. Previously those panels could keep showing it until the note you were viewing was edited.
+-   **Indexing keeps going after a failed read of its queue**: if reading the list of notes waiting to be indexed fails once (for example, the browser storage is briefly unavailable), the plugin logs it and tries again a second later instead of stopping indexing until Obsidian restarts.
 -   **Regex-excluded content no longer leaves the vault when you open a note that isn't indexed yet**: when a note has no indexed chunks (not indexed yet, or excluded by path or frontmatter), the plugin embeds it on the fly to find similar notes. That on-the-fly embedding now strips text matched by the **Exclude content from index** patterns first, just like indexing does, so that text is never sent to a cloud provider.
 
 ### Changed

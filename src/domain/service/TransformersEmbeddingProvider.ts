@@ -14,6 +14,7 @@ import { type EmbeddingProvider, type ModelInfo } from "./EmbeddingProvider";
 import type { TransformersWorker } from "./transformers.worker";
 // @ts-expect-error - Worker import handled by bundler
 import InlineWorker from "./transformers.worker";
+import { logRejection } from "@/utils/logRejection";
 
 export interface TransformersConfig {
     useGPU: boolean;
@@ -216,14 +217,16 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     dispose(): void {
         if (this.workerManager.isInitialized()) {
             const worker = this.workerManager.getWorker();
-            worker
-                .handleUnload()
-                .catch((err: unknown) => {
-                    log.error("Error unloading Transformers model:", err);
-                })
-                .finally(() => {
-                    this.workerManager.dispose();
-                });
+            // Not awaited: dispose() is sync. The worker is disposed either way.
+            logRejection(
+                worker
+                    .handleUnload()
+                    .catch((err: unknown) => {
+                        log.error("Error unloading Transformers model:", err);
+                    })
+                    .then(() => this.workerManager.dispose()),
+                "dispose Transformers worker"
+            );
         }
         this.modelId = null;
         this.vectorSize = null;
@@ -231,7 +234,7 @@ export class TransformersEmbeddingProvider implements EmbeddingProvider {
     }
 
     setLogLevel(level: log.LogLevelDesc): void {
-        this.workerManager.updateLogLevel(level);
+        logRejection(this.workerManager.updateLogLevel(level), "update worker log level");
     }
 
     /**
