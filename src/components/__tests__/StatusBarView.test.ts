@@ -185,3 +185,42 @@ describe("StatusBarView model line names the active provider", () => {
         view.dispose();
     });
 });
+
+describe("StatusBarView indexed count leaves out excluded notes", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        capturedTitles.length = 0;
+    });
+
+    it("counts only notes the exclusion rules do not match", async () => {
+        const { config, statusBarItem } = createConfig();
+        const files = ["a.md", "b.md", "Private/c.md"].map((path) => ({
+            path,
+        }));
+        (
+            config.app as unknown as {
+                vault: { getMarkdownFiles: () => { path: string }[] };
+            }
+        ).vault.getMarkdownFiles = () => files;
+        (
+            config.indexedNotesMTimeStore as unknown as {
+                getCurrentIndexedNoteCount: () => number;
+            }
+        ).getCurrentIndexedNoteCount = () => 2;
+        (
+            config as unknown as { isExcluded: (p: string) => boolean }
+        ).isExcluded = (p) => p.startsWith("Private/");
+        const view = new StatusBarView(config);
+
+        const handler = statusBarItem.addEventListener.mock.calls[0][1] as (
+            evt: MouseEvent
+        ) => void;
+        handler({} as MouseEvent);
+
+        await vi.waitFor(() => {
+            expect(capturedTitles).toContain("Indexed: 2/2 notes (0 chunks)");
+        });
+
+        view.dispose();
+    });
+});

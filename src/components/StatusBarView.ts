@@ -19,6 +19,9 @@ export interface StatusBarViewConfig {
     modelService: EmbeddingService;
     onRetry: () => void;
     onOpenSettings: () => void;
+    // Current exclusion rules; excluded notes are left out of the total so
+    // the count matches the Indexed line in settings.
+    isExcluded?: (path: string) => boolean;
 }
 
 type StatusBarState = "idle" | "downloading" | "indexing" | "error";
@@ -198,8 +201,10 @@ export class StatusBarView {
             // Normal state menu - show stats
             const indexedNoteCount =
                 this.config.indexedNotesMTimeStore.getCurrentIndexedNoteCount();
-            const totalNoteCount =
-                this.config.app.vault.getMarkdownFiles().length;
+            const isExcluded = this.config.isExcluded ?? (() => false);
+            const totalNoteCount = this.config.app.vault
+                .getMarkdownFiles()
+                .filter((file) => !isExcluded(file.path)).length;
 
             let chunkCount = 0;
             try {

@@ -267,6 +267,7 @@ export default class MainPlugin extends Plugin {
             erroredNoteStore: this.erroredNoteStore,
             noteChunkRepository: this.noteChunkRepository,
             modelService: this.modelService,
+            isExcluded,
             onRetry: () => {
                 logRejection(this.init(this.settingsService.get().modelId, true, false), "retry model load");
             },
