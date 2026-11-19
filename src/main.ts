@@ -187,9 +187,27 @@ export default class MainPlugin extends Plugin {
             this.modelService
         );
 
+        const isExcluded = (path: string): boolean =>
+            isNoteExcluded(
+                path,
+                {
+                    excludeFolderPatterns:
+                        this.settingsService.get().excludeFolderPatterns,
+                    excludeFrontmatterRules:
+                        this.settingsService.get().excludeFrontmatterRules ?? [],
+                },
+                (p) => {
+                    const f = this.app.vault.getFileByPath(p);
+                    return f
+                        ? this.app.metadataCache.getFileCache(f)?.frontmatter
+                        : undefined;
+                }
+            );
+
         this.textSearchService = new TextSearchService(
             this.noteChunkRepository,
-            this.modelService
+            this.modelService,
+            isExcluded
         );
 
         this.similarNoteCoordinator = new SimilarNoteCoordinator(
@@ -197,22 +215,7 @@ export default class MainPlugin extends Plugin {
             this.noteRepository,
             this.similarNoteFinder,
             this.settingsService,
-            (path) =>
-                isNoteExcluded(
-                    path,
-                    {
-                        excludeFolderPatterns:
-                            this.settingsService.get().excludeFolderPatterns,
-                        excludeFrontmatterRules:
-                            this.settingsService.get().excludeFrontmatterRules ?? [],
-                    },
-                    (p) => {
-                        const f = this.app.vault.getFileByPath(p);
-                        return f
-                            ? this.app.metadataCache.getFileCache(f)?.frontmatter
-                            : undefined;
-                    }
-                )
+            isExcluded
         );
 
         this.leafViewCoordinator = new LeafViewCoordinator(

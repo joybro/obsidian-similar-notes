@@ -14,7 +14,11 @@ export interface TextSearchResult {
 export class TextSearchService {
     constructor(
         private readonly noteChunkRepository: NoteChunkRepository,
-        private readonly embeddingService: EmbeddingService
+        private readonly embeddingService: EmbeddingService,
+        // Current exclusion rules (path patterns and frontmatter). Checked at
+        // search time so a newly excluded note stops appearing before
+        // "Apply rules" removes its chunks from the index.
+        private readonly isExcluded: (path: string) => boolean = () => false
     ) {}
 
     /**
@@ -53,7 +57,7 @@ export class TextSearchService {
         // Generate embedding for the (possibly truncated) text
         const embedding = await this.embeddingService.embedText(searchText);
 
-        // Find similar chunks (no exclusions for text search)
+        // Find similar chunks; exclusions are applied after grouping
         const results = await this.noteChunkRepository.findSimilarChunks(
             embedding,
             limit * 3, // Get more results to ensure we have enough after grouping
@@ -61,8 +65,11 @@ export class TextSearchService {
             [] // No excluded paths
         );
 
-        // Group by note path and keep the best match per note
-        const uniqueResults = this.groupByNotePath(results);
+        // Group by note path and keep the best match per note, dropping
+        // notes the current exclusion rules match
+        const uniqueResults = this.groupByNotePath(results).filter(
+            (result) => !this.isExcluded(result.chunk.path)
+        );
 
         // Sort by score descending
         uniqueResults.sort((a, b) => b.score - a.score);
