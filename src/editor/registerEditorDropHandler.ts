@@ -1,4 +1,4 @@
-import { type App, type Plugin, type TFile } from "obsidian";
+import { type App, type Plugin, TFile } from "obsidian";
 
 /**
  * Register the editor-drop handler that inserts a wiki-style link when a
@@ -10,6 +10,8 @@ export function registerEditorDropHandler(plugin: Plugin): void {
 
     plugin.registerEvent(
         app.workspace.on("editor-drop", (evt, editor, info) => {
+            // Another handler already took this drop.
+            if (evt.defaultPrevented) return;
             const plainText = evt.dataTransfer?.getData("text/plain");
 
             // Check if this looks like a wiki-style link from Similar Notes
@@ -18,14 +20,14 @@ export function registerEditorDropHandler(plugin: Plugin): void {
             // Extract path from [[path]] and resolve the file
             const notePath = plainText.slice(2, -2);
             const file = app.vault.getAbstractFileByPath(notePath);
-            if (!file) return;
+            if (!(file instanceof TFile)) return;
 
             evt.preventDefault();
 
             // Compute link text respecting Obsidian's "New link format" setting
             const sourcePath = info?.file?.path ?? "";
             const linktext = app.metadataCache.fileToLinktext(
-                file as TFile,
+                file,
                 sourcePath
             );
             const linkMarkup = `[[${linktext}]]`;

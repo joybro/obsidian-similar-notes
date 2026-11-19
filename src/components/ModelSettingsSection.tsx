@@ -230,8 +230,7 @@ export class ModelSettingsSection {
             // Only create if it doesn't exist or was removed
             if (!this.usageStatsSectionContainer || !this.usageStatsSectionContainer.parentElement) {
                 // Create and insert usage stats container right after model section
-                this.usageStatsSectionContainer = document.createElement("div");
-                this.usageStatsSectionContainer.addClass("usage-stats-section");
+                this.usageStatsSectionContainer = createDiv({ cls: "usage-stats-section" });
                 sectionContainer.insertAdjacentElement("afterend", this.usageStatsSectionContainer);
 
                 // Create new UsageStatsSection instance

@@ -364,14 +364,17 @@ export default class MainPlugin extends Plugin {
         }
     }
 
-    async onunload() {
-        // Clean up sidebar views
-        this.app.workspace.detachLeavesOfType(VIEW_TYPE_SIMILAR_NOTES_SIDEBAR);
-
+    onunload() {
+        // Sidebar leaves are not detached: Obsidian restores them in place
+        // when the plugin loads again (plugin guidelines).
         this.statusBarView.dispose();
         this.noteIndexingService.stopLoop();
         logRejection(this.leafViewCoordinator.onUnload(), "unload leaf views");
+        logRejection(this.disposeServices(), "dispose services");
+    }
 
+    // Obsidian does not await onunload; the steps below keep their order here.
+    private async disposeServices(): Promise<void> {
         // Explicitly dispose Orama worker
         if (this.noteChunkRepository) {
             // Call our new dispose method on the repository

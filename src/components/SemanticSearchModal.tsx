@@ -1,6 +1,6 @@
 import { getNoteDisplayText } from "@/utils/displayUtils";
-import type { App, TFile } from "obsidian";
-import { Modal, Notice } from "obsidian";
+import type { App } from "obsidian";
+import { Modal, Notice, Platform, TFile } from "obsidian";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { SimilarNote } from "@/domain/model/SimilarNote";
@@ -16,7 +16,7 @@ const MIN_SEARCH_LENGTH = 3;
 const DEBOUNCE_MS = 300;
 
 // Platform-specific modifier keys
-const isMac = typeof navigator !== "undefined" && navigator.platform.includes("Mac");
+const isMac = Platform.isMacOS;
 const MOD_KEY = isMac ? "\u2318" : "Ctrl";
 const ALT_KEY = isMac ? "\u2325" : "Alt";
 
@@ -185,9 +185,7 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
     const resultFiles = useMemo(() => {
         return results.map((note) => {
             const file = app.vault.getAbstractFileByPath(note.path);
-            return file instanceof app.vault.adapter.constructor
-                ? null
-                : (file as TFile | null);
+            return file instanceof TFile ? file : null;
         });
     }, [results, app.vault]);
 
@@ -278,7 +276,8 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                     <div className="prompt-empty-state">No similar notes found</div>
                 )}
                 {results.map((note, index) => {
-                    const file = app.vault.getAbstractFileByPath(note.path) as TFile | null;
+                    const found = app.vault.getAbstractFileByPath(note.path);
+                    const file = found instanceof TFile ? found : null;
                     return (
                         <SearchResultItem
                             key={note.path}
