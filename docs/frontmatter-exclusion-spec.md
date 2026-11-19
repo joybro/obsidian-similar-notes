@@ -85,11 +85,15 @@ Two consequences of keeping this behavior (QA ledger sim1, 2026-11-19):
 - With a cloud provider (`openai`, `gemini`) the ad-hoc embedding is skipped
   for excluded notes: `SimilarNoteCoordinator` passes
   `allowAdHocEmbedding: false` to `SimilarNoteFinder`, which returns no results
-  instead of embedding. The excluded note's own panel is empty; its text never
-  leaves the device. Local providers (`builtin`, `ollama`) keep the panel as
+  instead of embedding. The excluded note's own panel is empty once the
+  exclusion is applied (Apply Rules, Reindex, or the startup sync); until then
+  the note keeps its stored chunks and still shows results, since the skip
+  only applies to a note without indexed chunks. Its text never leaves the
+  device. Local providers (`builtin`, `ollama`) keep the panel as
   before. An `openai` provider pointed at a local OpenAI-compatible server is
   still treated as cloud (the URL is not inspected). The "Path patterns"
-  setting description states this. Owner decision: similar-notes-dev desk
+  setting description states this, including "after you apply the rules"
+  (QA sim10). Owner decision: similar-notes-dev desk
   `decisions.md`, 2026-11-19 request.
 - The results cache (`SimilarNoteCoordinator`, keyed on the source note's
   mtime) does not decide exclusion. Every read and every refresh drops targets
