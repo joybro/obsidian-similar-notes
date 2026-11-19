@@ -8,6 +8,12 @@ on:
 jobs:
     build:
         runs-on: ubuntu-latest
+        env:
+            # onnxruntime-node (a transitive dependency of @huggingface/transformers)
+            # downloads CUDA binaries in its postinstall; the v1.21.0 GPU tarball now
+            # 404s and fails `npm install`. The plugin bundle never uses
+            # onnxruntime-node, so skip that download.
+            ONNXRUNTIME_NODE_INSTALL_CUDA: skip
         permissions:
             contents: write
         steps:
