@@ -179,7 +179,7 @@ export class IndexedDBChunkStorage {
                     .result;
 
                 if (cursor) {
-                    chunks.push(cursor.value);
+                    chunks.push(cursor.value as NoteChunkInternal);
                     cursor.continue();
                 } else {
                     // No more matching records
@@ -303,7 +303,7 @@ export class IndexedDBChunkStorage {
 
                 if (cursor) {
                     // Remove the IndexedDB id field before passing to Orama
-                    const { id: _id, ...chunk } = cursor.value;
+                    const { id: _id, ...chunk } = cursor.value as NoteChunkInternal;
                     batch.push(chunk as NoteChunkInternal);
 
                     if (batch.length >= batchSize) {

@@ -47,7 +47,7 @@ export class HuggingFaceClient {
                 return null;
             }
 
-            const data: HuggingFaceApiResponse = response.json;
+            const data = response.json as HuggingFaceApiResponse;
 
             const parameterCount = data.safetensors?.total;
             const parameterSize = parameterCount

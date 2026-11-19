@@ -110,7 +110,7 @@ export class GeminiClient {
             }
 
             log.debug(`[Gemini] Embedding successful in ${elapsed}ms`);
-            const data: GeminiEmbedResponse = response.json;
+            const data = response.json as GeminiEmbedResponse;
 
             if (!data.embedding || !Array.isArray(data.embedding.values)) {
                 throw new Error("Invalid embedding response from Gemini: missing embedding values");
@@ -160,7 +160,7 @@ export class GeminiClient {
             }
 
             log.debug(`[Gemini] Batch embedding successful in ${elapsed}ms`);
-            const data: GeminiBatchEmbedResponse = response.json;
+            const data = response.json as GeminiBatchEmbedResponse;
 
             if (!data.embeddings || !Array.isArray(data.embeddings)) {
                 throw new Error("Invalid embedding response from Gemini: missing embeddings array");
@@ -198,7 +198,7 @@ export class GeminiClient {
                 return this.estimateTokens(text);
             }
 
-            const data: GeminiCountTokensResponse = response.json;
+            const data = response.json as GeminiCountTokensResponse;
             return data.totalTokens;
         } catch (error) {
             log.warn("[Gemini] countTokens failed, falling back to estimation:", error);

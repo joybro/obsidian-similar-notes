@@ -94,7 +94,7 @@ export class OpenAIClient {
             }
 
             log.debug(`[OpenAI] Embedding successful in ${elapsed}ms`);
-            const data: OpenAIEmbeddingResponse = response.json;
+            const data = response.json as OpenAIEmbeddingResponse;
 
             if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
                 throw new Error("Invalid embedding response from OpenAI: missing data array");
@@ -145,7 +145,7 @@ export class OpenAIClient {
             }
 
             log.debug(`[OpenAI] Batch embedding successful in ${elapsed}ms`);
-            const data: OpenAIEmbeddingResponse = response.json;
+            const data = response.json as OpenAIEmbeddingResponse;
 
             if (!data.data || !Array.isArray(data.data)) {
                 throw new Error("Invalid embedding response from OpenAI: missing data array");
