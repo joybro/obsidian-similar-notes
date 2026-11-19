@@ -32,8 +32,8 @@ schema and the IndexedDB object stores do not change:
 
 | field | value |
 |---|---|
-| `path`, `title` | the note's (title = file basename, derived from the path) |
-| `content` | the title text |
+| `path`, `title` | the note's path; `title` = the title text below |
+| `content` | the title text: the file basename (derived from the path) with surrounding whitespace trimmed (`titleTextFromPath`, the one helper indexing, rename and backfill share). A whitespace-only name gets no title row. Body rows keep the untrimmed basename in `title`, like `Note.title`. |
 | `chunkIndex` | `-1` (reserved: title chunk) |
 | `totalChunks` | the note's body chunk count, unchanged |
 | `embedding` | `embedText(title)` |
