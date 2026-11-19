@@ -4,6 +4,9 @@ on:
     push:
         tags:
             - "*"
+    # Manual run from a branch: install and build only (no release), to check
+    # the pipeline before pushing a tag.
+    workflow_dispatch:
 
 jobs:
     build:
@@ -16,6 +19,9 @@ jobs:
             ONNXRUNTIME_NODE_INSTALL_CUDA: skip
         permissions:
             contents: write
+            # For actions/attest-build-provenance on tag releases.
+            id-token: write
+            attestations: write
         steps:
             - uses: actions/checkout@v4
 
@@ -30,6 +36,7 @@ jobs:
                   npm run build
 
             - name: Create release
+              if: startsWith(github.ref, 'refs/tags/')
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
@@ -53,3 +60,15 @@ jobs:
                     --title="$tag" \
                     --draft $prerelease \
                     main.js manifest.json styles.css
+
+            # Signed build provenance for the uploaded files (Obsidian's community
+            # scorecard lists missing attestations). Runs after the manifest edit
+            # above, so it covers the exact files in the release.
+            - name: Attest release assets
+              if: startsWith(github.ref, 'refs/tags/')
+              uses: actions/attest-build-provenance@v2
+              with:
+                  subject-path: |
+                      main.js
+                      manifest.json
+                      styles.css

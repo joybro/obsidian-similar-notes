@@ -47,6 +47,7 @@ If the user just says "release 1.3.0" (no beta), use `bump-version` instead.
 ### 0. Sanity check before bumping
 
 - Confirm `main` is the branch and has the work to ship.
+- **Rehearse the release build:** `gh workflow run release.yml -R joybro/obsidian-similar-notes --ref <branch>` (install + build only; release and attest steps run only on tags). Wait for `success` before tagging.
 - **Confirm CI on `main` is green** (`gh run list -R joybro/obsidian-similar-notes --workflow=ci.yml --limit 1`). `release.yml` installs dependencies the same way, so a red CI install means the tag's release build fails too (1.8.0-beta.1: CI had been red on `npm ci` since 1.7.0 and nobody looked; the tag then produced no draft).
 - **Check the exit code of `npm test`, not only the summary line**: Vitest prints `Tests N passed` and still exits 1 on an unhandled error (1.8.0-beta.1 prep: an `openLinkText` mock returning `undefined`).
 - `git log --oneline <last-stable-tag>..HEAD` — eyeball the commit set.
