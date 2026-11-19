@@ -106,6 +106,8 @@ If the user only asked to *prepare* the bump, **stop here** and let them review 
 
 ### 5. Push, tag, and publish the release (only when the release is delegated to you)
 
+Before tagging, rehearse the release build from the branch you will tag: `gh workflow run release.yml -R joybro/obsidian-similar-notes --ref <branch>` runs install + build only (the release and attest steps run only on tags); wait for `success`.
+
 CI builds the assets and creates a *draft*; you finish by publishing. This mirrors `beta-release` steps 4–5, but for a stable release **you publish it yourself** instead of handing off to the maintainer, and the body has **no** BRAT section.
 
 ```bash
