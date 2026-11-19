@@ -47,10 +47,6 @@ export default defineConfig([
             indent: ["error", 4, { SwitchCase: 1 }],
             "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }],
             "max-lines-per-function": ["error", { max: 150, skipBlankLines: true, skipComments: true }],
-            // main's manifest still says minAppVersion 1.8.9 while the settings tab
-            // has used 1.11 APIs since 1.0.0. The 1.8.0 release raises it to 1.11.0
-            // (branch lime/release-1.8.0); make this "error" again once main does.
-            "obsidianmd/no-unsupported-api": "warn",
             "@typescript-eslint/no-unused-vars": ["error", {
                 argsIgnorePattern: "^_",
                 varsIgnorePattern: "^_",
