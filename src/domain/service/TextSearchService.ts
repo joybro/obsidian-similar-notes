@@ -3,6 +3,7 @@ import { type NoteChunk, isTitleChunk } from "../model/NoteChunk";
 import { SimilarNote } from "../model/SimilarNote";
 import type { NoteChunkRepository } from "../repository/NoteChunkRepository";
 import type { EmbeddingService } from "./EmbeddingService";
+import { TITLE_OVERLAP_WEIGHT, titleOverlap } from "./titleOverlap";
 
 export interface TextSearchResult {
     similarNotes: SimilarNote[];
@@ -10,6 +11,8 @@ export interface TextSearchResult {
     maxTokens: number;
     isOverLimit: boolean;
 }
+
+type RankedHit = { chunk: NoteChunk; score: number; rank: number };
 
 export class TextSearchService {
     constructor(
@@ -65,14 +68,23 @@ export class TextSearchService {
             [] // No excluded paths
         );
 
+        // Title rows rank by similarity plus the title overlap bonus; the
+        // shown score stays the plain similarity (title-vector spec).
+        const ranked = results.map((result) => ({
+            ...result,
+            rank: isTitleChunk(result.chunk)
+                ? result.score + TITLE_OVERLAP_WEIGHT * titleOverlap(searchText, result.chunk.content)
+                : result.score,
+        }));
+
         // Group by note path and keep the best match per note, dropping
         // notes the current exclusion rules match
-        const uniqueResults = this.groupByNotePath(results).filter(
+        const uniqueResults = this.groupByNotePath(ranked).filter(
             (result) => !this.isExcluded(result.chunk.path)
         );
 
-        // Sort by score descending
-        uniqueResults.sort((a, b) => b.score - a.score);
+        // Sort by ranking key descending
+        uniqueResults.sort((a, b) => b.rank - a.rank);
 
         log.info(
             `[TextSearchService] Found ${uniqueResults.length} unique similar notes:`,
@@ -117,22 +129,20 @@ export class TextSearchService {
     }
 
     /**
-     * Group search results by note path, keeping the highest scoring chunk per note
+     * Group search results by note path, keeping the highest ranked chunk per note
      */
-    private groupByNotePath(
-        results: { chunk: NoteChunk; score: number }[]
-    ): { chunk: NoteChunk; score: number }[] {
+    private groupByNotePath(results: RankedHit[]): RankedHit[] {
         const grouped = results.reduce(
             (acc, result) => {
                 if (
                     acc[result.chunk.path] === undefined ||
-                    acc[result.chunk.path].score < result.score
+                    acc[result.chunk.path].rank < result.rank
                 ) {
                     acc[result.chunk.path] = result;
                 }
                 return acc;
             },
-            {} as Record<string, { chunk: NoteChunk; score: number }>
+            {} as Record<string, RankedHit>
         );
 
         return Object.values(grouped);
