@@ -1,14 +1,14 @@
 # Similar Notes for Obsidian
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/joybro)
+When you open a note, similar notes appear at the bottom of it, and they refresh as you edit.
 
 Find semantically similar notes using AI. Choose local models for privacy or cloud APIs for flexibility.
 
 ### Similar Notes View
 
-When you open a note, similar notes appear at the bottom of it, and they refresh as you edit.
-
 ![Similar Notes Demo](images/demo.gif)
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/joybro)
 
 ### Semantic Search
 
@@ -21,6 +21,7 @@ Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not jus
 - **Flexible Options**: Run locally (100% private) or use cloud APIs like OpenAI
 - **Mobile & Desktop**: Works on iOS, Android, and all desktop platforms (on mobile, a cloud API is the default; see Getting Started)
 - **OpenAI Support**: Use OpenAI embedding models or any OpenAI-compatible API
+- **Gemini Support**: Use Google's Gemini embedding API on mobile or desktop
 - **Ollama Support**: Connect to custom models via Ollama (desktop; on mobile only with an Ollama server your phone can reach over the network)
 - **No Setup Required on Desktop**: Built-in models work out of the box, no API keys needed
 
@@ -33,7 +34,7 @@ Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not jus
 
 Progress appears in the status bar.
 
-> **On mobile**: new installs start with the OpenAI provider, because built-in models can crash Obsidian on phones with little memory. Add an OpenAI (or OpenAI-compatible) API key in settings, or switch to Gemini. You can still choose a built-in model in settings if your device has enough memory.
+> **On mobile**: new installs start with the OpenAI provider, because built-in models can crash Obsidian on phones with little memory. Add an OpenAI (or OpenAI-compatible) API key in settings, or switch to [Gemini](#gemini). You can still choose a built-in model in settings if your device has enough memory.
 
 ## Model Options
 
@@ -71,6 +72,21 @@ Supports any OpenAI-compatible embedding API.
 5. Use **Test connection** to verify before Load & Apply.
 
 > **Privacy note**: OpenRouter routes your note content to the model vendor, and each vendor has its own data retention policy. OpenRouter accounts have a Zero Data Retention (ZDR) option that restricts routing to providers who confirmed they do not store your data; requests that would hit a non-ZDR endpoint fail with an error instead of going through silently. If your vault contains sensitive material, enable it once at [openrouter.ai/settings/privacy](https://openrouter.ai/settings/privacy) (Data Policies, Zero Data Retention) before indexing. It applies account-wide, so no plugin configuration is needed. (Thanks to David Torrens for testing OpenRouter and researching the ZDR setting.)
+
+### Gemini
+
+Supports Google's Gemini embedding API on mobile and desktop.
+
+**Recommended:**
+
+- `gemini-embedding-001`
+
+1. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey).
+2. Open Similar Notes settings and select **Google Gemini** under **Model provider**.
+3. Enter your **API key** and choose **gemini-embedding-001 (Recommended)** under **Model**.
+4. Select **Test** under **Test connection**, then select **Apply Changes**.
+
+> Your note text is sent to Google to generate embeddings.
 
 ### Ollama (Desktop)
 
