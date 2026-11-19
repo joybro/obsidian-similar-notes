@@ -759,6 +759,39 @@ describe("SimilarNoteCoordinator", () => {
             });
         });
 
+        test("IR3: only the open note queued keeps the plain line, another note queued switches", async () => {
+            const pending$ = new BehaviorSubject(0);
+            const queued = new Map<string, number>();
+            const coord = make();
+            coord.watchPendingIndexCount(pending$, (p) => queued.get(p) ?? 0);
+            withStatus("ok", []);
+            expect(await reasonAfterOpen(coord)).toEqual({ kind: "none" });
+
+            // Typing in the open note queues it (count 0 to 1): its own
+            // indexing never fills its own panel, so the line stays.
+            queued.set("open.md", 1);
+            pending$.next(1);
+            let view = await firstValueFrom(coord.getNoteBottomViewModelObservable());
+            expect(view.emptyReason).toEqual({ kind: "none" });
+            // Reopening while only the open note is queued: still plain.
+            expect(await reasonAfterOpen(coord)).toEqual({ kind: "none" });
+
+            // Another note gets queued (sync, another pane): switch.
+            queued.set("other.md", 1);
+            pending$.next(2);
+            view = await firstValueFrom(coord.getNoteBottomViewModelObservable());
+            expect(view.emptyReason).toEqual({ kind: "indexing", remaining: 2 });
+
+            // The other note is indexed, only the open note is left: search
+            // again and fall back to the plain line.
+            queued.delete("other.md");
+            pending$.next(1);
+            await vi.waitFor(async () => {
+                view = await firstValueFrom(coord.getNoteBottomViewModelObservable());
+                expect(view.emptyReason).toEqual({ kind: "none" });
+            });
+        });
+
         test("results during indexing show normally (no indexing line)", async () => {
             const pending$ = new BehaviorSubject(50);
             const coord = make();

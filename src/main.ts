@@ -247,7 +247,8 @@ export default class MainPlugin extends Plugin {
         this.register(
             (() => {
                 const sub = this.similarNoteCoordinator.watchPendingIndexCount(
-                    this.noteIndexingService.getNoteChangeCount$()
+                    this.noteIndexingService.getNoteChangeCount$(),
+                    (path) => this.noteChangeQueue.getQueuedCountFor(path)
                 );
                 return () => sub.unsubscribe();
             })()

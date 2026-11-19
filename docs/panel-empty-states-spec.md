@@ -24,7 +24,7 @@ controls.
 | excluded-cloud | excluded note with OpenAI or Gemini, ad-hoc embedding skipped (`ad-hoc-disallowed`, frontmatter-exclusion spec §2.1) | This note is excluded from the index, so it isn't sent to OpenAI. (provider name from the setting: OpenAI or Gemini) |
 | embedding-failed | the on-the-fly embedding threw (`embedding-failed`; a Notice is also shown) | Couldn't analyze this note. Check the model in Settings, then reopen the note. |
 | below-threshold | the search returned results but none reach Minimum similarity | No notes above the minimum similarity (0.50). (setting value, two decimals) |
-| indexing | the search ran, returned nothing, and notes are queued for indexing | Indexing your vault: 1,240 notes left. Results fill in as notes are indexed. (count = the status bar's "N to index" source, `NoteIndexingService.getNoteChangeCount$`; "1 note left" for one) |
+| indexing | the search ran, returned nothing, and notes other than the open one are queued for indexing | Indexing your vault: 1,240 notes left. Results fill in as notes are indexed. (count = the status bar's "N to index" source, `NoteIndexingService.getNoteChangeCount$`; "1 note left" for one) |
 | none | anything else | No similar notes found. |
 
 Order: the first three are searches that never ran and win; `excluded-cloud`
@@ -48,6 +48,14 @@ the indexing loop starts (which waits for the model, possibly a first
 download). If the panel already shows "No similar notes found." when notes
 become queued (count 0 to positive), it switches to the indexing line and drops
 that cached empty result, so the searches above run (QA sim8).
+
+Only notes other than the open one count toward this line (CDO IR3). The open
+note's own queued edit (typing in a note with no results, then pausing) never
+fills its own panel, since a note is not in its own results, so the panel keeps
+"No similar notes found." instead of promising results and flickering at every
+pause. The count shown is still the status bar's total. When only the open
+note is left queued while the indexing line shows, the coordinator searches
+once more and falls back to the plain line.
 
 ## Caching
 
