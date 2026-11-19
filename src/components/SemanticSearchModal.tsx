@@ -122,7 +122,7 @@ function useSemanticSearch(textSearchService: TextSearchService) {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isSearching, setIsSearching] = useState(false);
     const [tokenWarning, setTokenWarning] = useState<string | null>(null);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const debounceRef = useRef<number | null>(null);
 
     const performSearch = useCallback(
         async (searchQuery: string) => {
@@ -157,10 +157,10 @@ function useSemanticSearch(textSearchService: TextSearchService) {
     );
 
     useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => performSearch(query), DEBOUNCE_MS);
+        if (debounceRef.current) window.clearTimeout(debounceRef.current);
+        debounceRef.current = window.setTimeout(() => performSearch(query), DEBOUNCE_MS);
         return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
+            if (debounceRef.current) window.clearTimeout(debounceRef.current);
         };
     }, [query, performSearch]);
 

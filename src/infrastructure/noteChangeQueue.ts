@@ -52,7 +52,7 @@ export class NoteChangeQueue {
     /**
      * Pending modification timeouts for debouncing
      */
-    private pendingModifications: Map<string, NodeJS.Timeout> = new Map();
+    private pendingModifications: Map<string, number> = new Map();
 
     /**
      * Creates a new file change queue
@@ -140,12 +140,12 @@ export class NoteChangeQueue {
                     // Clear existing pending timeout for this file
                     const existingTimeout = this.pendingModifications.get(file.path);
                     if (existingTimeout) {
-                        clearTimeout(existingTimeout);
+                        window.clearTimeout(existingTimeout);
                     }
 
                     // Set debounced queue addition
                     const delayMs = (settings.indexingDelaySeconds ?? 1) * 1000;
-                    const timeout = setTimeout(() => {
+                    const timeout = window.setTimeout(() => {
                         this.pendingModifications.delete(file.path);
 
                         // Remove the file from the queue if it exists
@@ -256,7 +256,7 @@ export class NoteChangeQueue {
     cleanup(): void {
         // Clear all pending modification timeouts
         for (const timeout of this.pendingModifications.values()) {
-            clearTimeout(timeout);
+            window.clearTimeout(timeout);
         }
         this.pendingModifications.clear();
 

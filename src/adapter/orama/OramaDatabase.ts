@@ -91,7 +91,7 @@ export class OramaWorker {
                                 chunk.path
                             );
                         }
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- db is created before this batch loop starts
                         await insertMultiple(this.db!, batch as Doc[]);
                     },
                     (processed, total) => {
@@ -304,7 +304,7 @@ export class OramaWorker {
         let offset = 0;
         let allResults: { chunk: NoteChunkDTO; score: number }[] = [];
 
-        // eslint-disable-next-line no-constant-condition
+        // eslint-disable-next-line no-constant-condition -- paged search loop, exits by break (empty page or enough results)
         while (true) {
             const searchParams: SearchParams<Orama<Schema>> = {
                 mode: "vector",
@@ -328,7 +328,7 @@ export class OramaWorker {
             const filteredHits = results.hits.filter((hit) => {
                 if (
                     options?.bodyChunksOnly &&
-                    (hit.document as unknown as Doc).chunkIndex < 0
+                    (hit.document).chunkIndex < 0
                 ) {
                     return false;
                 }
@@ -341,14 +341,14 @@ export class OramaWorker {
             // Add filtered results to our collection
             allResults = allResults.concat(
                 filteredHits.map((hit) => {
-                    const doc = hit.document as unknown as Doc;
+                    const doc = hit.document;
                     const dto: NoteChunkDTO = {
                         path: doc.path,
                         title: doc.title,
                         content: doc.content,
                         chunkIndex: doc.chunkIndex,
                         totalChunks: doc.totalChunks,
-                        embedding: doc.embedding as unknown as number[],
+                        embedding: doc.embedding,
                     };
                     return {
                         chunk: dto,

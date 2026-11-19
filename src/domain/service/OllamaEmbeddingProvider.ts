@@ -302,7 +302,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
                 await this.ollamaClient.generateEmbedding(modelId, testText);
                 maxWorking = tokens;
                 log.debug(`[Ollama] Successfully tested ${tokens} tokens (~${testChars} chars, payload ${payloadSize} bytes)`);
-            } catch (error) {
+            } catch {
                 log.info(`[Ollama] Failed at ${tokens} tokens (payload ${payloadSize} bytes), using ${maxWorking} as max`);
                 break;
             }

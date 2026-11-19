@@ -140,7 +140,7 @@ export class IndexSettingsSection {
         this.getContentExclusionSettingBuilders().forEach((builder) => contentExclusionGroup.addSetting(builder));
 
         // Initialize stats and excluded/errored files lists
-        setTimeout(() => {
+        window.setTimeout(() => {
             this.renderStats(indexedChunkCount);
             this.updateErroredFilesList();
             this.updateExcludedFilesList();

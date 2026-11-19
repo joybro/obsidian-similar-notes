@@ -139,7 +139,7 @@ export class OllamaClient {
                 model,
                 input: text,
                 truncate: true,
-            } as OllamaEmbeddingRequest);
+            });
             const requestSize = new Blob([requestBody]).size;
             log.debug(`[Ollama] Request payload size: ${requestSize} bytes`);
 
@@ -190,7 +190,7 @@ export class OllamaClient {
                 model,
                 input: inputs,
                 truncate: true,
-            } as OllamaEmbeddingRequest);
+            });
             const requestSize = new Blob([requestBody]).size;
             log.debug(`[Ollama] Embedding batch of ${inputs.length} input(s), payload ${requestSize} bytes`);
 

@@ -62,7 +62,7 @@ export function matchesGlobPattern(path: string, pattern: string): boolean {
         }
         
         return matcher(path);
-    } catch (e) {
+    } catch {
         // If pattern is invalid, picomatch will throw
         // Return false for invalid patterns
         return false;
@@ -79,7 +79,7 @@ export function isValidGlobPattern(pattern: string): boolean {
     try {
         picomatch(pattern);
         return true;
-    } catch (e) {
+    } catch {
         return false;
     }
 }
