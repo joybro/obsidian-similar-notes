@@ -53,6 +53,21 @@ Helpers: `TITLE_CHUNK_INDEX`, `isTitleChunk`, `titleFromPath` and
   max(body, title). A title hit's preview is the title; the result shows the
   note's first body chunk as preview instead (title-only previews say nothing),
   read with `getByPath` for that hit only.
+- Title overlap bonus (text queries only): before grouping, a title row's
+  ranking key is its similarity plus `0.1 × overlap`, where `overlap` is the
+  share of the query's character bigrams (taken inside each word, after
+  lowercasing and turning punctuation into spaces; words of one character
+  are skipped) that also occur in the title. Body rows keep their plain
+  similarity. Results are grouped and sorted by this key, but the score shown
+  to the user stays the plain similarity of the winning row. The bonus only
+  reorders the candidates the vector search already returned (`limit * 3`
+  chunks); it never adds notes. Why: short Korean title fragments lose to
+  other notes' titles on meaning alone (fixed Korean benchmark: title-fragment
+  MRR 0.69 without the bonus, 0.77 to 0.78 with it; English 0.97 to 0.98;
+  body-sentence queries change by at most 0.003). Character bigrams rather
+  than whole words, so a fragment with a particle attached or a word still
+  being typed keeps its overlap. Helper: `titleOverlap` in
+  `src/domain/service/titleOverlap.ts`.
 - `SimilarNoteFinder.findSimilarNotes` (panel, and the agent export command
   through `SimilarNoteCoordinator`): the query side uses only
   `chunkIndex >= 0` rows of the open note, and title rows are dropped from the
@@ -110,6 +125,9 @@ list):
 
 - A title-fragment query ranks the note first when its body never mentions the
   title words (TextSearchService with a fake repository holding a title row).
+- With two title rows of near-equal similarity, the one sharing the query's
+  characters ranks first, and the shown score is the unboosted similarity
+  (`src/domain/service/__tests__/titleOverlap.test.ts`).
 - The panel's results for a note are identical with and without title rows.
 - Rename re-embeds only the title row; folder move re-embeds nothing.
 - Backfill queues only notes lacking a title row and embeds only titles.
