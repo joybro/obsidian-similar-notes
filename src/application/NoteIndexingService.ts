@@ -12,6 +12,7 @@ import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { NoteChange, NoteChangeQueue } from "@/infrastructure/noteChangeQueue";
 import { showNoteErrorNotice } from "@/utils/errorHandling";
+import { shouldExcludeFile } from "@/utils/folderExclusion";
 import { shouldExcludeByFrontmatter } from "@/utils/frontmatterExclusion";
 import { applyExclusionPatterns } from "@/utils/indexableText";
 import { computeIndexableTextHash } from "@/utils/indexableTextHash";
@@ -68,17 +69,20 @@ export class NoteIndexingService {
         log.info(`[NoteIndexingService] ===== Processing change: ${change.path} (${change.reason}) =====`);
 
         try {
-            // Authoritative frontmatter-exclusion check (frontmatter-exclusion
-            // spec §2). It runs here, not at event/queue time, because
-            // metadataCache lags vault events — by processing time the cache
-            // is warm. An excluded note ends up exactly like a path-excluded
-            // one: no chunks, no mtime/hash metadata.
+            // Authoritative exclusion check (frontmatter-exclusion spec §2).
+            // Frontmatter rules are checked here, not at event/queue time,
+            // because metadataCache lags vault events: by processing time the
+            // cache is warm. Path patterns are filtered at event time too, but
+            // a change queued before a pattern was saved, or re-queued by
+            // "Retry errored", arrives here unfiltered, so the current
+            // patterns are applied again. An excluded note ends up with no
+            // chunks and no mtime/hash metadata.
             if (
                 change.reason !== "deleted" &&
-                this.isFrontmatterExcluded(change.path)
+                this.isExcluded(change.path)
             ) {
                 log.info(
-                    `[NoteIndexingService] ${change.path} is frontmatter-excluded, removing from index`
+                    `[NoteIndexingService] ${change.path} is excluded, removing from index`
                 );
                 if (change.reason === "renamed" && change.oldPath) {
                     await this.noteChunkRepository.removeByPath(
@@ -438,6 +442,13 @@ export class NoteIndexingService {
         }
 
         return indexableTextHash;
+    }
+
+    private isExcluded(path: string): boolean {
+        const patterns =
+            this.settingsService.get().excludeFolderPatterns ?? [];
+        if (shouldExcludeFile(path, patterns)) return true;
+        return this.isFrontmatterExcluded(path);
     }
 
     private isFrontmatterExcluded(path: string): boolean {

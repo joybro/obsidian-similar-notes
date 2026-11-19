@@ -65,6 +65,15 @@ rules; they only keep the existing path-pattern filter. An excluded note's
 modify event flows through the queue and resolves to a removal no-op at
 processing time.
 
+The same processing-time check also applies the current **path patterns**
+(`excludeFolderPatterns`), with the same removal end-state. The event-time
+path filter alone is not enough: a change that was already queued (or waiting
+out the indexing delay) when the user saved a new pattern, and every note
+re-queued by "Retry errored" (`NoteChangeQueue.retryErrored` enqueues errored
+paths without filtering), would otherwise reach the embedding provider. This
+is what lets the "Path patterns" setting promise that a cloud provider never
+receives an excluded note's text.
+
 ## §2.1 Exclusion is one-directional (intentional)
 
 Exclusion removes a note as a recommendation *target*: it never appears in
