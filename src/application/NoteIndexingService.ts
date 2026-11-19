@@ -1,4 +1,9 @@
 import type { SettingsService } from "@/application/SettingsService";
+import {
+    NoteChunk,
+    isTitleChunk,
+    titleFromPath,
+} from "@/domain/model/NoteChunk";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
@@ -115,6 +120,8 @@ export class NoteIndexingService {
 
             if (change.reason === "deleted") {
                 await this.processDeletedNote(change.path);
+            } else if (change.reason === "title-backfill") {
+                await this.processTitleBackfill(change.path);
             } else if (change.reason === "renamed") {
                 const result = await this.processRenamedNote(change);
                 if (result === null) {
@@ -195,12 +202,79 @@ export class NoteIndexingService {
         });
     }
 
+    /**
+     * Queues a title-only embed for every note that has body chunks but no
+     * title row (indexed before title rows existed). Called once after the
+     * index is loaded from storage. See title-vector spec "Backfill".
+     */
+    async enqueueTitleBackfill(): Promise<void> {
+        const paths = await this.noteChunkRepository.getPathsWithoutTitleChunk();
+        if (paths.length === 0) return;
+        log.info(
+            `[NoteIndexingService] Queueing title backfill for ${paths.length} notes`
+        );
+        this.noteChangeQueue.enqueue(
+            paths.map((path) => ({ path, reason: "title-backfill" as const }))
+        );
+    }
+
     getNoteChangeCount$(): Observable<number> {
         return this.noteChangeCount$.asObservable();
     }
 
     private async processDeletedNote(path: string) {
         await this.noteChunkRepository.removeByPath(path);
+    }
+
+    /**
+     * Writes (or replaces) the title row of an indexed note, keeping its body
+     * rows as they are. Body rows' `title` field is updated to the current
+     * title as well, since a rename carries them with the old one.
+     */
+    private async replaceTitleChunk(path: string): Promise<void> {
+        const rows = await this.noteChunkRepository.getByPath(path);
+        const title = titleFromPath(path);
+        const body = rows.filter((row) => !isTitleChunk(row));
+        if (body.length === 0) {
+            // The note was removed (or emptied) since it was queued.
+            return;
+        }
+        const existingTitle = rows.find(isTitleChunk);
+        if (
+            existingTitle &&
+            existingTitle.content === title &&
+            body.every((row) => row.title === title)
+        ) {
+            return;
+        }
+        const titleEmbedding =
+            existingTitle && existingTitle.content === title
+                ? existingTitle.embedding
+                : (await this.embeddingService.embedTexts([title]))[0];
+        await this.noteChunkRepository.removeByPath(path);
+        await this.noteChunkRepository.putMulti([
+            ...body.map(
+                (row) =>
+                    new NoteChunk(
+                        row.path,
+                        title,
+                        row.content,
+                        row.chunkIndex,
+                        row.totalChunks,
+                        row.embedding
+                    )
+            ),
+            NoteChunk.titleChunk(
+                path,
+                title,
+                body[0].totalChunks,
+                titleEmbedding
+            ),
+        ]);
+    }
+
+    private async processTitleBackfill(path: string): Promise<void> {
+        await this.replaceTitleChunk(path);
     }
 
     /** Returns null when the file vanished before processing (do not mark). */
@@ -241,6 +315,12 @@ export class NoteIndexingService {
         log.info(
             `[NoteIndexingService] Carried embedding ${oldPath} -> ${newPath} without re-embedding`
         );
+
+        // The title changes with the basename: re-embed only the title row.
+        // A folder move keeps the basename, so nothing is re-embedded.
+        if (titleFromPath(oldPath) !== titleFromPath(newPath)) {
+            await this.replaceTitleChunk(newPath);
+        }
 
         // If the renamed file is the currently active one, refresh the sidebar.
         this.refreshActiveNote(newPath);
@@ -316,6 +396,14 @@ export class NoteIndexingService {
                 : chunk.content
         );
 
+        // The title vector rides in the same batch, last (title-vector spec).
+        // Derived from the path like rename and backfill do (equals
+        // note.title, the basename), so all three agree on the title text.
+        const title = titleFromPath(note.path).trim();
+        if (title) {
+            textsToEmbed.push(title);
+        }
+
         // Single batch API call for all chunks. A failure here MUST propagate to
         // processChange's catch → handleChangeFailure (retry, then terminal
         // Errored). Do NOT swallow it: swallowing made a failed note take the
@@ -326,6 +414,16 @@ export class NoteIndexingService {
         const noteChunks = splitted.map((chunk, index) =>
             chunk.withEmbedding(embeddings[index])
         );
+        if (title) {
+            noteChunks.push(
+                NoteChunk.titleChunk(
+                    note.path,
+                    title,
+                    splitted.length,
+                    embeddings[splitted.length]
+                )
+            );
+        }
 
         log.info(`[NoteIndexingService] Successfully generated embeddings, saving to repository`);
 

@@ -46,18 +46,30 @@ export interface NoteChunkRepository {
      *
      * @param queryEmbedding - The embedding vector to use as the search criteria
      * @param limit - Maximum number of NoteChunks to return
+     * @param options.bodyChunksOnly - When true, title rows (chunkIndex < 0)
+     *        are skipped and `limit` body chunks are still returned. Used by
+     *        the Similar notes panel, which does not use title vectors.
      */
     findSimilarChunks(
         queryEmbedding: number[],
         limit: number,
         minScore?: number,
-        excludePaths?: string[]
+        excludePaths?: string[],
+        options?: { bodyChunksOnly?: boolean }
     ): Promise<{ chunk: NoteChunk; score: number }[]>;
 
     /**
-     * Returns the total number of stored NoteChunks.
+     * Returns the number of stored body chunks (chunkIndex >= 0). Title rows
+     * are not counted.
      */
     count(): Promise<number>;
+
+    /**
+     * Paths that had body chunks but no title row when the index was loaded
+     * from storage (vaults indexed before title rows existed). Used to queue
+     * the title backfill once per load.
+     */
+    getPathsWithoutTitleChunk(): Promise<string[]>;
 
     /**
      * Dispose the repository and clean up resources

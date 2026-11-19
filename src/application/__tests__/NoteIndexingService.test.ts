@@ -49,6 +49,7 @@ function makeService() {
         putMulti: vi.fn().mockResolvedValue(undefined),
         count: vi.fn().mockResolvedValue(0),
         renamePath: vi.fn().mockResolvedValue(false),
+        getByPath: vi.fn().mockResolvedValue([]),
     };
     const noteChunkingService = { split: vi.fn() };
     const embeddingService = {
@@ -257,7 +258,7 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
         });
         queue.getIndexableTextHash.mockReturnValue(storedHash);
         noteChunkingService.split.mockResolvedValue([chunk]);
-        embeddingService.embedTexts.mockResolvedValue([[0.25]]);
+        embeddingService.embedTexts.mockResolvedValue([[0.25], [0.5]]);
 
         await (service as unknown as ChangeProcessor).processChange(change);
 
@@ -265,14 +266,23 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
             path: "note.md",
             content: "hello world",
         });
+        // Body chunks first, then the title vector (title-vector spec).
         expect(embeddingService.embedTexts).toHaveBeenCalledWith([
             "Note\n\nhello world",
+            "note",
         ]);
         expect(noteChunkRepository.removeByPath).toHaveBeenCalledWith(
             "note.md"
         );
         expect(noteChunkRepository.putMulti).toHaveBeenCalledWith([
             embeddedChunk,
+            expect.objectContaining({
+                path: "note.md",
+                content: "note",
+                chunkIndex: -1,
+                totalChunks: 1,
+                embedding: [0.5],
+            }),
         ]);
         expect(queue.markNoteChangeProcessed).toHaveBeenCalledWith(
             change,
@@ -302,7 +312,7 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
             }
         );
         noteChunkingService.split.mockResolvedValue([chunk]);
-        embeddingService.embedTexts.mockResolvedValue([[0.25]]);
+        embeddingService.embedTexts.mockResolvedValue([[0.25], [0.5]]);
 
         await (service as unknown as ChangeProcessor).processChange({
             path: "note.md",
@@ -408,7 +418,7 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
             });
             queue.getIndexableTextHash.mockReturnValue(storedHash);
             noteChunkingService.split.mockResolvedValue([chunk]);
-            embeddingService.embedTexts.mockResolvedValue([[0.25]]);
+            embeddingService.embedTexts.mockResolvedValue([[0.25], [0.5]]);
 
             await (service as unknown as ChangeProcessor).processChange(change);
 
@@ -538,7 +548,7 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
         });
         queue.getIndexableTextHash.mockReturnValue("hash:hello world");
         noteChunkingService.split.mockResolvedValue([chunk]);
-        embeddingService.embedTexts.mockResolvedValue([[0.25]]);
+        embeddingService.embedTexts.mockResolvedValue([[0.25], [0.5]]);
 
         await (service as unknown as ChangeProcessor).processChange(change);
 
@@ -597,7 +607,7 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
         });
         queue.getIndexableTextHash.mockReturnValue("old-hash");
         noteChunkingService.split.mockResolvedValue([chunk]);
-        embeddingService.embedTexts.mockResolvedValue([[0.25]]);
+        embeddingService.embedTexts.mockResolvedValue([[0.25], [0.5]]);
         queue.clearIndexableTextHash.mockImplementation(async () => {
             callOrder.push("clearHash");
         });
@@ -679,7 +689,7 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
             content: "hello world",
         });
         noteChunkingService.split.mockResolvedValue([chunk]);
-        embeddingService.embedTexts.mockResolvedValue([[0.25]]);
+        embeddingService.embedTexts.mockResolvedValue([[0.25], [0.5]]);
         noteChunkRepository.putMulti.mockRejectedValue(
             new Error("repository failed")
         );
@@ -713,7 +723,7 @@ describe("NoteIndexingService indexable-text hashing (#51)", () => {
         });
         noteChunkRepository.renamePath.mockResolvedValue(false);
         noteChunkingService.split.mockResolvedValue([chunk]);
-        embeddingService.embedTexts.mockResolvedValue([[0.25]]);
+        embeddingService.embedTexts.mockResolvedValue([[0.25], [0.5]]);
 
         await (service as unknown as ChangeProcessor).processChange(change);
 

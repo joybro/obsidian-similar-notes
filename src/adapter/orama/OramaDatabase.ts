@@ -33,6 +33,9 @@ export class OramaWorker {
     private schema: Schema;
     private vectorSize: number;
     private storage: IndexedDBChunkStorage;
+    // Paths that had body chunks but no title row (chunkIndex < 0) when the
+    // index was loaded from IndexedDB. Snapshot for the title backfill.
+    private pathsWithoutTitleChunk: string[] = [];
 
     setLogLevel(level: log.LogLevelDesc): void {
         log.setLevel(level);
@@ -46,6 +49,7 @@ export class OramaWorker {
     ): Promise<void> {
         this.vectorSize = vectorSize;
         this.db = null;
+        this.pathsWithoutTitleChunk = [];
         this.schema = {
             path: "string",
             pathHash: "string",
@@ -77,9 +81,16 @@ export class OramaWorker {
                 // Load data from IndexedDB in batches
                 log.info("Loading chunks from IndexedDB...");
                 let loadedCount = 0;
+                const bodyPaths = new Set<string>();
+                const titledPaths = new Set<string>();
                 await this.storage.loadInBatches(
                     100,
                     async (batch) => {
+                        for (const chunk of batch) {
+                            (chunk.chunkIndex < 0 ? titledPaths : bodyPaths).add(
+                                chunk.path
+                            );
+                        }
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         await insertMultiple(this.db!, batch as Doc[]);
                     },
@@ -95,6 +106,9 @@ export class OramaWorker {
 
                 log.info(
                     `Successfully loaded ${loadedCount} chunks from IndexedDB`
+                );
+                this.pathsWithoutTitleChunk = [...bodyPaths].filter(
+                    (path) => !titledPaths.has(path)
                 );
             } else {
                 log.info("Starting with empty database for reindexing");
@@ -279,7 +293,8 @@ export class OramaWorker {
         queryEmbedding: number[],
         limit: number,
         minScore?: number,
-        excludePaths?: string[]
+        excludePaths?: string[],
+        options?: { bodyChunksOnly?: boolean }
     ): Promise<{ chunk: NoteChunkDTO; score: number }[]> {
         if (!this.db) {
             throw new Error("Database not loaded");
@@ -311,6 +326,12 @@ export class OramaWorker {
 
             // Filter results based on excludePaths
             const filteredHits = results.hits.filter((hit) => {
+                if (
+                    options?.bodyChunksOnly &&
+                    (hit.document as unknown as Doc).chunkIndex < 0
+                ) {
+                    return false;
+                }
                 if (excludePaths) {
                     return !excludePaths.includes(hit.document.path);
                 }
@@ -349,10 +370,20 @@ export class OramaWorker {
         return allResults;
     }
 
-    count(): number {
+    /** Number of body chunks; title rows (chunkIndex < 0) are not counted. */
+    async count(): Promise<number> {
         if (!this.db) {
             throw new Error("Database not loaded");
         }
-        return count(this.db);
+        const titleRows = await search(this.db, {
+            term: "",
+            where: { chunkIndex: { lt: 0 } },
+            limit: 0,
+        });
+        return count(this.db) - titleRows.count;
+    }
+
+    getPathsWithoutTitleChunk(): string[] {
+        return this.pathsWithoutTitleChunk;
     }
 }
