@@ -186,6 +186,11 @@
 
 /* Excluded files list styles */
 
+.similar-notes-excluded-total {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
 .similar-notes-excluded-files-list {
     height: 120px;
     min-height: 60px;

@@ -104,10 +104,12 @@ export function renderExcludedFilesList(
     listEl: HTMLElement,
     entries: ExcludedFileEntry[]
 ): void {
-    descEl.innerHTML = `
-        <div>Excluded files:</div>
-        <div style="font-size: var(--font-ui-smaller); color: var(--text-muted);">${entries.length} files total</div>
-    `;
+    descEl.empty();
+    descEl.createDiv({ text: "Excluded files:" });
+    descEl.createDiv({
+        cls: "similar-notes-excluded-total",
+        text: `${entries.length} files total`,
+    });
 
     listEl.empty();
 

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { SettingsService, SimilarNotesSettings } from "@/application/SettingsService";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
@@ -121,12 +120,12 @@ export class IndexSettingsSection {
         indexedNoteCount: number;
         indexedChunkCount: number;
     }): void {
-        this.initializeSectionContainer();
+        const section = this.initializeSectionContainer();
 
         const indexedChunkCount = currentStats.indexedChunkCount;
 
         // Index group: general config, statistics, and error recovery.
-        const indexGroup = new SettingGroup(this.sectionContainer!).setHeading("Index");
+        const indexGroup = new SettingGroup(section).setHeading("Index");
         this.getIndexSettingBuilders().forEach((builder) => indexGroup.addSetting(builder));
 
         // File exclusion (which files are indexed — path patterns and
@@ -134,10 +133,10 @@ export class IndexSettingsSection {
         // indexed) are distinct concerns, so each gets its own group.
         // SettingGroup can't nest and Setting-level sub-headings render
         // poorly, so sibling groups are the clean way to separate them.
-        const fileExclusionGroup = new SettingGroup(this.sectionContainer!).setHeading("Exclude files from index");
+        const fileExclusionGroup = new SettingGroup(section).setHeading("Exclude files from index");
         this.getFileExclusionSettingBuilders().forEach((builder) => fileExclusionGroup.addSetting(builder));
 
-        const contentExclusionGroup = new SettingGroup(this.sectionContainer!).setHeading("Exclude content from index");
+        const contentExclusionGroup = new SettingGroup(section).setHeading("Exclude content from index");
         this.getContentExclusionSettingBuilders().forEach((builder) => contentExclusionGroup.addSetting(builder));
 
         // Initialize stats and excluded/errored files lists
@@ -346,13 +345,15 @@ export class IndexSettingsSection {
             });
     }
 
-    private initializeSectionContainer(): void {
+    private initializeSectionContainer(): HTMLElement {
         const { containerEl } = this.props;
 
-        if (!this.sectionContainer || !this.sectionContainer.parentElement) {
-            this.sectionContainer = containerEl.createDiv("index-settings-section");
+        let section = this.sectionContainer;
+        if (!section || !section.parentElement) {
+            section = containerEl.createDiv("index-settings-section");
+            this.sectionContainer = section;
         } else {
-            this.sectionContainer.empty();
+            section.empty();
         }
 
         // Reset state
@@ -366,6 +367,8 @@ export class IndexSettingsSection {
         this.erroredFilesList = undefined;
         this.retryErroredButton = undefined;
         this.regexpTester.reset();
+
+        return section;
     }
 
     private updateErroredFilesList(): void {
