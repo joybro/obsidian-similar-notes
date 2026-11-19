@@ -304,7 +304,7 @@ export class OramaWorker {
         let offset = 0;
         let allResults: { chunk: NoteChunkDTO; score: number }[] = [];
 
-        // eslint-disable-next-line no-constant-condition -- paged search loop, exits by break (empty page or enough results)
+        // Paged search loop, exits by break (empty page or enough results)
         while (true) {
             const searchParams: SearchParams<Orama<Schema>> = {
                 mode: "vector",

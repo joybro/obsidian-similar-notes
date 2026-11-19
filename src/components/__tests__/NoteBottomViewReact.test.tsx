@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
@@ -84,7 +83,7 @@ describe("SimilarNotesViewReact", () => {
         render(
             <NoteBottomViewReact
                 workspace={mockWorkspace as unknown as Workspace}
-                leaf={mockLeaf as unknown as MarkdownView}
+                leaf={mockLeaf}
                 bottomViewModelSubject$={bottomViewModelSubject$}
                 vaultName="test-vault"
             />
@@ -98,7 +97,7 @@ describe("SimilarNotesViewReact", () => {
         render(
             <NoteBottomViewReact
                 workspace={mockWorkspace as unknown as Workspace}
-                leaf={mockLeaf as unknown as MarkdownView}
+                leaf={mockLeaf}
                 bottomViewModelSubject$={bottomViewModelSubject$}
                 vaultName="test-vault"
             />
@@ -114,7 +113,7 @@ describe("SimilarNotesViewReact", () => {
         render(
             <NoteBottomViewReact
                 workspace={mockWorkspace as unknown as Workspace}
-                leaf={mockLeaf as unknown as MarkdownView}
+                leaf={mockLeaf}
                 bottomViewModelSubject$={bottomViewModelSubject$}
                 vaultName="test-vault"
             />
@@ -134,7 +133,7 @@ describe("SimilarNotesViewReact", () => {
         render(
             <NoteBottomViewReact
                 workspace={mockWorkspace as unknown as Workspace}
-                leaf={mockLeaf as unknown as MarkdownView}
+                leaf={mockLeaf}
                 bottomViewModelSubject$={bottomViewModelSubject$}
                 vaultName="test-vault"
             />
@@ -181,7 +180,7 @@ describe("SimilarNotesViewReact", () => {
         render(
             <NoteBottomViewReact
                 workspace={mockWorkspace as unknown as Workspace}
-                leaf={mockLeaf as unknown as MarkdownView}
+                leaf={mockLeaf}
                 bottomViewModelSubject$={bottomViewModelSubject$}
                 vaultName="test-vault"
                 viewType="bottom"
@@ -197,7 +196,7 @@ describe("SimilarNotesViewReact", () => {
         render(
             <NoteBottomViewReact
                 workspace={mockWorkspace as unknown as Workspace}
-                leaf={mockLeaf as unknown as MarkdownView}
+                leaf={mockLeaf}
                 bottomViewModelSubject$={bottomViewModelSubject$}
                 vaultName="test-vault"
             />
@@ -211,7 +210,7 @@ describe("SimilarNotesViewReact", () => {
         render(
             <NoteBottomViewReact
                 workspace={mockWorkspace as unknown as Workspace}
-                leaf={mockLeaf as unknown as MarkdownView}
+                leaf={mockLeaf}
                 bottomViewModelSubject$={bottomViewModelSubject$}
                 vaultName="test-vault"
             />

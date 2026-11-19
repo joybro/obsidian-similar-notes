@@ -119,6 +119,16 @@ For driving the command from an agent (CLI flow, validation tips, drop-in skill 
 - **Orama**: Built-in vector database for fast search
 - **Web Workers**: Built-in model inference and vector search run in background threads
 
+## Network Use and Bundled Code
+
+The plugin makes network requests only for the provider you choose:
+
+- **Built-in models (default)**: downloads the model files from `huggingface.co` the first time a model is loaded, and the ONNX Runtime WebAssembly file (`ort-wasm-simd-threaded.jsep.wasm`, part of [Transformers.js](https://github.com/huggingface/transformers.js) / [ONNX Runtime Web](https://github.com/microsoft/onnxruntime)) from `cdn.jsdelivr.net`. Both are cached; your notes are not sent anywhere. The model picker also reads model details from the `huggingface.co` API.
+- **OpenAI-compatible, Gemini, Ollama**: sends note text to the server URL you configure (by default `api.openai.com`, `generativelanguage.googleapis.com`, or `localhost:11434`).
+- **github.com**: only the "Report a bug" button in settings, which opens this repository's issue page in your browser.
+
+There is no telemetry or analytics. The WebAssembly file runs the built-in embedding model; it is not part of this repository's source. Release assets (`main.js`, `manifest.json`, `styles.css`) are built by GitHub Actions from this repository and, from 1.8.0 on, carry GitHub artifact attestations.
+
 ## Multi-Device Usage
 
 This plugin stores its index locally in IndexedDB, which is device-specific storage that **does not sync** across devices.

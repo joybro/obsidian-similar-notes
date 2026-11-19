@@ -69,7 +69,7 @@ describe("SemanticLinkSuggest.onTrigger (spec item 1)", () => {
     it("triggers on the configured prefix and returns the query + range", () => {
         const suggest = makeSuggest({ trigger: ";;" });
         const editor = { getLine: () => ";;frank" };
-        const info = suggest.onTrigger({ line: 2, ch: 7 } as never, editor as never, null);
+        const info = suggest.onTrigger({ line: 2, ch: 7 }, editor as never, null);
         expect(info).toEqual({
             start: { line: 2, ch: 0 },
             end: { line: 2, ch: 7 },
@@ -81,7 +81,7 @@ describe("SemanticLinkSuggest.onTrigger (spec item 1)", () => {
         const suggest = makeSuggest({ trigger: "" });
         const editor = { getLine: () => "anything" };
         expect(
-            suggest.onTrigger({ line: 0, ch: 8 } as never, editor as never, null)
+            suggest.onTrigger({ line: 0, ch: 8 }, editor as never, null)
         ).toBeNull();
     });
 });

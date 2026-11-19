@@ -135,7 +135,7 @@ function makeWorld(files: Record<string, string>) {
         noteRepository as never,
         repo as never,
         queue as never,
-        chunkingService as never,
+        chunkingService,
         embeddingService as never,
         {
             emitNoteBottomViewModelFromPath: vi.fn(),
@@ -214,7 +214,7 @@ describe("title vector (title-vector spec)", () => {
         }
         const finder = new SimilarNoteFinder(
             repo as never,
-            chunkingService as never,
+            chunkingService,
             embeddingService as never
         );
         const note = new Note(

@@ -22,8 +22,8 @@ vi.mock("obsidian", () => {
             this.extension = path.split('.').pop() || '';
             this.basename = path.split('/').pop()?.split('.')[0] || '';
             this.stat = { mtime, ctime: mtime, size: 100 };
-            this.vault = {} as unknown;
-            this.parent = {} as unknown;
+            this.vault = {};
+            this.parent = {};
         }
     }
 
@@ -36,7 +36,7 @@ import { TFile as MockedTFile } from "obsidian";
 // Helper function to create mock TFile objects
 const createMockTFile = (path: string, mtime: number): TFile => {
     // MockedTFile constructor signature differs from TFile, but it's intentional for testing
-    return new MockedTFile(path, mtime) as unknown as TFile;
+    return new MockedTFile(path, mtime);
 };
 
 // Mock Vault with only the methods we need
@@ -45,7 +45,6 @@ type MockVault = Pick<
     "getMarkdownFiles" | "read" | "on" | "offref" | "getAbstractFileByPath"
 >;
 
-// eslint-disable-next-line max-lines-per-function
 describe("FileChangeQueue", () => {
     let mockVault: MockVault;
     let mockMetadataCache: MetadataCache;
@@ -94,7 +93,6 @@ describe("FileChangeQueue", () => {
             clear: vi.fn().mockResolvedValue(undefined),
             set: vi.fn().mockResolvedValue(undefined),
         } as unknown as ErroredNoteStore;
-        
         mockMetadataCache = {
             getFileCache: vi.fn().mockReturnValue(null),
         } as unknown as MetadataCache;
@@ -348,7 +346,7 @@ describe("FileChangeQueue", () => {
                         return unregisterDelete;
                     }
                     if (event === "rename") {
-                        renameCallback = callback as (file: TFile, oldPath: string) => void | Promise<void>;
+                        renameCallback = callback;
                         return unregisterRename;
                     }
                     return () => {

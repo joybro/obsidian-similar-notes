@@ -1,4 +1,7 @@
-import builtins from "builtin-modules";
+import { builtinModules } from "node:module";
+
+// Node built-ins stay external (same set the builtin-modules package gave, minus internal "_" modules)
+const builtins = builtinModules.filter((m) => !m.startsWith("_"));
 import esbuild from "esbuild";
 import inlineWorkerPlugin from "esbuild-plugin-inline-worker";
 import { polyfillNode } from "esbuild-plugin-polyfill-node";
