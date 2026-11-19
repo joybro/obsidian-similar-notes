@@ -23,6 +23,17 @@ export interface StatusBarViewConfig {
 
 type StatusBarState = "idle" | "downloading" | "indexing" | "error";
 
+// Same names as the Model provider dropdown in settings.
+const PROVIDER_LABELS: Record<
+    "builtin" | "ollama" | "openai" | "gemini",
+    string
+> = {
+    builtin: "Built-in Models",
+    ollama: "Ollama",
+    openai: "OpenAI / Compatible",
+    gemini: "Google Gemini",
+};
+
 export class StatusBarView {
     private statusBarItem: HTMLElement;
     private lastNotifiedThreshold: number | null = null;
@@ -211,7 +222,9 @@ export class StatusBarView {
             );
 
             if (modelId) {
-                const providerLabel = providerType === "ollama" ? "Ollama" : "Built-in";
+                const providerLabel = providerType
+                    ? PROVIDER_LABELS[providerType]
+                    : PROVIDER_LABELS.builtin;
                 menu.addItem((item) =>
                     item.setTitle(`Model: ${modelId} (${providerLabel})`).setIsLabel(true)
                 );
