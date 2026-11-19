@@ -118,6 +118,7 @@ function makeWorld(files: Record<string, string>) {
     const queue = {
         requeue: vi.fn((c: NoteChange) => queued.push(c)),
         enqueue: vi.fn((cs: NoteChange[]) => queued.push(...cs)),
+        getFileChangeCount: vi.fn(() => queued.length),
         getIndexableTextHash: vi.fn(() => undefined),
         clearIndexableTextHash: vi.fn(async () => undefined),
         markNoteChangeProcessed: vi.fn(async () => undefined),
