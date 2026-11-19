@@ -255,7 +255,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                                     semanticLinkTrigger: trigger,
                                 });
                             });
-                        text.inputEl.style.width = "80px";
+                        text.inputEl.addClass("similar-notes-input-w80");
                     });
             },
             // Show source chunk
@@ -294,7 +294,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         text.inputEl.type = "number";
                         text.inputEl.min = "1";
                         text.inputEl.max = "50";
-                        text.inputEl.style.width = "60px";
+                        text.inputEl.addClass("similar-notes-input-w60");
                     });
             },
             // Bottom result count
@@ -316,7 +316,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         text.inputEl.type = "number";
                         text.inputEl.min = "1";
                         text.inputEl.max = "20";
-                        text.inputEl.style.width = "60px";
+                        text.inputEl.addClass("similar-notes-input-w60");
                     });
             },
             // Minimum similarity threshold
@@ -341,7 +341,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         text.inputEl.min = "0";
                         text.inputEl.max = "1";
                         text.inputEl.step = "0.05";
-                        text.inputEl.style.width = "70px";
+                        text.inputEl.addClass("similar-notes-input-w70");
                     });
             },
         ];

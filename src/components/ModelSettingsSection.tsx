@@ -286,7 +286,7 @@ export class ModelSettingsSection {
                 },
             });
             // Fetch models after render
-            window.setTimeout(() => result.fetchModels(), 0);
+            window.setTimeout(() => void result.fetchModels(), 0);
             return result.builders;
         } else if (this.tempModelProvider === "openai") {
             return getOpenAISettingBuilders({

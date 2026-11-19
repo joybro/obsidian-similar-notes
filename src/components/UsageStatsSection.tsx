@@ -103,7 +103,7 @@ export class UsageStatsSection {
                         text.inputEl.addEventListener("blur", () => {
                             onRender();
                         });
-                        text.inputEl.style.width = "100px";
+                        text.inputEl.addClass("similar-notes-input-w100");
                     });
             })
             .addSetting((setting) => {

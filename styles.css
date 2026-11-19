@@ -471,3 +471,9 @@ select option:disabled {
 .hover-popover.similar-notes-suggest-popover {
     z-index: var(--layer-menu);
 }
+
+/* Narrow number inputs in settings (widths that were inline styles before). */
+.setting-item-control input.similar-notes-input-w60 { width: 60px; }
+.setting-item-control input.similar-notes-input-w70 { width: 70px; }
+.setting-item-control input.similar-notes-input-w80 { width: 80px; }
+.setting-item-control input.similar-notes-input-w100 { width: 100px; }

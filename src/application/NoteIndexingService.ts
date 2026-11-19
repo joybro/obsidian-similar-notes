@@ -56,7 +56,7 @@ export class NoteIndexingService {
 
             const changes = await this.noteChangeQueue.pollFileChanges(concurrency);
             if (changes.length === 0) {
-                this.fileChangeLoopTimer = window.setTimeout(fileChangeLoop, 1000);
+                this.fileChangeLoopTimer = window.setTimeout(() => void fileChangeLoop(), 1000);
                 return;
             }
 
