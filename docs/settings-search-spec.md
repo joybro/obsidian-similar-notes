@@ -2,9 +2,7 @@
 
 ## Status
 
-Draft (similar-notes-dev desk task T48, 2026-11-19). Not implemented. Planned
-after the 1.8.0 release so the settings tab does not change under the 1.8.0 QA
-check. No user-visible copy changes.
+Draft. Not implemented. Planned after the 1.8.0 release. No user-visible copy changes.
 
 ## Problem
 
@@ -91,7 +89,7 @@ warnings left on the 1.8.0 branch.
   names per group, per provider); names match builders; `display()` over the
   definitions produces the same `.setting-item-name` texts as before
   (snapshot taken before the change).
-- Test_local (Obsidian 1.15.1, mini): settings search for "Path patterns",
+- A disposable test vault (Obsidian 1.15.1): settings search for "Path patterns",
   "Minimum similarity" and "OpenAI" shows Similar Notes rows, and opening a
   result lands on the row. Provider switch still re-renders the model group;
   index statistics still update live.
