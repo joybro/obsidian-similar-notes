@@ -67,7 +67,10 @@ never tried). This ceiling is about *transport safety*, not the model context.
 ### Context ceiling — `capMaxTokensToContext`
 
 `OllamaClient.getModelInfo` reads the model's real `contextLength` from
-`/api/show`. `capMaxTokensToContext` then caps the chunk size at
+`/api/show`: the key is `<general.architecture>.context_length` (for
+example `bert.context_length`, and `nomic-bert.context_length` with a hyphen for
+`nomic-embed-text`; before 1.8.0 a fixed key list spelled it `nomic_bert` and
+missed it, so nomic ran uncapped at 2048). `capMaxTokensToContext` then caps the chunk size at
 `floor(contextLength × CONTEXT_SAFETY_FACTOR)`, with
 **`CONTEXT_SAFETY_FACTOR = 0.5`**. If the context length is unknown, the
 detected value is used unchanged.

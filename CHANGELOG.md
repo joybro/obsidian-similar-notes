@@ -14,6 +14,8 @@ All notable changes to this project will be documented in this file.
 -   **Newly excluded notes disappear from results right away**: after you exclude a note (path pattern or frontmatter rule), it no longer shows up in other notes' Similar notes panels, even ones whose results were already shown before. Previously those panels could keep showing it until the note you were viewing was edited.
 -   **Indexing keeps going after a failed read of its queue**: if reading the list of notes waiting to be indexed fails once (for example, the browser storage is briefly unavailable), the plugin logs it and tries again a second later instead of stopping indexing until Obsidian restarts.
 -   **Regex-excluded content no longer leaves the vault when you open a note that isn't indexed yet**: when a note has no indexed chunks (not indexed yet, or excluded by path or frontmatter), the plugin embeds it on the fly to find similar notes. That on-the-fly embedding now strips text matched by the **Exclude content from index** patterns first, just like indexing does, so that text is never sent to a cloud provider.
+-   **Ollama no longer depends on the server's CORS settings**: requests to your Ollama server now go through Obsidian's own request API instead of the browser's `fetch`, so a server on another computer (or one your phone reaches) does not need `OLLAMA_ORIGINS` to allow Obsidian.
+-   **nomic-embed-text's model details are read correctly**: the Ollama model description in settings now shows its dimensions (768-dim), and its context length (2048) now caps the embedding input size as intended.
 
 ### Changed
 

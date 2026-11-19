@@ -41,7 +41,7 @@ interface OllamaShowResponse {
         quantization_level?: string;
         family?: string;
     };
-    model_info?: Record<string, number | undefined>;
+    model_info?: Record<string, number | string | undefined>;
 }
 
 export interface OllamaModelInfo {
@@ -99,6 +99,22 @@ function ollamaRequest(url: string, body?: string): Promise<RequestUrlResponse> 
                 throw: false,
             }
     );
+}
+
+function readArchNumber(
+    modelInfo: Record<string, number | string | undefined>,
+    field: string
+): number | undefined {
+    const arch = modelInfo["general.architecture"];
+    const keys =
+        typeof arch === "string"
+            ? [`${arch}.${field}`]
+            : Object.keys(modelInfo).filter((k) => k.endsWith(`.${field}`));
+    for (const key of keys) {
+        const value = modelInfo[key];
+        if (typeof value === "number" && value > 0) return value;
+    }
+    return undefined;
 }
 
 function isOk(response: RequestUrlResponse): boolean {
@@ -278,19 +294,13 @@ export class OllamaClient {
             const details = data.details ?? {};
             const modelInfo = data.model_info ?? {};
 
-            // Find embedding length from model_info (varies by architecture)
-            const embeddingLength =
-                modelInfo['bert.embedding_length'] ||
-                modelInfo['nomic_bert.embedding_length'] ||
-                modelInfo['llama.embedding_length'] ||
-                undefined;
-
-            // Find context length from model_info
-            const contextLength =
-                modelInfo['bert.context_length'] ||
-                modelInfo['nomic_bert.context_length'] ||
-                modelInfo['llama.context_length'] ||
-                undefined;
+            // model_info keys are prefixed by the architecture, which
+            // general.architecture names ("bert", "nomic-bert" with a hyphen,
+            // "llama", ...). Reading that prefix instead of a fixed key list
+            // finds nomic-embed-text's context length, which the old
+            // "nomic_bert." key never matched.
+            const embeddingLength = readArchNumber(modelInfo, "embedding_length");
+            const contextLength = readArchNumber(modelInfo, "context_length");
 
             return {
                 parameterSize: details.parameter_size || 'unknown',

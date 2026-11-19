@@ -138,7 +138,14 @@ describe("OllamaClient over requestUrl", () => {
     test("getModelInfo POSTs the model name to /api/show and reads its details", async () => {
         const mock = stubRequestOnce({
             details: { parameter_size: "137M", quantization_level: "F16", family: "nomic-bert" },
-            model_info: { "nomic_bert.embedding_length": 768, "nomic_bert.context_length": 2048 },
+            // Shape of Ollama 0.40's real /api/show for nomic-embed-text: the
+            // prefix is "nomic-bert" with a hyphen.
+            model_info: {
+                "general.architecture": "nomic-bert",
+                "nomic-bert.context_length": 2048,
+                "nomic-bert.embedding_length": 768,
+                "nomic-bert.feed_forward_length": 3072,
+            },
         });
 
         const info = await new OllamaClient().getModelInfo("nomic-embed-text");
@@ -152,5 +159,29 @@ describe("OllamaClient over requestUrl", () => {
             embeddingLength: 768,
             contextLength: 2048,
         });
+    });
+});
+
+describe("OllamaClient.getModelInfo reads the architecture-prefixed lengths", () => {
+    test("bert models (bge-m3, all-minilm)", async () => {
+        stubRequestOnce({
+            details: { family: "bert" },
+            model_info: { "general.architecture": "bert", "bert.context_length": 8192, "bert.embedding_length": 1024 },
+        });
+        const info = await new OllamaClient().getModelInfo("bge-m3");
+        expect(info).toMatchObject({ contextLength: 8192, embeddingLength: 1024 });
+    });
+
+    test("without general.architecture, falls back to any *.context_length key", async () => {
+        stubRequestOnce({ details: {}, model_info: { "qwen3.context_length": 32768, "qwen3.embedding_length": 1024 } });
+        const info = await new OllamaClient().getModelInfo("x");
+        expect(info).toMatchObject({ contextLength: 32768, embeddingLength: 1024 });
+    });
+
+    test("unknown lengths stay undefined", async () => {
+        stubRequestOnce({ details: {}, model_info: { "general.architecture": "nomic-bert" } });
+        const info = await new OllamaClient().getModelInfo("x");
+        expect(info?.contextLength).toBeUndefined();
+        expect(info?.embeddingLength).toBeUndefined();
     });
 });
