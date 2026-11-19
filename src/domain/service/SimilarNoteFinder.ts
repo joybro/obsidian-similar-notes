@@ -1,7 +1,7 @@
 import { showNoteErrorNotice } from "@/utils/errorHandling";
 import log from "loglevel";
 import type { Note } from "../model/Note";
-import type { NoteChunk } from "../model/NoteChunk";
+import { type NoteChunk, isTitleChunk } from "../model/NoteChunk";
 import { SimilarNote } from "../model/SimilarNote";
 import type { NoteChunkRepository } from "../repository/NoteChunkRepository";
 import type { EmbeddingService } from "./EmbeddingService";
@@ -63,7 +63,11 @@ export class SimilarNoteFinder {
         log.info(`[SimilarNoteFinder] ===== Finding similar notes for: ${note.path} =====`);
 
         // Try to get already indexed chunks first
-        let noteChunks = await this.noteChunkRepository.getByPath(note.path);
+        // Title rows are for text queries only; the panel compares bodies
+        // (title-vector spec "Query paths").
+        let noteChunks = (
+            await this.noteChunkRepository.getByPath(note.path)
+        ).filter((chunk) => !isTitleChunk(chunk));
 
         // If not found in repository, generate new embeddings
         if (!noteChunks || noteChunks.length === 0) {
@@ -108,7 +112,8 @@ export class SimilarNoteFinder {
                         embedding,
                         15,
                         0,
-                        [note.path] // exclude self only; linked notes are now shown (marked)
+                        [note.path], // exclude self only; linked notes are now shown (marked)
+                        { bodyChunksOnly: true }
                     );
                 return results.map((result) => ({
                     ...result,

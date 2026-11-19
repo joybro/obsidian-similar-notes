@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+-   **Searching by part of a note's title finds the note** (#26): semantic search and the `;;` link suggestion now also match against each note's title on its own, so a query with a few words of the title ranks that note near the top even in long notes. When a note matches by its title, the preview shows the start of the note. The Similar notes panel is unchanged. After updating, existing notes get their title indexed in the background (one short embedding per note; with a cloud provider that is one short text per note).
+
 ### Fixed
 
 -   **Excluded notes are no longer sent to a cloud API when you open them**: with OpenAI or Gemini as the provider, opening a note excluded by path or frontmatter no longer embeds its text on the fly, so it never leaves your device. That note's own Similar notes panel stays empty. With a built-in model or Ollama nothing changes.

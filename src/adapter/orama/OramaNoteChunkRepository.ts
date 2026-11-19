@@ -64,12 +64,19 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         queryEmbedding: number[],
         limit: number,
         minScore?: number,
-        excludePaths?: string[]
+        excludePaths?: string[],
+        options?: { bodyChunksOnly?: boolean }
     ): Promise<{ chunk: NoteChunk; score: number }[]> {
         this.workerManager.ensureInitialized();
         const worker = this.workerManager.getWorker();
         return await worker
-            .findSimilarChunks(queryEmbedding, limit, minScore, excludePaths)
+            .findSimilarChunks(
+                queryEmbedding,
+                limit,
+                minScore,
+                excludePaths,
+                options
+            )
             .then((chunks) =>
                 chunks.map((chunk) => ({
                     ...chunk,
@@ -82,6 +89,12 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
         this.workerManager.ensureInitialized();
         const worker = this.workerManager.getWorker();
         return await worker.count();
+    }
+
+    async getPathsWithoutTitleChunk(): Promise<string[]> {
+        this.workerManager.ensureInitialized();
+        const worker = this.workerManager.getWorker();
+        return await worker.getPathsWithoutTitleChunk();
     }
 
     public setLogLevel(level: log.LogLevelDesc): void {

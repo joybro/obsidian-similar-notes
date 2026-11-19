@@ -76,6 +76,8 @@ src/
 
 9. **Frontmatter-based file exclusion**: Notes can opt out of indexing from inside the note via frontmatter rules (`key` / `key: value`, matched against the parsed `metadataCache` frontmatter, never raw YAML). The authoritative check runs at processing time in `NoteIndexingService` (metadataCache lags vault events), with `NoteChangeQueue.analyzeSyncNeeds` also applying it during bulk sync. See `docs/frontmatter-exclusion-spec.md`.
 
+10. **Title vectors**: Each indexed note has one extra chunk row with `chunkIndex = -1` whose content is the note title and whose embedding is the title alone. Text queries (semantic search modal, `;;` link suggest) score a note by max(body, title) through best-hit-per-note grouping; the Similar notes panel ignores title rows on both the query and candidate side (`bodyChunksOnly`), and `count()` counts body chunks only. Renames re-embed only the title row; vaults indexed before this get title rows through a `title-backfill` queue pass on load. See `docs/title-vector-spec.md`.
+
 10. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
 
    - **Sectioning**: The settings tab is divided into top-level sections using Obsidian's `SettingGroup` (`@since 1.11.0`) — one per area (e.g. Model, Index, Exclude files from index, Exclude content from index, Display, Debug & Support). Each section is built by a `*SettingsSection` class (e.g. `IndexSettingsSection`) that returns `SettingBuilder` arrays.

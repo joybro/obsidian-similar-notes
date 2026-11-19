@@ -461,6 +461,12 @@ export default class MainPlugin extends Plugin {
         // Pass NoteChunkRepository to the settings tab after it's initialized
         await this.settingTab.setNoteChunkRepository(this.noteChunkRepository);
 
+        if (firstTime) {
+            // Notes indexed before title rows existed get them now
+            // (title-vector spec "Backfill"). A reindex writes them anyway.
+            await this.noteIndexingService.enqueueTitleBackfill();
+        }
+
         // Start the noteIndexingService loop
         this.noteIndexingService.startLoop();
     }

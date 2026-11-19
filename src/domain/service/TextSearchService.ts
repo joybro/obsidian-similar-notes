@@ -1,5 +1,5 @@
 import log from "loglevel";
-import type { NoteChunk } from "../model/NoteChunk";
+import { type NoteChunk, isTitleChunk } from "../model/NoteChunk";
 import { SimilarNote } from "../model/SimilarNote";
 import type { NoteChunkRepository } from "../repository/NoteChunkRepository";
 import type { EmbeddingService } from "./EmbeddingService";
@@ -75,19 +75,21 @@ export class TextSearchService {
             }))
         );
 
-        // Convert to SimilarNote format
-        const similarNotes = uniqueResults
-            .slice(0, limit)
-            .map(
-                (result) =>
+        // Convert to SimilarNote format. Title rows take part in the search
+        // (a note scores max(body, title)), but a title-only preview says
+        // nothing, so a title hit previews the note's first body chunk.
+        const similarNotes = await Promise.all(
+            uniqueResults.slice(0, limit).map(
+                async (result) =>
                     new SimilarNote(
                         result.chunk.title,
                         result.chunk.path,
                         result.score,
-                        result.chunk.content,
+                        await this.previewOf(result.chunk),
                         text // The source is the search query itself
                     )
-            );
+            )
+        );
 
         return {
             similarNotes,
@@ -95,6 +97,16 @@ export class TextSearchService {
             maxTokens,
             isOverLimit,
         };
+    }
+
+    private async previewOf(chunk: NoteChunk): Promise<string> {
+        if (!isTitleChunk(chunk)) {
+            return chunk.content;
+        }
+        const body = (await this.noteChunkRepository.getByPath(chunk.path))
+            .filter((row) => !isTitleChunk(row))
+            .sort((a, b) => a.chunkIndex - b.chunkIndex);
+        return body[0]?.content ?? chunk.content;
     }
 
     /**

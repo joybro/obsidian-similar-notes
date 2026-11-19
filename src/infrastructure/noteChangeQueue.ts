@@ -9,7 +9,9 @@ import type { EventRef, MetadataCache, TAbstractFile, Vault } from "obsidian";
 
 export type NoteChange = {
     path: string;
-    reason: "new" | "modified" | "deleted" | "renamed";
+    // "title-backfill": the note's body chunks are indexed but it has no
+    // title row yet; embed only the title (title-vector spec "Backfill").
+    reason: "new" | "modified" | "deleted" | "renamed" | "title-backfill";
     mtime?: number;
     // Only set when reason === "renamed". Lets the indexing service carry
     // the existing embedding from oldPath to path without re-embedding.
@@ -334,6 +336,11 @@ export class NoteChangeQueue {
         this.queue.push(change);
     }
 
+    /** Appends changes to the back of the queue. */
+    enqueue(changes: NoteChange[]): void {
+        this.queue.push(...changes);
+    }
+
     /**
      * Returns the number of changes remaining in the queue
      */
@@ -473,6 +480,10 @@ export class NoteChangeQueue {
         change: NoteChange,
         indexableTextHash?: string
     ): Promise<void> {
+        if (change.reason === "title-backfill") {
+            // Title-only embed: the note's mtime and hash stay as they are.
+            return;
+        }
         if (change.reason === "deleted") {
             await this.mTimeStore.deleteMTime(change.path);
         } else if (change.reason === "renamed") {
