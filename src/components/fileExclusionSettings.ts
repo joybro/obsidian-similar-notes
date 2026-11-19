@@ -19,7 +19,7 @@ export function buildExcludePathsSetting(
 ): void {
     setting
         .setName("Path patterns")
-        .setDesc("Enter glob patterns to exclude folders/files from indexing (one per line). Note: Only applies to newly modified notes. Use Reindex to apply to all notes. Excluded notes (by path or frontmatter) never appear in other notes' results. With a cloud API (OpenAI, Gemini), an excluded note's text is never sent; after you apply the rules, its own Similar notes panel shows no similar notes, while with a local model it still shows.")
+        .setDesc("Enter glob patterns to exclude folders/files from indexing (one per line). Changes apply to notes as they are edited; press Apply rules below to apply them to all notes now. Excluded notes (by path or frontmatter) never appear in other notes' results. With a cloud API (OpenAI, Gemini), an excluded note's text is never sent; after you apply the rules, its own Similar notes panel shows no similar notes, while with a local model it still shows.")
         .addTextArea((text) => {
             text.inputEl.rows = 5;
             text.inputEl.cols = 40;

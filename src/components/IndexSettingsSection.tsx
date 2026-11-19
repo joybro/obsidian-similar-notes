@@ -270,7 +270,7 @@ export class IndexSettingsSection {
                     .setDesc("Add or remove files to match the current path patterns and frontmatter rules, without a full reindex. Content patterns apply only on reindex or when a note is edited.")
                     .addButton((button) => {
                         button
-                            .setButtonText("Apply Rules")
+                            .setButtonText("Apply rules")
                             .setTooltip("Sync indexed files with the current exclusion rules")
                             .onClick(async () => this.handleApplyExclusionPatterns());
                     });

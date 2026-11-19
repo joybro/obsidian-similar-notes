@@ -66,7 +66,7 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
         // API Key
         (setting) => {
             setting
-                .setName("API Key")
+                .setName("API key")
                 .setDesc("Your OpenAI API key (required for OpenAI, optional for local servers)")
                 .addText((text) => {
                     text.setPlaceholder("sk-...")

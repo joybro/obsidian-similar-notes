@@ -86,7 +86,7 @@ Two consequences of keeping this behavior (QA ledger sim1, 2026-11-19):
   for excluded notes: `SimilarNoteCoordinator` passes
   `allowAdHocEmbedding: false` to `SimilarNoteFinder`, which returns no results
   instead of embedding. The excluded note's own panel is empty once the
-  exclusion is applied (Apply Rules, Reindex, or the startup sync); until then
+  exclusion is applied (Apply rules, Reindex, or the startup sync); until then
   the note keeps its stored chunks and still shows results, since the skip
   only applies to a note without indexed chunks. Its text never leaves the
   device. Local providers (`builtin`, `ollama`) keep the panel as

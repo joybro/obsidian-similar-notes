@@ -66,7 +66,7 @@ Supports any OpenAI-compatible embedding API.
 
 1. **Model provider**: OpenAI API
 2. **Server URL**: `https://openrouter.ai/api/v1`
-3. **API Key**: your OpenRouter key (`sk-or-...`)
+3. **API key**: your OpenRouter key (`sk-or-...`)
 4. **Model**: Custom model..., then enter the model ID from OpenRouter (e.g. `perplexity/pplx-embed-v1-0.6b`, `qwen/qwen3-embedding-8b`, or `openai/text-embedding-3-small`)
 5. Use **Test connection** to verify before Load & Apply.
 

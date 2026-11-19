@@ -196,8 +196,8 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         const displayBuilders = this.getDisplaySettingBuilders();
         displayBuilders.forEach(builder => displayGroup.addSetting(builder));
 
-        // Debug & Support settings group
-        const debugGroup = new SettingGroup(containerEl).setHeading("Debug & Support");
+        // Debug and support settings group
+        const debugGroup = new SettingGroup(containerEl).setHeading("Debug and support");
         const debugBuilders = this.getDebugSettingBuilders();
         debugBuilders.forEach(builder => debugGroup.addSetting(builder));
     }
@@ -376,7 +376,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     .setName("Copy environment info")
                     .setDesc("Copy your environment and settings info to clipboard for bug reports")
                     .addButton((button) => {
-                        button.setButtonText("Copy to Clipboard").onClick(() => {
+                        button.setButtonText("Copy to clipboard").onClick(() => {
                             // Read settings fresh at click time. Capturing the
                             // render-time `settings` snapshot made the report lag
                             // one or two changes behind (it reflected the model /

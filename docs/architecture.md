@@ -80,7 +80,7 @@ src/
 
 10. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
 
-   - **Sectioning**: The settings tab is divided into top-level sections using Obsidian's `SettingGroup` (`@since 1.11.0`) — one per area (e.g. Model, Index, Exclude files from index, Exclude content from index, Display, Debug & Support). Each section is built by a `*SettingsSection` class (e.g. `IndexSettingsSection`) that returns `SettingBuilder` arrays.
+   - **Sectioning**: The settings tab is divided into top-level sections using Obsidian's `SettingGroup` (`@since 1.11.0`) — one per area (e.g. Model, Index, Exclude files from index, Exclude content from index, Display, Debug and support). Each section is built by a `*SettingsSection` class (e.g. `IndexSettingsSection`) that returns `SettingBuilder` arrays.
    - **Use sibling groups, not sub-headings.** `SettingGroup` cannot nest, and inserting `Setting.setHeading()` divider rows *inside* a group renders poorly (tried more than once and reverted). To break a crowded section into sub-areas, add another sibling top-level `SettingGroup` instead of nesting or in-group headings.
 
 10. **Content Exclusion**: Supports RegExp patterns to exclude content from indexing (e.g., frontmatter, code blocks).
