@@ -1,7 +1,13 @@
 import { type App, Modal, Setting } from "obsidian";
+import { logRejection } from "@/utils/logRejection";
 
 export class LoadModelModal extends Modal {
-    constructor(app: App, message: string, onSubmit: () => void, onCancel: () => void) {
+    constructor(
+        app: App,
+        message: string,
+        onSubmit: () => void | Promise<void>,
+        onCancel: () => void
+    ) {
         super(app);
         this.setContent(message);
 
@@ -12,7 +18,8 @@ export class LoadModelModal extends Modal {
                     .setCta()
                     .onClick(() => {
                         this.close();
-                        onSubmit();
+                        const result = onSubmit();
+                        if (result) logRejection(result, "confirmed action");
                     })
             )
             .addButton((btn) =>

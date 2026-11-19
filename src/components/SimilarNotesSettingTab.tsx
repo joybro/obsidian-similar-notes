@@ -57,28 +57,32 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         // Subscribe to count changes
         this.subscription = this.mTimeStore
             .getIndexedNoteCount$()
-            .subscribe(async (count) => {
-                this.indexedNoteCount = count;
-                // Update chunk count when note count changes
-                if (this.noteChunkRepository) {
-                    try {
-                        this.indexedChunkCount = await this.noteChunkRepository.count();
-                    } catch (error) {
-                        log.error("Failed to update chunk count", error);
-                    }
-                }
-                // Update stats without full redraw if possible
-                if (this.containerEl.isShown()) {
-                    if (this.indexSettingsSection) {
-                        this.indexSettingsSection.updateStats({
-                            indexedNoteCount: this.indexedNoteCount,
-                            indexedChunkCount: this.indexedChunkCount
-                        });
-                    } else {
-                        this.display();
-                    }
-                }
+            .subscribe((count) => {
+                logRejection(this.onIndexedNoteCountChange(count), "update index stats");
             });
+    }
+
+    private async onIndexedNoteCountChange(count: number): Promise<void> {
+        this.indexedNoteCount = count;
+        // Update chunk count when note count changes
+        if (this.noteChunkRepository) {
+            try {
+                this.indexedChunkCount = await this.noteChunkRepository.count();
+            } catch (error) {
+                log.error("Failed to update chunk count", error);
+            }
+        }
+        // Update stats without full redraw if possible
+        if (this.containerEl.isShown()) {
+            if (this.indexSettingsSection) {
+                this.indexSettingsSection.updateStats({
+                    indexedNoteCount: this.indexedNoteCount,
+                    indexedChunkCount: this.indexedChunkCount
+                });
+            } else {
+                this.display();
+            }
+        }
     }
 
     /**

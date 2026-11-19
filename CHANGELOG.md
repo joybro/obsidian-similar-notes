@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 -   **Path patterns setting explains what exclusion covers**: the description now says how excluded notes behave when you open them with a cloud API versus a local model.
 -   **Path patterns setting points to Apply rules, not Reindex**: the description now says changes apply as notes are edited and that **Apply rules** applies them to all notes now. Previously it pointed to Reindex, which re-embeds the whole vault (and with a cloud provider, pays for it again).
 -   **"Couldn't analyze this note" shows in red**: when the model fails on the open note, the panel line uses the error color so it no longer reads like the other grey hints.
+-   **The Similar notes sidebar stays where you put it when the plugin reloads**: disabling or updating the plugin no longer closes the sidebar view, so Obsidian puts it back in the same place when the plugin loads again (Obsidian's plugin guidelines).
 -   **Settings labels use sentence case**: Apply rules, Copy to clipboard, API key, Debug and support, and the GPU dialog's buttons.
 
 ## [1.7.0] - 2026-09-05
