@@ -324,4 +324,53 @@ describe("title vector (title-vector spec)", () => {
         expect(await repo.getByPath("Fresh.md")).toEqual(freshBefore);
         expect(queued).toEqual([]);
     });
+
+    test("index, rename and backfill write the same trimmed title row for a space-padded name", async () => {
+        const titleRows = async (repo: InMemoryChunkRepository, path: string) =>
+            (await repo.getByPath(path))
+                .filter((r) => r.chunkIndex < 0)
+                .map((r) => ({ title: r.title, content: r.content, embedding: r.embedding }));
+        const expected = (text: string) => [
+            { title: text, content: text, embedding: embed(text) },
+        ];
+
+        // Index
+        const a = makeWorld({ " Padded Name .md": "body text" });
+        await a.process({ path: " Padded Name .md", reason: "new", mtime: 1 });
+        expect(await titleRows(a.repo, " Padded Name .md")).toEqual(expected("Padded Name"));
+
+        // Rename to another padded name
+        await a.process({
+            path: " Other Name .md",
+            oldPath: " Padded Name .md",
+            reason: "renamed",
+            mtime: 2,
+        });
+        expect(await titleRows(a.repo, " Other Name .md")).toEqual(expected("Other Name"));
+
+        // Backfill of a row set indexed before title rows existed
+        const b = makeWorld({ " Padded Name .md": "body text" });
+        b.repo.rows.push(
+            new NoteChunk(" Padded Name .md", " Padded Name ", "body text", 0, 1, embed("body text"))
+        );
+        await b.service.enqueueTitleBackfill();
+        for (const change of b.queued.splice(0)) await b.process(change);
+        expect(await titleRows(b.repo, " Padded Name .md")).toEqual(expected("Padded Name"));
+
+        // A second backfill pass finds nothing to do (no re-embed loop)
+        await b.service.enqueueTitleBackfill();
+        expect(b.queued).toEqual([]);
+    });
+
+    test("a whitespace-only name gets no title row on index, rename or backfill", async () => {
+        const w = makeWorld({ "   .md": "body text", "Named.md": "other body" });
+        await w.process({ path: "   .md", reason: "new", mtime: 1 });
+        expect((await w.repo.getByPath("   .md")).filter((r) => r.chunkIndex < 0)).toEqual([]);
+
+        await w.process({ path: "Named.md", reason: "new", mtime: 1 });
+        await w.process({ path: "  .md", oldPath: "Named.md", reason: "renamed", mtime: 2 });
+        const renamed = await w.repo.getByPath("  .md");
+        expect(renamed.filter((r) => r.chunkIndex < 0)).toEqual([]);
+        expect(renamed.filter((r) => r.chunkIndex >= 0)).toHaveLength(1);
+    });
 });

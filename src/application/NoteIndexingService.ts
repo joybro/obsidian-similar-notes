@@ -3,6 +3,7 @@ import {
     NoteChunk,
     isTitleChunk,
     titleFromPath,
+    titleTextFromPath,
 } from "@/domain/model/NoteChunk";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { NoteRepository } from "@/domain/repository/NoteRepository";
@@ -233,24 +234,28 @@ export class NoteIndexingService {
      */
     private async replaceTitleChunk(path: string): Promise<void> {
         const rows = await this.noteChunkRepository.getByPath(path);
+        // Body rows carry the basename as is (like Note.title); the title
+        // row's text is trimmed, matching processUpdatedNote.
         const title = titleFromPath(path);
+        const titleText = titleTextFromPath(path);
         const body = rows.filter((row) => !isTitleChunk(row));
         if (body.length === 0) {
             // The note was removed (or emptied) since it was queued.
             return;
         }
         const existingTitle = rows.find(isTitleChunk);
-        if (
-            existingTitle &&
-            existingTitle.content === title &&
-            body.every((row) => row.title === title)
-        ) {
+        const titleRowCurrent = titleText
+            ? existingTitle?.content === titleText
+            : existingTitle === undefined;
+        if (titleRowCurrent && body.every((row) => row.title === title)) {
             return;
         }
-        const titleEmbedding =
-            existingTitle && existingTitle.content === title
+        // Embed before touching the index, so a failed call leaves it as it was.
+        const titleEmbedding = !titleText
+            ? undefined
+            : existingTitle && existingTitle.content === titleText
                 ? existingTitle.embedding
-                : (await this.embeddingService.embedTexts([title]))[0];
+                : (await this.embeddingService.embedTexts([titleText]))[0];
         await this.noteChunkRepository.removeByPath(path);
         await this.noteChunkRepository.putMulti([
             ...body.map(
@@ -264,12 +269,17 @@ export class NoteIndexingService {
                         row.embedding
                     )
             ),
-            NoteChunk.titleChunk(
-                path,
-                title,
-                body[0].totalChunks,
-                titleEmbedding
-            ),
+            // A whitespace-only name gets no title row, as when indexing.
+            ...(titleEmbedding
+                ? [
+                    NoteChunk.titleChunk(
+                        path,
+                        titleText,
+                        body[0].totalChunks,
+                        titleEmbedding
+                    ),
+                ]
+                : []),
         ]);
     }
 
@@ -397,9 +407,9 @@ export class NoteIndexingService {
         );
 
         // The title vector rides in the same batch, last (title-vector spec).
-        // Derived from the path like rename and backfill do (equals
-        // note.title, the basename), so all three agree on the title text.
-        const title = titleFromPath(note.path).trim();
+        // Derived from the path with the same helper rename and backfill use,
+        // so all three write the same title text (trimmed basename).
+        const title = titleTextFromPath(note.path);
         if (title) {
             textsToEmbed.push(title);
         }

@@ -17,6 +17,15 @@ export function titleFromPath(path: string): string {
     return name.endsWith(".md") ? name.slice(0, -3) : name;
 }
 
+/**
+ * Text of a note's title row: the basename with surrounding whitespace
+ * removed. Indexing, rename and backfill all derive it here so the three
+ * paths write the same row; an empty result means the note gets no title row.
+ */
+export function titleTextFromPath(path: string): string {
+    return titleFromPath(path).trim();
+}
+
 export class NoteChunk {
     constructor(
         public readonly path: string,
