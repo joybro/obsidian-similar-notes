@@ -30,9 +30,16 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
         onDropdownCreated,
     } = props;
 
-    const ollamaUrl =
-        tempOllamaUrl || settings.ollamaUrl || "http://localhost:11434";
+    const resolveUrl = (value: string | undefined) =>
+        value || settings.ollamaUrl || "http://localhost:11434";
+    const ollamaUrl = resolveUrl(tempOllamaUrl);
     const ollamaClient = new OllamaClient(ollamaUrl);
+
+    // The URL and model inputs do not re-render the section on change (see
+    // their onChange handlers), so the render-time props go stale. Track the
+    // values currently in the form for Refresh and Test.
+    let currentUrl = ollamaUrl;
+    let currentModel = tempOllamaModel;
 
     // State for Ollama models
     let ollamaModels: OllamaModelWithEmbeddingInfo[] = [];
@@ -82,8 +89,8 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
 
                 // Set current value if it exists in the list
                 const modelNames = ollamaModels.map(m => m.name);
-                if (tempOllamaModel && modelNames.includes(tempOllamaModel)) {
-                    dropdown.setValue(tempOllamaModel);
+                if (currentModel && modelNames.includes(currentModel)) {
+                    dropdown.setValue(currentModel);
                 }
             }
         }
@@ -105,7 +112,8 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                             // rebuilds this very input element and steals focus
                             // after every keystroke (issue #43). Only the apply
                             // button state needs to react to the change.
-                            ollamaClient.setBaseUrl(value);
+                            currentUrl = resolveUrl(value);
+                            ollamaClient.setBaseUrl(currentUrl);
                             updateApplyButtonState();
                         });
                 });
@@ -121,6 +129,7 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                     dropdown.addOption("", "Loading models...");
                     dropdown.setValue(tempOllamaModel || "");
                     dropdown.onChange((value) => {
+                        currentModel = value;
                         onOllamaModelChange(value);
                         // Update only the apply button; a full re-render would
                         // re-fetch the model list and reset the dropdown.
@@ -143,14 +152,14 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                 .setDesc("Test the connection to Ollama server and selected model")
                 .addButton((button) => {
                     button.setButtonText("Test").onClick(async () => {
-                        const model = tempOllamaModel;
+                        const model = currentModel;
                         if (!model) {
                             new Notice("Please select a model first");
                             return;
                         }
 
                         new Notice(
-                            `Testing connection to ${ollamaUrl} with model ${model}...`
+                            `Testing connection to ${currentUrl} with model ${model}...`
                         );
 
                         try {

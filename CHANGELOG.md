@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 -   **Indexing no longer stops until restart after an unexpected error**: if an unexpected error happens while the plugin picks the next notes to index, it now logs the error and tries again a second later. Before, indexing quietly stopped until Obsidian was restarted.
 -   **Regex-excluded content no longer leaves the vault when you open a note that isn't indexed yet**: when a note has no indexed chunks (not indexed yet, or excluded by path or frontmatter), the plugin embeds it on the fly to find similar notes. That on-the-fly embedding now strips text matched by the **Exclude content from index** patterns first, just like indexing does, so that text is never sent to a cloud provider.
 -   **Ollama no longer depends on the server's CORS settings**: requests to your Ollama server now go through Obsidian's own request API instead of the browser's `fetch`, so a server on another computer (or one your phone reaches) does not need `OLLAMA_ORIGINS` to allow Obsidian.
+-   **Ollama's Test connection checks what you just picked**: after you choose a model or edit the server URL, **Test** now tests that model at that URL. Before, it could say "Please select a model first" or test the previous model, and its message showed the old URL.
 -   **nomic-embed-text's model details are read correctly**: the Ollama model description in settings now shows its dimensions (768-dim), and its context length (2048) now caps the embedding input size as intended.
 
 ### Changed
