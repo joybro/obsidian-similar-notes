@@ -48,7 +48,8 @@ describe("SimilarNotesViewReact", () => {
     let currentFile: TFile;
 
     beforeEach(() => {
-        mockOpenLinkText = vi.fn();
+        // Obsidian's openLinkText returns a Promise; the view chains .catch on it.
+        mockOpenLinkText = vi.fn().mockResolvedValue(undefined);
         mockLeaf = {
             file: undefined,
         } as unknown as MarkdownView;
