@@ -43,6 +43,10 @@ export class SimilarNoteCoordinator {
     private cache = new Map<string, SimilarNoteCacheEntry>(); // file path -> entry
     // Notes still waiting to be indexed (the status bar's "N to index").
     private pendingIndexCount = 0;
+    // How many of those queued changes are for a given path. The open note's
+    // own queued edit never fills its own panel (it is not in its own
+    // results), so only the others count toward the indexing line (CDO IR3).
+    private queuedCountFor: (path: string) => number = () => 0;
     // Throttle for re-searching while the panel shows the indexing line.
     private lastIndexingSearchAt = 0;
     private indexingSearchInFlight = false;
@@ -114,16 +118,25 @@ export class SimilarNoteCoordinator {
      * line when notes become queued (QA sim8: the open note may have been
      * searched before the first count was published).
      */
-    watchPendingIndexCount(pendingIndexCount$: Observable<number>) {
+    watchPendingIndexCount(
+        pendingIndexCount$: Observable<number>,
+        queuedCountFor?: (path: string) => number
+    ) {
+        if (queuedCountFor) {
+            this.queuedCountFor = queuedCountFor;
+        }
         return pendingIndexCount$.subscribe((count) => {
-            const wasPending = this.pendingIndexCount > 0;
             this.pendingIndexCount = count;
             const view = this.noteBottomViewModel$.value;
             const reason = view.emptyReason?.kind;
             if (!view.currentFile) {
                 return;
             }
-            if (reason === "none" && count > 0 && !wasPending) {
+            // The panel's reason was computed when others were last 0
+            // ("none") or positive ("indexing"), so it carries the previous
+            // state.
+            const others = this.pendingOtherThan(view.currentFile.path);
+            if (reason === "none" && others > 0) {
                 // The empty result was cached as final; drop it so the
                 // searches below actually look again.
                 this.cache.delete(view.currentFile.path);
@@ -136,7 +149,7 @@ export class SimilarNoteCoordinator {
             if (reason !== "indexing") {
                 return;
             }
-            if (count > 0) {
+            if (others > 0) {
                 this.noteBottomViewModel$.next({
                     ...view,
                     emptyReason: { kind: "indexing", remaining: count },
@@ -147,12 +160,17 @@ export class SimilarNoteCoordinator {
                 ) {
                     void this.researchWhileIndexing(view.currentFile);
                 }
-            } else if (wasPending) {
-                // Indexing finished while this note showed the indexing
-                // line: search again now that the index is complete.
+            } else {
+                // Indexing of the other notes finished while this note showed
+                // the indexing line (the open note itself may still be
+                // queued): search again now that the index is complete.
                 void this.emitNoteBottomViewModel(view.currentFile);
             }
         });
+    }
+
+    private pendingOtherThan(path: string): number {
+        return Math.max(0, this.pendingIndexCount - this.queuedCountFor(path));
     }
 
     // One throttled search while the indexing line shows; skipped while a
@@ -300,7 +318,12 @@ export class SimilarNoteCoordinator {
             emptyReason:
                 filtered.length > 0
                     ? undefined
-                    : this.emptyReasonFor(status, notes.length, threshold),
+                    : this.emptyReasonFor(
+                        status,
+                        notes.length,
+                        threshold,
+                        file.path
+                    ),
             noteDisplayMode: settings.noteDisplayMode,
             sidebarResultCount: settings.sidebarResultCount,
             bottomResultCount: settings.bottomResultCount,
@@ -316,7 +339,8 @@ export class SimilarNoteCoordinator {
     private emptyReasonFor(
         status: SimilarNoteSearchStatus,
         rawCount: number,
-        threshold: number
+        threshold: number,
+        path: string
     ): EmptyReason {
         if (status === "empty-content") {
             return { kind: "unwritten" };
@@ -334,7 +358,7 @@ export class SimilarNoteCoordinator {
         if (rawCount > 0) {
             return { kind: "below-threshold", threshold };
         }
-        if (this.pendingIndexCount > 0) {
+        if (this.pendingOtherThan(path) > 0) {
             return { kind: "indexing", remaining: this.pendingIndexCount };
         }
         return { kind: "none" };
@@ -435,7 +459,10 @@ export class SimilarNoteCoordinator {
         const cacheable =
             status !== "embedding-failed" &&
             status !== "ad-hoc-disallowed" &&
-            !(similarNoteEntries.length === 0 && this.pendingIndexCount > 0);
+            !(
+                similarNoteEntries.length === 0 &&
+                this.pendingOtherThan(file.path) > 0
+            );
         if (cacheable) {
             this.cache.set(file.path, {
                 mtime: file.stat.mtime,

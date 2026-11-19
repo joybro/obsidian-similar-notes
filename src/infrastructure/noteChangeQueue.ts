@@ -348,6 +348,11 @@ export class NoteChangeQueue {
         return this.queue.length;
     }
 
+    /** Number of queued changes for one path (part of getFileChangeCount). */
+    getQueuedCountFor(path: string): number {
+        return this.queue.filter((change) => change.path === path).length;
+    }
+
     /**
      * Returns the hash of the indexable text persisted for a note, if any.
      */
