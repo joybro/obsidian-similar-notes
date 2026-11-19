@@ -127,7 +127,7 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
         builders.push((setting) => {
             setting
                 .setName("Max tokens")
-                .setDesc("Maximum tokens per chunk for this model")
+                .setDesc("Maximum input tokens this model accepts. Note chunks and search text are kept within this limit.")
                 .addText((text) => {
                     text.setPlaceholder("8191")
                         .setValue(openaiMaxTokens?.toString() ?? "")

@@ -13,10 +13,10 @@ export class GPUSettingModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
 
-        contentEl.createEl("h2", { text: "GPU Acceleration Disabled" });
+        contentEl.createEl("h2", { text: "Model loaded on CPU" });
         
         contentEl.createEl("p", { 
-            text: "Model loaded successfully with CPU mode. GPU acceleration failed and has been automatically disabled for this session." 
+            text: "GPU acceleration failed, so this model load fell back to CPU. GPU acceleration is still on in settings, so the next model load tries the GPU again." 
         });
         
         contentEl.createEl("p", { 
