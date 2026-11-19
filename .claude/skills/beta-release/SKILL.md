@@ -47,6 +47,8 @@ If the user just says "release 1.3.0" (no beta), use `bump-version` instead.
 ### 0. Sanity check before bumping
 
 - Confirm `main` is the branch and has the work to ship.
+- **Confirm CI on `main` is green** (`gh run list -R joybro/obsidian-similar-notes --workflow=ci.yml --limit 1`). `release.yml` installs dependencies the same way, so a red CI install means the tag's release build fails too (1.8.0-beta.1: CI had been red on `npm ci` since 1.7.0 and nobody looked; the tag then produced no draft).
+- **Check the exit code of `npm test`, not only the summary line**: Vitest prints `Tests N passed` and still exits 1 on an unhandled error (1.8.0-beta.1 prep: an `openLinkText` mock returning `undefined`).
 - `git log --oneline <last-stable-tag>..HEAD` — eyeball the commit set.
 - **Scan every commit message in that range for `Closes #N` / `Fixes #N` / `Resolves #N`.** If any appear, those issues will *auto-close* the moment you push to `main` from the beta-bump commit onward — which is wrong for a beta (the issue should close on stable, not on the beta build). If you find any, plan to reopen those issues after pushing (see step 6) and use `Refs #N` in future commits.
 
