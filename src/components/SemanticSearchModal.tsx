@@ -10,6 +10,7 @@ import {
     handleSemanticSearchKey,
     insertLinkForNote,
 } from "./semanticSearchActions";
+import { logRejection } from "@/utils/logRejection";
 
 const MIN_SEARCH_LENGTH = 3;
 const DEBOUNCE_MS = 300;
@@ -199,7 +200,7 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
             const note = results[index];
             if (!note) return;
 
-            app.workspace.openLinkText(note.path, "", newTab);
+            logRejection(app.workspace.openLinkText(note.path, "", newTab), "open note");
             onClose();
         },
         [results, app.workspace, onClose]

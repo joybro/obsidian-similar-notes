@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import { MarkdownView, TFile } from "obsidian";
+import { logRejection } from "@/utils/logRejection";
 
 // Characters illegal in OS file names plus Obsidian link-sensitive characters.
 const ILLEGAL_FILENAME_CHARS = /[\\/:*?"<>|#^[\]]/g;
@@ -30,12 +31,12 @@ export async function createNoteFromQuery(app: App, query: string): Promise<bool
 
     const existing = app.vault.getAbstractFileByPath(targetPath);
     if (existing) {
-        app.workspace.openLinkText(targetPath, sourcePath, false);
+        logRejection(app.workspace.openLinkText(targetPath, sourcePath, false), "open note");
         return true;
     }
 
     await app.vault.create(targetPath, "");
-    app.workspace.openLinkText(targetPath, sourcePath, false);
+    logRejection(app.workspace.openLinkText(targetPath, sourcePath, false), "open note");
     return true;
 }
 

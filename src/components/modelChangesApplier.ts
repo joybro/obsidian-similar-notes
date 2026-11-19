@@ -3,6 +3,7 @@ import type { App } from "obsidian";
 import type MainPlugin from "../main";
 import { LoadModelModal } from "./LoadModelModal";
 import { fetchAndCacheModelInfo } from "./modelInfoCache";
+import { logRejection } from "@/utils/logRejection";
 
 export interface ModelChangesApplierParams {
     plugin: MainPlugin;
@@ -94,7 +95,7 @@ export async function applyModelChanges(params: ModelChangesApplierParams): Prom
             }
 
             await settingsService.update(updateData);
-            plugin.changeModel(modelId);
+            logRejection(plugin.changeModel(modelId), "change model");
             onComplete();
         },
         Function.prototype as () => void

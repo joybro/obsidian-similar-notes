@@ -1,4 +1,5 @@
 import log from "loglevel";
+import { idbError } from "./idbError";
 
 /**
  * MTime entry stored in IndexedDB
@@ -43,7 +44,7 @@ export class IndexedDBMTimeStorage {
 
             request.onerror = () => {
                 log.error("Failed to open IndexedDB:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
 
             request.onsuccess = () => {
@@ -100,7 +101,7 @@ export class IndexedDBMTimeStorage {
 
             request.onerror = () => {
                 log.error("Failed to get mtime:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -135,9 +136,9 @@ export class IndexedDBMTimeStorage {
 
             request.onerror = () => {
                 log.error("Failed to set mtime:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
-            transaction.onabort = () => reject(transaction.error);
+            transaction.onabort = () => reject(idbError(transaction.error));
         });
     }
 
@@ -173,11 +174,11 @@ export class IndexedDBMTimeStorage {
             transaction.oncomplete = () => resolve();
             transaction.onerror = () => {
                 log.error("Failed to move note metadata:", transaction.error);
-                reject(transaction.error);
+                reject(idbError(transaction.error));
             };
             transaction.onabort = () => {
                 log.error("Failed to move note metadata:", transaction.error);
-                reject(transaction.error);
+                reject(idbError(transaction.error));
             };
         });
     }
@@ -204,9 +205,9 @@ export class IndexedDBMTimeStorage {
 
             request.onerror = () => {
                 log.error("Failed to delete mtime:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
-            transaction.onabort = () => reject(transaction.error);
+            transaction.onabort = () => reject(idbError(transaction.error));
         });
     }
 
@@ -239,7 +240,7 @@ export class IndexedDBMTimeStorage {
 
             request.onerror = () => {
                 log.error("Failed to get all mtimes:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -269,9 +270,9 @@ export class IndexedDBMTimeStorage {
 
             request.onerror = () => {
                 log.error("Failed to clear mtimes:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
-            transaction.onabort = () => reject(transaction.error);
+            transaction.onabort = () => reject(idbError(transaction.error));
         });
     }
 
@@ -300,7 +301,7 @@ export class IndexedDBMTimeStorage {
 
             request.onerror = () => {
                 log.error("Failed to get migration flag:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -334,7 +335,7 @@ export class IndexedDBMTimeStorage {
 
             request.onerror = () => {
                 log.error("Failed to set migration flag:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }

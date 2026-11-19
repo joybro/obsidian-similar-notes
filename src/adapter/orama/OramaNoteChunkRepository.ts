@@ -6,6 +6,7 @@ import type { Vault } from "obsidian";
 import type { OramaWorker } from "./OramaDatabase";
 // @ts-expect-error - Worker import handled by bundler
 import InlineWorker from "./orama.worker";
+import { logRejection } from "@/utils/logRejection";
 
 export class OramaNoteChunkRepository implements NoteChunkRepository {
     private workerManager: WorkerManager<OramaWorker>;
@@ -103,7 +104,7 @@ export class OramaNoteChunkRepository implements NoteChunkRepository {
             `OramaNoteChunkRepository log level set to: ${log.getLevel()}`
         );
 
-        this.workerManager.updateLogLevel(level);
+        logRejection(this.workerManager.updateLogLevel(level), "update worker log level");
     }
 
     /**

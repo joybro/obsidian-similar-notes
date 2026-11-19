@@ -5,6 +5,7 @@ import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepositor
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
+import { logRejection } from "@/utils/logRejection";
 
 export interface StatusBarViewConfig {
     plugin: Plugin;
@@ -47,7 +48,7 @@ export class StatusBarView {
 
     private setupClickHandler(): void {
         this.clickHandler = (evt) => {
-            this.showMenu(evt);
+            logRejection(this.showMenu(evt), "show status bar menu");
         };
         this.statusBarItem.addEventListener("click", this.clickHandler);
     }

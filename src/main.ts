@@ -34,6 +34,7 @@ import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChun
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { needsReindexForUpgrade } from "./lifecycle/versionUpgrade";
 import { NoteChangeQueue } from "./infrastructure/noteChangeQueue";
+import { logRejection } from "@/utils/logRejection";
 
 const dbFileName = "similar-notes.json";
 
@@ -90,7 +91,7 @@ export default class MainPlugin extends Plugin {
         // Register the ribbon icon early (before layout restore) so Obsidian applies
         // the user's "hide from ribbon" choice; late registration misses it (#50).
         this.addRibbonIcon("telescope", "Open Similar Notes", () => {
-            this.activateSimilarNotesView();
+            logRejection(this.activateSimilarNotesView(), "open Similar Notes view");
         });
 
         // Defer all other initialization to onLayoutReady
@@ -142,13 +143,13 @@ export default class MainPlugin extends Plugin {
 
         this.registerEvent(
             this.app.workspace.on("layout-change", async () => {
-                this.leafViewCoordinator?.onLayoutChange();
+                logRejection(this.leafViewCoordinator?.onLayoutChange(), "handle layout change");
             })
         );
 
         this.registerEvent(
             this.app.workspace.on("active-leaf-change", async (leaf) => {
-                this.leafViewCoordinator?.onActiveLeafChange(leaf);
+                logRejection(this.leafViewCoordinator?.onActiveLeafChange(leaf), "handle active leaf change");
             })
         );
     }
@@ -265,7 +266,7 @@ export default class MainPlugin extends Plugin {
             noteChunkRepository: this.noteChunkRepository,
             modelService: this.modelService,
             onRetry: () => {
-                this.init(this.settingsService.get().modelId, true, false);
+                logRejection(this.init(this.settingsService.get().modelId, true, false), "retry model load");
             },
             onOpenSettings: () => {
                 // @ts-expect-error - Obsidian's setting API
@@ -350,7 +351,7 @@ export default class MainPlugin extends Plugin {
 
         if (existing.length > 0) {
             // If sidebar is already open, focus it
-            this.app.workspace.revealLeaf(existing[0]);
+            logRejection(this.app.workspace.revealLeaf(existing[0]), "reveal Similar Notes view");
         } else {
             // Open in right sidebar
             const leaf = this.app.workspace.getRightLeaf(false);
@@ -369,7 +370,7 @@ export default class MainPlugin extends Plugin {
 
         this.statusBarView.dispose();
         this.noteIndexingService.stopLoop();
-        this.leafViewCoordinator.onUnload();
+        logRejection(this.leafViewCoordinator.onUnload(), "unload leaf views");
 
         // Explicitly dispose Orama worker
         if (this.noteChunkRepository) {
@@ -425,7 +426,7 @@ export default class MainPlugin extends Plugin {
                         : settings.ollamaModel
                 );
 
-                this.noteChunkingService.init();
+                logRejection(this.noteChunkingService.init(), "init chunking service");
             }
         } catch (error) {
             log.error("Failed to initialize model service:", error);
@@ -456,7 +457,7 @@ export default class MainPlugin extends Plugin {
                 vaultId,
                 false // loadExistingData - reindex from scratch
             );
-            this.noteChangeQueue.enqueueAllNotes();
+            logRejection(this.noteChangeQueue.enqueueAllNotes(), "queue all notes for reindex");
         }
 
         // Pass NoteChunkRepository to the settings tab after it's initialized

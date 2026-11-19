@@ -881,3 +881,44 @@ describe("pending count before the indexing loop starts (QA sim8)", () => {
         expect(await firstValueFrom(service.getNoteChangeCount$())).toBe(1240);
     });
 });
+
+describe("indexing loop survives a failed poll", () => {
+    test("a rejected pollFileChanges is retried on the idle cadence instead of ending indexing", async () => {
+        vi.useFakeTimers();
+        try {
+            const parts = makeService();
+            const polls: string[] = [];
+            const pollFileChanges = vi
+                .fn()
+                .mockImplementationOnce(async () => {
+                    polls.push("fail");
+                    throw new Error("IndexedDB unavailable");
+                })
+                .mockImplementation(async () => {
+                    polls.push("ok");
+                    return [];
+                });
+            (parts.queue as unknown as { pollFileChanges: typeof pollFileChanges }).pollFileChanges =
+                pollFileChanges;
+            const service = new NoteIndexingService(
+                parts.noteRepository as never,
+                parts.noteChunkRepository as never,
+                parts.queue as never,
+                parts.noteChunkingService as never,
+                parts.embeddingService as never,
+                parts.similarNoteCoordinator as never,
+                parts.settingsService as never,
+                parts.app as never,
+                parts.erroredStore as never
+            );
+            service.startLoop();
+            await vi.advanceTimersByTimeAsync(0);
+            expect(polls).toEqual(["fail"]);
+            await vi.advanceTimersByTimeAsync(1000);
+            expect(polls).toEqual(["fail", "ok"]);
+            service.stopLoop();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});

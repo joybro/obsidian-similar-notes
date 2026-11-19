@@ -47,29 +47,40 @@ export class NoteIndexingService {
     }
 
     startLoop() {
+        const scheduleNext = () => {
+            this.fileChangeLoopTimer = window.setTimeout(() => void fileChangeLoop(), 1000);
+        };
         const fileChangeLoop = async () => {
-            const count = this.noteChangeQueue.getFileChangeCount();
-            this.noteChangeCount$.next(count);
+            try {
+                const count = this.noteChangeQueue.getFileChangeCount();
+                this.noteChangeCount$.next(count);
 
-            // Determine concurrency based on provider capability
-            const supportsParallel = this.embeddingService.supportsParallelProcessing();
-            const concurrency = supportsParallel ? 5 : 1;
+                // Determine concurrency based on provider capability
+                const supportsParallel = this.embeddingService.supportsParallelProcessing();
+                const concurrency = supportsParallel ? 5 : 1;
 
-            const changes = await this.noteChangeQueue.pollFileChanges(concurrency);
-            if (changes.length === 0) {
-                this.fileChangeLoopTimer = window.setTimeout(() => void fileChangeLoop(), 1000);
+                const changes = await this.noteChangeQueue.pollFileChanges(concurrency);
+                if (changes.length === 0) {
+                    scheduleNext();
+                    return;
+                }
+
+                // Process files in parallel (or sequentially if concurrency=1)
+                await Promise.allSettled(
+                    changes.map((change) => this.processChange(change))
+                );
+            } catch (error) {
+                // A failed poll must not end indexing for the session: log and
+                // try again on the idle cadence.
+                log.error("[NoteIndexingService] Change loop failed, retrying in 1s:", error);
+                scheduleNext();
                 return;
             }
 
-            // Process files in parallel (or sequentially if concurrency=1)
-            await Promise.allSettled(
-                changes.map((change) => this.processChange(change))
-            );
-
-            fileChangeLoop();
+            void fileChangeLoop();
         };
 
-        fileChangeLoop();
+        void fileChangeLoop();
     }
 
     /**

@@ -14,6 +14,7 @@ import log from "loglevel";
 import type { TFile, Vault } from "obsidian";
 import { BehaviorSubject, type Observable } from "rxjs";
 import type { SettingsService } from "./SettingsService";
+import { logRejection } from "@/utils/logRejection";
 
 interface SimilarNoteCacheEntry {
     mtime: number;
@@ -89,7 +90,7 @@ export class SimilarNoteCoordinator {
                 if (newSettings.minSimilarityThreshold !== undefined) {
                     const file = this.noteBottomViewModel$.value.currentFile;
                     if (file) {
-                        this.emitNoteBottomViewModel(file);
+                        logRejection(this.emitNoteBottomViewModel(file), "refresh similar notes");
                         return;
                     }
                 }

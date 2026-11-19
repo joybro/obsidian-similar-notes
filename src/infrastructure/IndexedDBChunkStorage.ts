@@ -1,4 +1,5 @@
 import log from "loglevel";
+import { idbError, toError } from "./idbError";
 
 /**
  * Internal chunk structure stored in IndexedDB
@@ -50,7 +51,7 @@ export class IndexedDBChunkStorage {
 
             request.onerror = () => {
                 log.error("Failed to open IndexedDB:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
 
             request.onsuccess = () => {
@@ -112,7 +113,7 @@ export class IndexedDBChunkStorage {
             request.onsuccess = () => resolve();
             request.onerror = () => {
                 log.error("Failed to insert chunk:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -142,7 +143,7 @@ export class IndexedDBChunkStorage {
             transaction.oncomplete = () => resolve();
             transaction.onerror = () => {
                 log.error("Failed to insert chunks:", transaction.error);
-                reject(transaction.error);
+                reject(idbError(transaction.error));
             };
 
             for (const chunk of chunks) {
@@ -188,7 +189,7 @@ export class IndexedDBChunkStorage {
 
             request.onerror = () => {
                 log.error("Failed to get chunks by path:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -231,7 +232,7 @@ export class IndexedDBChunkStorage {
 
             request.onerror = () => {
                 log.error("Failed to remove chunks by path:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -257,7 +258,7 @@ export class IndexedDBChunkStorage {
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => {
                 log.error("Failed to count chunks:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -317,7 +318,7 @@ export class IndexedDBChunkStorage {
                             batch = [];
                         } catch (error) {
                             log.error("Error processing batch:", error);
-                            reject(error);
+                            reject(toError(error));
                             return;
                         }
                     }
@@ -335,7 +336,7 @@ export class IndexedDBChunkStorage {
                             }
                         } catch (error) {
                             log.error("Error processing final batch:", error);
-                            reject(error);
+                            reject(toError(error));
                             return;
                         }
                     }
@@ -346,7 +347,7 @@ export class IndexedDBChunkStorage {
 
             request.onerror = () => {
                 log.error("Failed to load chunks in batches:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -377,7 +378,7 @@ export class IndexedDBChunkStorage {
 
             request.onerror = () => {
                 log.error("Failed to clear chunks:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -408,7 +409,7 @@ export class IndexedDBChunkStorage {
 
             request.onerror = () => {
                 log.error("Failed to get migration flag:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }
@@ -446,7 +447,7 @@ export class IndexedDBChunkStorage {
 
             request.onerror = () => {
                 log.error("Failed to set migration flag:", request.error);
-                reject(request.error);
+                reject(idbError(request.error));
             };
         });
     }

@@ -1,6 +1,7 @@
 import type { SettingsService } from "@/application/SettingsService";
 import { applyExclusionPatterns } from "@/utils/indexableText";
 import type { Setting } from "obsidian";
+import { logRejection } from "@/utils/logRejection";
 
 /**
  * Self-contained "test your exclude RegExp against sample text" widget for the
@@ -54,7 +55,7 @@ export class RegexpExclusionTester {
         this.outputTextArea = output;
 
         input.addEventListener("input", () => {
-            this.settingsService.update({ regexpTestInputText: input.value });
+            logRejection(this.settingsService.update({ regexpTestInputText: input.value }), "save regex test text");
             this.run();
         });
     }

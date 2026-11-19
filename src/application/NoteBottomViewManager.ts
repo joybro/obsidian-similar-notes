@@ -5,6 +5,7 @@ import type { Observable } from "rxjs";
 import { BaseViewManager } from "./BaseViewManager";
 import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 import type { ViewCreationConfig } from "./ViewManager";
+import { logRejection } from "@/utils/logRejection";
 
 /**
  * ViewManager specifically for NoteBottomView instances
@@ -91,7 +92,7 @@ export class NoteBottomViewManager extends BaseViewManager<NoteBottomView> {
     private handleShowAtBottomChange(showAtBottom: boolean): void {
         if (showAtBottom) {
             // Re-create views for all open markdown leaves
-            this.recreateAllViews();
+            logRejection(this.recreateAllViews(), "recreate bottom views");
         } else {
             // Remove all bottom views
             this.removeAllViews();
