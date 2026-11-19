@@ -224,7 +224,6 @@ export class StatusBarView {
                     .setTitle("Reindex all")
                     .setIcon("refresh-cw")
                     .onClick(() => {
-                        // @ts-expect-error - Obsidian's commands API
                         this.config.app.commands.executeCommandById(
                             "similar-notes:reindex-all-notes"
                         );
@@ -237,7 +236,6 @@ export class StatusBarView {
                         .setTitle("Retry errored")
                         .setIcon("refresh-cw")
                         .onClick(() => {
-                            // @ts-expect-error - Obsidian's commands API
                             this.config.app.commands.executeCommandById(
                                 "similar-notes:retry-errored-notes"
                             );

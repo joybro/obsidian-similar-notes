@@ -304,7 +304,7 @@ export class IndexedDBChunkStorage {
                 if (cursor) {
                     // Remove the IndexedDB id field before passing to Orama
                     const { id: _id, ...chunk } = cursor.value as NoteChunkInternal;
-                    batch.push(chunk as NoteChunkInternal);
+                    batch.push(chunk);
 
                     if (batch.length >= batchSize) {
                         try {

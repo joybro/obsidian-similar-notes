@@ -883,18 +883,19 @@ describe("pending count before the indexing loop starts (QA sim8)", () => {
 });
 
 describe("indexing loop survives a failed poll", () => {
-    test("a rejected pollFileChanges is retried on the idle cadence instead of ending indexing", async () => {
+    test("a throwing pollFileChanges is retried on the idle cadence instead of ending indexing", async () => {
         vi.useFakeTimers();
         try {
             const parts = makeService();
             const polls: string[] = [];
             const pollFileChanges = vi
                 .fn()
-                .mockImplementationOnce(async () => {
+                // Synchronous like the real NoteChangeQueue.pollFileChanges.
+                .mockImplementationOnce(() => {
                     polls.push("fail");
                     throw new Error("IndexedDB unavailable");
                 })
-                .mockImplementation(async () => {
+                .mockImplementation(() => {
                     polls.push("ok");
                     return [];
                 });

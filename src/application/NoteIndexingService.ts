@@ -59,7 +59,7 @@ export class NoteIndexingService {
                 const supportsParallel = this.embeddingService.supportsParallelProcessing();
                 const concurrency = supportsParallel ? 5 : 1;
 
-                const changes = await this.noteChangeQueue.pollFileChanges(concurrency);
+                const changes = this.noteChangeQueue.pollFileChanges(concurrency);
                 if (changes.length === 0) {
                     scheduleNext();
                     return;
@@ -374,7 +374,7 @@ export class NoteIndexingService {
         const indexableTextHash = await computeIndexableTextHash(
             filteredContent
         );
-        const storedHash = await this.noteChangeQueue.getIndexableTextHash(
+        const storedHash = this.noteChangeQueue.getIndexableTextHash(
             path
         );
 

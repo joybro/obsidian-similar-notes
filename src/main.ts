@@ -172,8 +172,7 @@ export default class MainPlugin extends Plugin {
         this.settingTab.setModelService(this.modelService);
 
         // Initialize IndexedNoteMTimeStore with vault ID
-        // @ts-expect-error - appId exists at runtime but not in type definitions
-        const vaultId = this.app.appId as string;
+        const vaultId = this.app.appId;
         await this.indexedNotesMTimeStore.init(vaultId);
         await this.erroredNoteStore.init(vaultId);
 
@@ -269,9 +268,7 @@ export default class MainPlugin extends Plugin {
                 logRejection(this.init(this.settingsService.get().modelId, true, false), "retry model load");
             },
             onOpenSettings: () => {
-                // @ts-expect-error - Obsidian's setting API
                 this.app.setting.open();
-                // @ts-expect-error - Obsidian's setting API
                 this.app.setting.openTabById("similar-notes");
             },
         });
@@ -441,8 +438,7 @@ export default class MainPlugin extends Plugin {
         const dbPath = `${pluginDataDir}/${dbFileName}`;
 
         // Get vault ID for IndexedDB isolation
-        // @ts-expect-error - appId exists at runtime but not in type definitions
-        const vaultId = this.app.appId as string;
+        const vaultId = this.app.appId;
 
         // Migrate existing database from old location to new location
         const oldDbPath = `${this.app.vault.configDir}/${dbFileName}`;
