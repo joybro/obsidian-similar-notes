@@ -893,7 +893,7 @@ describe("indexing loop survives a failed poll", () => {
                 // Synchronous like the real NoteChangeQueue.pollFileChanges.
                 .mockImplementationOnce(() => {
                     polls.push("fail");
-                    throw new Error("IndexedDB unavailable");
+                    throw new Error("unexpected error in the loop");
                 })
                 .mockImplementation(() => {
                     polls.push("ok");
