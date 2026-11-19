@@ -41,5 +41,5 @@ Integration tests run the real queue and indexing loop with fake time and
 filesystem/model boundaries: edits are not processed before their debounce;
 ready work starts without the old poll remainder; busy passes stay serial;
 stop and restart cannot leave an old drain loop alive. Runtime measurement
-uses editor saves in Test_local with a warm local model and records both
+uses editor saves in a disposable test vault with a warm local model and records both
 queue timing and DOM continuity, separately from human-perceived smoothness.

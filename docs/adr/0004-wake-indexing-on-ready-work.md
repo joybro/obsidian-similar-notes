@@ -5,9 +5,8 @@ Status: Accepted
 ## Context
 
 After Obsidian saves an edit, the queue waits the user's indexing delay.
-The idle indexer then waits until its next one-second poll. Test_local
-measurement found the latter adding up to about one more second, even
-with a warm local model (similar-notes-dev T56).
+The idle indexer then waits until its next one-second poll. A local test-vault measurement found the latter adding up to about one
+more second, even with a warm local model.
 
 ## Decision
 

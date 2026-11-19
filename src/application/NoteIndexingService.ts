@@ -41,7 +41,7 @@ export class NoteIndexingService {
         // The queue is filled before this service exists, but the loop (which
         // republishes the count) starts only after the model is ready, possibly
         // after a long first download. Publish the startup count now so the
-        // status bar and an empty panel know notes are waiting (QA sim8).
+        // status bar and an empty panel know notes are waiting.
         this.noteChangeCount$ = new BehaviorSubject<number>(
             noteChangeQueue.getFileChangeCount()
         );

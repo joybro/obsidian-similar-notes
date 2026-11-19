@@ -864,7 +864,7 @@ describe("frontmatter exclusion at processing time (frontmatter-exclusion spec Â
     });
 });
 
-describe("pending count before the indexing loop starts (QA sim8)", () => {
+describe("pending count before the indexing loop starts", () => {
     test("the queue filled at startup is published before startLoop", async () => {
         const parts = makeService();
         parts.queue.getFileChangeCount.mockReturnValue(1240);
