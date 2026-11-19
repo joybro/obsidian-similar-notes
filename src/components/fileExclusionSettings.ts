@@ -24,7 +24,7 @@ export function buildExcludePathsSetting(
             text.inputEl.rows = 5;
             text.inputEl.cols = 40;
             text.setValue(settings.excludeFolderPatterns.join("\n"));
-            text.setPlaceholder("Templates/\nArchive/\n*.tmp\n**/drafts/*");
+            text.setPlaceholder("Templates/\nArchive/\n*.excalidraw.md\n**/drafts/*");
 
             const errorClass = "similar-notes-regexp-error";
 
