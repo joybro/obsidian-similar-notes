@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file.
 -   **Path patterns setting points to Apply rules, not Reindex**: the description now says that excluded notes leave other notes' results right away and that **Apply rules** removes newly excluded notes from the index (and indexes notes you no longer exclude). Previously it pointed to Reindex, which re-embeds the whole vault (and with a cloud provider, pays for it again).
 -   **"Couldn't analyze this note" shows in red**: when the model fails on the open note, the panel line uses the error color so it no longer reads like the other grey hints.
 -   **The Similar notes sidebar stays where you put it when the plugin reloads**: disabling or updating the plugin no longer closes the sidebar view, so Obsidian puts it back in the same place when the plugin loads again (Obsidian's plugin guidelines).
+-   **Settings and dialog text describe what actually happens**: the OpenAI-compatible **Max tokens** setting now says it is the model's maximum input tokens (not tokens per chunk). When the GPU fails and a built-in model loads on CPU, the dialog now says only that load fell back to CPU and that the next load tries the GPU again, instead of claiming GPU acceleration was turned off for the session.
 -   **Settings labels use sentence case**: Apply rules, Copy to clipboard, API key, Debug and support, and the GPU dialog's buttons.
 
 ## [1.7.0] - 2026-09-05
