@@ -87,7 +87,7 @@ export class SettingsService {
     constructor(private plugin: Plugin) {}
 
     async load(): Promise<void> {
-        const data = await this.plugin.loadData();
+        const data = (await this.plugin.loadData()) as Partial<SimilarNotesSettings> | null;
         this.settings = { ...DEFAULT_SETTINGS, ...data };
 
         // For new mobile installations, default to OpenAI provider

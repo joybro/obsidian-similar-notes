@@ -334,7 +334,7 @@ export class IndexSettingsSection {
                             new RegExp(pattern);
                             validPatterns.push(pattern);
                         } catch (e) {
-                            errorMessages.set(index, e.message);
+                            errorMessages.set(index, e instanceof Error ? e.message : String(e));
                         }
                     });
 
@@ -472,7 +472,9 @@ export class IndexSettingsSection {
                     this.updateExcludedFilesList();
                 } catch (error) {
                     log.error("Failed to apply exclusion patterns:", error);
-                    new Notice(`Failed to apply exclusion patterns: ${error.message}`);
+                    new Notice(
+                        `Failed to apply exclusion patterns: ${error instanceof Error ? error.message : String(error)}`
+                    );
                 }
             },
             () => {
