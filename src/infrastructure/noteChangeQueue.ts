@@ -4,6 +4,7 @@ import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeSto
 import { filterMarkdownFiles } from "@/utils/folderExclusion";
 import { isNoteExcluded } from "@/utils/noteExclusion";
 import log from "loglevel";
+import { Subject, type Observable } from "rxjs";
 import { TFile } from "obsidian";
 import type { EventRef, MetadataCache, TAbstractFile, Vault } from "obsidian";
 
@@ -43,6 +44,7 @@ export class NoteChangeQueue {
      * Queue of file changes to be processed
      */
     private queue: NoteChange[] = [];
+    private readonly readyChanges$ = new Subject<void>();
 
     /**
      * Event references for cleanup
@@ -94,7 +96,8 @@ export class NoteChangeQueue {
         const analysis = this.analyzeSyncNeeds(true);
         
         // Create changes from analysis
-        this.queue = this.createChanges(analysis);
+        this.queue = [];
+        this.enqueue(this.createChanges(analysis));
         
         log.info("queue size", this.queue.length);
         log.info(`Sync analysis: ${analysis.counts.added} to add, ${analysis.counts.removed} to remove, ${analysis.counts.updated} to update`);
@@ -120,11 +123,11 @@ export class NoteChangeQueue {
                     // A fresh create supersedes any prior terminal error.
                     void this.erroredNoteStore.delete(file.path);
                     // Add to queue with hash
-                    this.queue.push({
+                    this.enqueue([{
                         path: file.path,
                         reason: "new" as const,
                         mtime: file.stat.mtime,
-                    });
+                    }]);
                 }
             }
         });
@@ -156,11 +159,11 @@ export class NoteChangeQueue {
                         // A fresh edit supersedes any prior terminal error.
                         void this.erroredNoteStore.delete(file.path);
                         // Add to queue
-                        this.queue.push({
+                        this.enqueue([{
                             path: file.path,
                             reason: "modified" as const,
                             mtime: file.stat.mtime,
-                        });
+                        }]);
                     }, delayMs);
 
                     this.pendingModifications.set(file.path, timeout);
@@ -178,10 +181,10 @@ export class NoteChangeQueue {
                 );
 
                 // Add to queue (no hash for deleted files)
-                this.queue.push({
+                this.enqueue([{
                     path: file.path,
                     reason: "deleted" as const,
-                });
+                }]);
             }
         });
         this.eventRefs.push(deleteRef);
@@ -202,7 +205,7 @@ export class NoteChangeQueue {
 
                 if (!isNewPathIncluded) {
                     // New location is excluded — drop the old index entry and stop.
-                    this.queue.push({ path: oldPath, reason: "deleted" });
+                    this.enqueue([{ path: oldPath, reason: "deleted" }]);
                     log.info(`File renamed/moved to excluded location: ${oldPath} -> ${file.path}`);
                     return;
                 }
@@ -213,24 +216,24 @@ export class NoteChangeQueue {
                 // instead of re-embedding (issue #39, sub-issue 5).
                 const indexedMtime = this.mTimeStore.getMTime(oldPath);
                 if (indexedMtime !== undefined && indexedMtime === file.stat.mtime) {
-                    this.queue.push({
+                    this.enqueue([{
                         path: file.path,
                         reason: "renamed",
                         oldPath,
                         mtime: file.stat.mtime,
-                    });
+                    }]);
                     log.info(`File renamed/moved (embedding preserved): ${oldPath} -> ${file.path}`);
                     return;
                 }
 
                 // Mtime changed, or the old path was never indexed — fall back
                 // to full re-embed.
-                this.queue.push({ path: oldPath, reason: "deleted" });
-                this.queue.push({
+                this.enqueue([{ path: oldPath, reason: "deleted" }]);
+                this.enqueue([{
                     path: file.path,
                     reason: "new",
                     mtime: file.stat.mtime,
-                });
+                }]);
                 log.info(`File renamed/moved (content changed, re-embedding): ${oldPath} -> ${file.path}`);
             }
         });
@@ -287,7 +290,8 @@ export class NoteChangeQueue {
         
         // A full reprocess supersedes all prior terminal errors.
         await this.erroredNoteStore.clear();
-        this.queue = newQueue;
+        this.queue = [];
+        this.enqueue(newQueue);
         log.info(`Enqueued all notes: ${newQueue.length} files queued for reprocessing`);
     }
 
@@ -302,12 +306,12 @@ export class NoteChangeQueue {
         for (const path of paths) {
             const file = this.vault.getAbstractFileByPath(path);
             if (file instanceof TFile) {
-                this.queue.push({
+                this.enqueue([{
                     path,
                     reason: "modified",
                     mtime: file.stat.mtime,
                     forceReindex: true,
-                });
+                }]);
             }
         }
         await this.erroredNoteStore.clear();
@@ -333,12 +337,19 @@ export class NoteChangeQueue {
      * Used by the indexing service to retry a failed change in-session.
      */
     requeue(change: NoteChange): void {
-        this.queue.push(change);
+        this.enqueue([change]);
     }
 
     /** Appends changes to the back of the queue. */
     enqueue(changes: NoteChange[]): void {
+        if (changes.length === 0) return;
         this.queue.push(...changes);
+        this.readyChanges$.next();
+    }
+
+    /** Ready work, after the configured edit debounce has expired. */
+    getReadyChanges$(): Observable<void> {
+        return this.readyChanges$.asObservable();
     }
 
     /**
@@ -532,7 +543,7 @@ export class NoteChangeQueue {
         const changes = this.createChanges(analysis);
         
         // Add all changes to queue for processing
-        this.queue.push(...changes);
+        this.enqueue(changes);
         
         log.info(`Applied exclusion patterns: ${analysis.counts.removed} files queued for removal, ${analysis.counts.added} files queued for addition`);
         return { removed: analysis.counts.removed, added: analysis.counts.added };
