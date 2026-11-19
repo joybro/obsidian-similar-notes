@@ -10,13 +10,11 @@ import {
 // the real Setting here — same pattern as OllamaSettingsSection.test.)
 function makeFakeSetting() {
     const captured = { name: "", desc: "", classes: [] as string[] };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const setting: any = {
         setName: (v: string) => ((captured.name = v), setting),
         setDesc: (v: string) => ((captured.desc = v), setting),
         setClass: (c: string) => (captured.classes.push(c), setting),
         addDropdown: (cb: (d: unknown) => void) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const d: any = {
                 addOption: () => d,
                 setValue: () => d,
@@ -26,7 +24,6 @@ function makeFakeSetting() {
             return setting;
         },
         addText: (cb: (t: unknown) => void) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const t: any = {
                 setValue: () => t,
                 onChange: () => t,
@@ -36,7 +33,6 @@ function makeFakeSetting() {
             return setting;
         },
         addToggle: (cb: (t: unknown) => void) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const t: any = { setValue: () => t, onChange: () => t };
             cb(t);
             return setting;

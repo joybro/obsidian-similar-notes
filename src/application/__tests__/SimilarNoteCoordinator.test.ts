@@ -40,7 +40,6 @@ function makeSettings(
     };
 }
 
-// eslint-disable-next-line max-lines-per-function
 describe("SimilarNoteCoordinator", () => {
     let vault: Vault;
     let noteRepository: NoteRepository;
@@ -67,7 +66,7 @@ describe("SimilarNoteCoordinator", () => {
             }),
             findByPath: vi.fn(),
             getLinkedPaths: vi.fn().mockResolvedValue([]),
-        } as unknown as NoteRepository;
+        };
 
         const findSimilarNotes = vi.fn().mockResolvedValue([]);
         similarNoteFinder = {

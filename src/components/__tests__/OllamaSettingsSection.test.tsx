@@ -45,7 +45,7 @@ function buildUrlOnChange(overrides: {
     };
 
     const result = getOllamaSettingBuilders(
-        props as unknown as Parameters<typeof getOllamaSettingBuilders>[0]
+        props
     );
     const { setting, getTextOnChange } = makeFakeSetting();
     // builders[0] is the "Server URL" setting.

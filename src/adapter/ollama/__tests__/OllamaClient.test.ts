@@ -14,7 +14,7 @@ function stubRequestOnce(jsonBody: unknown, status = 200) {
         arrayBuffer: new ArrayBuffer(0),
         json: jsonBody,
         text: JSON.stringify(jsonBody),
-    } as never);
+    });
     return mock;
 }
 

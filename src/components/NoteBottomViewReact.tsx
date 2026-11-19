@@ -160,7 +160,7 @@ const SearchResult = ({
     useLayoutEffect(() => {
         if (isCollapsed) {
             // When collapsing: Start the animation
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state must flip in the same layout pass
+            // eslint-disable-next-line react-hooks/set-state-in-effect, @eslint-react/set-state-in-effect -- animation state must flip in the same layout pass
             setIsAnimating(true);
 
             // Remove from DOM after animation completes
@@ -172,9 +172,9 @@ const SearchResult = ({
         }
         // When expanding:
         // 1. First render in collapsed state
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state must flip in the same layout pass
+        // eslint-disable-next-line @eslint-react/set-state-in-effect -- animation state must flip in the same layout pass
         setShouldRender(true);
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state must flip in the same layout pass
+        // eslint-disable-next-line @eslint-react/set-state-in-effect -- animation state must flip in the same layout pass
         setIsAnimating(true);
 
         // 2. Start animation in the next frame

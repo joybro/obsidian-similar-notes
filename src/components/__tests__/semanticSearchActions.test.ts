@@ -62,10 +62,10 @@ describe("createNoteFromQuery (spec item 2)", () => {
 
         expect(created).toBe(true);
         expect(
-            (app as never as { vault: { create: ReturnType<typeof vi.fn> } }).vault.create
+            (app as { vault: { create: ReturnType<typeof vi.fn> } }).vault.create
         ).toHaveBeenCalledWith("Notes/my new idea.md", "");
         expect(
-            (app as never as { workspace: { openLinkText: ReturnType<typeof vi.fn> } }).workspace
+            (app as { workspace: { openLinkText: ReturnType<typeof vi.fn> } }).workspace
                 .openLinkText
         ).toHaveBeenCalledWith("Notes/my new idea.md", "src.md", false);
     });
@@ -76,7 +76,7 @@ describe("createNoteFromQuery (spec item 2)", () => {
 
         expect(created).toBe(false);
         expect(
-            (app as never as { vault: { create: ReturnType<typeof vi.fn> } }).vault.create
+            (app as { vault: { create: ReturnType<typeof vi.fn> } }).vault.create
         ).not.toHaveBeenCalled();
     });
 
@@ -91,10 +91,10 @@ describe("createNoteFromQuery (spec item 2)", () => {
 
         expect(created).toBe(true);
         expect(
-            (app as never as { vault: { create: ReturnType<typeof vi.fn> } }).vault.create
+            (app as { vault: { create: ReturnType<typeof vi.fn> } }).vault.create
         ).not.toHaveBeenCalled();
         expect(
-            (app as never as { workspace: { openLinkText: ReturnType<typeof vi.fn> } }).workspace
+            (app as { workspace: { openLinkText: ReturnType<typeof vi.fn> } }).workspace
                 .openLinkText
         ).toHaveBeenCalledWith("Notes/dup.md", "src.md", false);
     });

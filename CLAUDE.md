@@ -20,6 +20,16 @@ Similar Notes is an Obsidian plugin that provides semantic note recommendations 
 - `npm run test:watch` - Run tests in watch mode
 - `npm run test -- path/to/test` - Run specific test file
 
+### Linting
+
+- `npm run lint` - ESLint 9 over the whole repo (`eslint.config.mjs`). It includes
+  `eslint-plugin-obsidianmd`'s recommended set, which is what the
+  community.obsidian.md automated review runs, so a clean lint here predicts the
+  plugin page's scan. Run it from the repo root: the plugin also checks
+  `package.json` and `manifest.json` (e.g. banned dependencies, `minAppVersion`).
+- `obsidianmd/no-unsupported-api` is a warning on main only until `manifest.json`
+  carries `minAppVersion` 1.11.0 (1.8.0 release); then set it back to error.
+
 ### Development Workflow
 
 1. Run `npm run dev` to start the development build

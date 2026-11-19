@@ -20,7 +20,8 @@ function deleteDatabase(name: string): Promise<void> {
     return new Promise((resolve, reject) => {
         const request = indexedDB.deleteDatabase(name);
         request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
+        request.onerror = () =>
+            reject(request.error ?? new Error(`Database deletion failed: ${name}`));
         request.onblocked = () =>
             reject(new Error(`Database deletion blocked: ${name}`));
     });
