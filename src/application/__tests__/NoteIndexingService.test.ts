@@ -924,3 +924,116 @@ describe("indexing loop survives a failed poll", () => {
         }
     });
 });
+
+describe("path-pattern exclusion at processing time (frontmatter-exclusion spec §2)", () => {
+    // The queue filters path patterns only when a vault event fires. A change
+    // queued before the user added a pattern, or re-queued by "Retry errored",
+    // reaches processChange unfiltered, so the processing-time check must
+    // apply the current path patterns too.
+    function armPathPatterns(
+        mocks: ReturnType<typeof makeService>,
+        patterns: string[]
+    ) {
+        mocks.settingsService.get.mockReturnValue({
+            includeFrontmatter: false,
+            excludeRegexPatterns: [],
+            excludeFolderPatterns: patterns,
+            excludeFrontmatterRules: [],
+        });
+    }
+
+    test("a change queued before a matching path pattern was added is removed, not embedded", async () => {
+        const mocks = makeService();
+        const { service, queue, noteChunkRepository, embeddingService, noteRepository } =
+            mocks;
+        const { chunk } = makeChunk();
+        noteRepository.findByPath.mockResolvedValue({
+            path: "Private/diary.md",
+            title: "diary",
+            content: "secret",
+        });
+        mocks.noteChunkingService.split.mockResolvedValue([chunk]);
+        embeddingService.embedTexts.mockResolvedValue([[0.1], [0.2]]);
+        // The pattern is saved after the change was queued.
+        armPathPatterns(mocks, ["Private/"]);
+
+        await (service as unknown as ChangeProcessor).processChange({
+            path: "Private/diary.md",
+            reason: "modified",
+            mtime: 1000,
+        });
+
+        expect(embeddingService.embedTexts).not.toHaveBeenCalled();
+        expect(noteRepository.findByPath).not.toHaveBeenCalled();
+        expect(noteChunkRepository.removeByPath).toHaveBeenCalledWith(
+            "Private/diary.md"
+        );
+        expect(queue.markNoteChangeProcessed).toHaveBeenCalledWith({
+            path: "Private/diary.md",
+            reason: "deleted",
+        });
+    });
+
+    test("a retried errored note that matches a path pattern is not embedded and its errored entry is cleared", async () => {
+        const mocks = makeService();
+        const { service, erroredStore, embeddingService, noteRepository } = mocks;
+        noteRepository.findByPath.mockResolvedValue({
+            path: "Private/diary.md",
+            title: "diary",
+            content: "secret",
+        });
+        mocks.noteChunkingService.split.mockResolvedValue([makeChunk().chunk]);
+        embeddingService.embedTexts.mockResolvedValue([[0.1], [0.2]]);
+        erroredStore.get.mockReturnValue({ error: "boom" });
+        armPathPatterns(mocks, ["Private/**"]);
+
+        // The shape NoteChangeQueue.retryErrored enqueues.
+        await (service as unknown as ChangeProcessor).processChange({
+            path: "Private/diary.md",
+            reason: "modified",
+            mtime: 1000,
+            forceReindex: true,
+        });
+
+        expect(embeddingService.embedTexts).not.toHaveBeenCalled();
+        expect(erroredStore.delete).toHaveBeenCalledWith("Private/diary.md");
+    });
+
+    test("a title backfill for a path-excluded note does not embed the title", async () => {
+        const mocks = makeService();
+        const { service, embeddingService, noteChunkRepository } = mocks;
+        noteChunkRepository.getByPath.mockResolvedValue([
+            { path: "Private/diary.md", title: "diary", content: "x", chunkIndex: 0, totalChunks: 1, embedding: [0.1] },
+        ]);
+        embeddingService.embedTexts.mockResolvedValue([[0.2]]);
+        armPathPatterns(mocks, ["Private/"]);
+
+        await (service as unknown as ChangeProcessor).processChange({
+            path: "Private/diary.md",
+            reason: "title-backfill",
+        });
+
+        expect(embeddingService.embedTexts).not.toHaveBeenCalled();
+    });
+
+    test("a note outside every path pattern is still embedded", async () => {
+        const mocks = makeService();
+        const { service, embeddingService, noteRepository } = mocks;
+        noteRepository.findByPath.mockResolvedValue({
+            path: "Public/note.md",
+            title: "note",
+            content: "hello world",
+        });
+        mocks.noteChunkingService.split.mockResolvedValue([makeChunk().chunk]);
+        embeddingService.embedTexts.mockResolvedValue([[0.1], [0.2]]);
+        armPathPatterns(mocks, ["Private/"]);
+
+        await (service as unknown as ChangeProcessor).processChange({
+            path: "Public/note.md",
+            reason: "modified",
+            mtime: 1000,
+        });
+
+        expect(embeddingService.embedTexts).toHaveBeenCalled();
+    });
+});
