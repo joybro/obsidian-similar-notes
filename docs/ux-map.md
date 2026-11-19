@@ -43,7 +43,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - 행동: open, open in new tab (Cmd-click), hover preview (Cmd+hover), drag into editor, right-click menu (Open link, Open in new tab, Copy Obsidian URL), collapse
   - Each empty state is one grey line in the same place; only the text differs (`docs/panel-empty-states-spec.md`).
   - empty: "No similar notes found." (the search ran, nothing came back, nothing is waiting to be indexed)
-  - empty-unwritten: the note has no text (after exclusion patterns): "Write a few lines and similar notes will appear here."
+  - empty-unwritten: the note has no text (after exclusion patterns) and is not an excluded note under OpenAI or Gemini (that one shows empty-excluded-note): "Write a few lines and similar notes will appear here."
   - empty-below-threshold: results exist but all are under Minimum similarity: "No notes above the minimum similarity (0.50)."
   - empty-excluded-note: the open note is excluded and the provider is OpenAI or Gemini, so it is not embedded on the fly (frontmatter-exclusion spec §2.1): "This note is excluded from the index, so it isn't sent to OpenAI." (or Gemini); with a local provider it shows results like partial-not-indexed
   - loading-indexing: the search found nothing while notes are queued for indexing: "Indexing your vault: N notes left. Results fill in as notes are indexed." N follows the status bar's "N to index"; while it shows, the panel searches again at most every 10 s as N drops (results replace the line), and once more when the queue empties; a "No similar notes found." panel switches to this line when notes become queued

@@ -27,7 +27,9 @@ controls.
 | indexing | the search ran, returned nothing, and notes are queued for indexing | Indexing your vault: 1,240 notes left. Results fill in as notes are indexed. (count = the status bar's "N to index" source, `NoteIndexingService.getNoteChangeCount$`; "1 note left" for one) |
 | none | anything else | No similar notes found. |
 
-Order: the first three are searches that never ran and win; `below-threshold`
+Order: the first three are searches that never ran and win; `excluded-cloud`
+beats `unwritten`, so an empty excluded note under a cloud provider already
+says it is excluded (writing in it would not bring results; QA sim9); `below-threshold`
 only when results exist; `indexing` only when there are zero results (EY3: if
 indexed notes already produce results during indexing, they are shown and no
 indexing line appears).
