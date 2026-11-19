@@ -27,6 +27,10 @@ interface SimilarNotesWithStatus {
 }
 
 const MAX_CACHE_SIZE = 20;
+// While the panel shows "Indexing your vault", search again at most this
+// often as the queue drains. Each search may embed the open note on the fly
+// (it is not indexed yet), so keep it low: about 6 per minute.
+export const INDEXING_RESEARCH_INTERVAL_MS = 10_000;
 
 export class SimilarNoteCoordinator {
     private noteBottomViewModel$ = new BehaviorSubject<NoteBottomViewModel>({
@@ -39,6 +43,9 @@ export class SimilarNoteCoordinator {
     private cache = new Map<string, SimilarNoteCacheEntry>(); // file path -> entry
     // Notes still waiting to be indexed (the status bar's "N to index").
     private pendingIndexCount = 0;
+    // Throttle for re-searching while the panel shows the indexing line.
+    private lastIndexingSearchAt = 0;
+    private indexingSearchInFlight = false;
 
     constructor(
         private readonly vault: Vault,
@@ -99,13 +106,34 @@ export class SimilarNoteCoordinator {
      * Follow the live count of notes waiting to be indexed (the status bar's
      * "N to index"), so an empty panel during indexing can say so instead of
      * "No similar notes found." Wired after the indexing service exists.
+     *
+     * While the panel shows the indexing line it searches again as the count
+     * drops (throttled, INDEXING_RESEARCH_INTERVAL_MS), so results fill in as
+     * notes are indexed, as the line promises (QA sim7), and once more when
+     * the queue reaches zero. A plain "none" panel switches to the indexing
+     * line when notes become queued (QA sim8: the open note may have been
+     * searched before the first count was published).
      */
     watchPendingIndexCount(pendingIndexCount$: Observable<number>) {
         return pendingIndexCount$.subscribe((count) => {
             const wasPending = this.pendingIndexCount > 0;
             this.pendingIndexCount = count;
             const view = this.noteBottomViewModel$.value;
-            if (view.emptyReason?.kind !== "indexing" || !view.currentFile) {
+            const reason = view.emptyReason?.kind;
+            if (!view.currentFile) {
+                return;
+            }
+            if (reason === "none" && count > 0 && !wasPending) {
+                // The empty result was cached as final; drop it so the
+                // searches below actually look again.
+                this.cache.delete(view.currentFile.path);
+                this.noteBottomViewModel$.next({
+                    ...view,
+                    emptyReason: { kind: "indexing", remaining: count },
+                });
+                return;
+            }
+            if (reason !== "indexing") {
                 return;
             }
             if (count > 0) {
@@ -113,12 +141,34 @@ export class SimilarNoteCoordinator {
                     ...view,
                     emptyReason: { kind: "indexing", remaining: count },
                 });
+                if (
+                    Date.now() - this.lastIndexingSearchAt >=
+                    INDEXING_RESEARCH_INTERVAL_MS
+                ) {
+                    void this.researchWhileIndexing(view.currentFile);
+                }
             } else if (wasPending) {
                 // Indexing finished while this note showed the indexing
                 // line: search again now that the index is complete.
                 void this.emitNoteBottomViewModel(view.currentFile);
             }
         });
+    }
+
+    // One throttled search while the indexing line shows; skipped while a
+    // previous one is still running or the user has moved to another note.
+    private async researchWhileIndexing(file: TFile) {
+        if (this.indexingSearchInFlight) {
+            return;
+        }
+        this.indexingSearchInFlight = true;
+        try {
+            await this.emitNoteBottomViewModel(file, {
+                onlyIfStillCurrent: true,
+            });
+        } finally {
+            this.indexingSearchInFlight = false;
+        }
     }
 
     getNoteBottomViewModelObservable() {
@@ -227,8 +277,20 @@ export class SimilarNoteCoordinator {
         return true;
     }
 
-    async emitNoteBottomViewModel(file: TFile) {
+    async emitNoteBottomViewModel(
+        file: TFile,
+        options: { onlyIfStillCurrent?: boolean } = {}
+    ) {
+        // Any search restarts the indexing re-search throttle: the panel
+        // just looked, so the next look waits a full interval.
+        this.lastIndexingSearchAt = Date.now();
         const { notes, status } = await this.getSimilarNotesWithStatus(file);
+        if (
+            options.onlyIfStillCurrent &&
+            this.noteBottomViewModel$.value.currentFile?.path !== file.path
+        ) {
+            return;
+        }
         const settings = this.settingsService.get();
         const threshold = settings.minSimilarityThreshold;
         const filtered = notes.filter((entry) => entry.similarity >= threshold);

@@ -32,8 +32,20 @@ only when results exist; `indexing` only when there are zero results (EY3: if
 indexed notes already produce results during indexing, they are shown and no
 indexing line appears).
 
-While the indexing line shows, the count updates live. When the queue reaches
-zero the coordinator searches again for the open note.
+While the indexing line shows, the count updates live, and the coordinator
+searches again for the open note as the count drops, at most once every 10
+seconds (`INDEXING_RESEARCH_INTERVAL_MS`; the clock restarts on any search of
+the panel), so results fill in before the queue empties (QA sim7). The open
+note is usually not indexed yet, so each of these searches embeds it on the
+fly; 10 seconds keeps that to about six calls a minute on a long first index.
+Once results show, the panel leaves the indexing state and these searches
+stop. When the queue reaches zero it searches once more.
+
+The pending count is published as soon as the startup queue is filled, before
+the indexing loop starts (which waits for the model, possibly a first
+download). If the panel already shows "No similar notes found." when notes
+become queued (count 0 to positive), it switches to the indexing line and drops
+that cached empty result, so the searches above run (QA sim8).
 
 ## Caching
 
