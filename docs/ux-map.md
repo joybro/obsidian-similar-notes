@@ -30,7 +30,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
 - T2: Cmd+Shift+O → search-modal → type (required: ≥ min length) → pick result → (opened note)
 - T3: type the trigger `;;` + words in the editor → link-suggest → pick → link inserted in the editor
 - T4: install / Load & Apply in settings (load-model-modal) → status-bar (downloading → indexing → idle)
-- T5: settings → Exclude files from index / Exclude content from index → Apply Rules → status-bar (indexing)
+- T5: settings → Exclude files from index / Exclude content from index → Apply rules → status-bar (indexing)
 - T6: command "Export similar notes for active note" → JSON file `.obsidian/plugins/similar-notes/similar-notes-export.json` (no screen; contract in `docs/agent-export.md`)
 - T7: status-bar menu (N errored) → command "Retry errored notes" → status-bar
 
@@ -79,8 +79,8 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - 오류에서: the menu shows the last error; fix the provider in settings, then Retry errored notes
 
 - screen: settings | states: ideal, ideal-mobile-warning, partial-unapplied-model, ideal-trigger-off
-  - 무엇을 보여주나: model provider and model (Load & Apply), display options, link-suggestion trigger (empty trigger turns it off), index exclusions with preview and Apply Rules, usage stats, Reindex and Clear
-  - 행동: change provider/model, Load & Apply, edit exclusions, Apply Rules, Reindex, Clear
+  - 무엇을 보여주나: model provider and model (Load & Apply), display options, link-suggestion trigger (empty trigger turns it off), index exclusions with preview and Apply rules, usage stats, Reindex and Clear
+  - 행동: change provider/model, Load & Apply, edit exclusions, Apply rules, Reindex, Clear
   - → load-model-modal (modal): Load & Apply
   - → settings (back): close settings
 

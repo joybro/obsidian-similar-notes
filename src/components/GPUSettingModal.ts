@@ -26,7 +26,7 @@ export class GPUSettingModal extends Modal {
         new Setting(contentEl)
             .addButton((btn) =>
                 btn
-                    .setButtonText("Yes, Disable GPU")
+                    .setButtonText("Yes, disable GPU")
                     .setCta()
                     .onClick(async () => {
                         try {
@@ -41,7 +41,7 @@ export class GPUSettingModal extends Modal {
             )
             .addButton((btn) =>
                 btn
-                    .setButtonText("No, Keep GPU Enabled")
+                    .setButtonText("No, keep GPU on")
                     .onClick(() => {
                         if (this.onCancel) {
                             this.onCancel();

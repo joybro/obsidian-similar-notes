@@ -40,7 +40,7 @@ export function getGeminiSettingBuilders(props: GeminiSettingsSectionProps): Set
         // API Key
         (setting) => {
             setting
-                .setName("API Key")
+                .setName("API key")
                 .setDesc("Your Google AI Studio API key (get it from aistudio.google.com)")
                 .addText((text) => {
                     text.setPlaceholder("AIza...")

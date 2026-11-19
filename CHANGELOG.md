@@ -19,6 +19,9 @@ All notable changes to this project will be documented in this file.
 -   **An empty Similar notes panel now says why**: instead of always "No similar notes found.", the panel tells you when the note has no text yet, when it's excluded and not sent to OpenAI or Gemini, when the model couldn't analyze it, when results are hidden by your minimum similarity, or when your vault is still being indexed (with the number of notes left).
 -   **README and settings text now match what the plugin does**: the README says mobile installs start with a cloud API (key needed), that Ollama on mobile needs a server the phone can reach, and that settings including API keys live in plain text in the plugin's `data.json` inside the vault. The mobile warning for built-in models now recommends OpenAI or Gemini and mentions the one-time model download from Hugging Face.
 -   **Path patterns setting explains what exclusion covers**: the description now says how excluded notes behave when you open them with a cloud API versus a local model.
+-   **Path patterns setting points to Apply rules, not Reindex**: the description now says changes apply as notes are edited and that **Apply rules** applies them to all notes now. Previously it pointed to Reindex, which re-embeds the whole vault (and with a cloud provider, pays for it again).
+-   **"Couldn't analyze this note" shows in red**: when the model fails on the open note, the panel line uses the error color so it no longer reads like the other grey hints.
+-   **Settings labels use sentence case**: Apply rules, Copy to clipboard, API key, Debug and support, and the GPU dialog's buttons.
 
 ## [1.7.0] - 2026-09-05
 
