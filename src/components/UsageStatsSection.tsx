@@ -1,5 +1,6 @@
 import type { SettingsService, SimilarNotesSettings, UsageStats } from "@/application/SettingsService";
 import { Notice, SettingGroup, type TextComponent, type ButtonComponent } from "obsidian";
+import { localDateKey } from "@/utils/localDate";
 
 interface UsageStatsSectionProps {
     sectionContainer: HTMLElement;
@@ -145,7 +146,7 @@ function estimateCost(tokens: number, pricePerMillion?: number): string | null {
  */
 function getTodayKey(): string {
     const now = new Date();
-    return now.toISOString().split("T")[0];
+    return localDateKey(now);
 }
 
 /**

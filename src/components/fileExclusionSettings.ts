@@ -84,7 +84,7 @@ export function buildExcludeFrontmatterSetting(
 
     // Rule syntax reference, below the one-line description.
     const syntax = setting.descEl.createEl("ul");
-    syntax.createEl("li").setText("key — property exists (and is not false)");
+    syntax.createEl("li").setText("key — property exists and is not false or empty");
     syntax.createEl("li").setText(
         "key: value — property equals the value, or the list contains it"
     );
