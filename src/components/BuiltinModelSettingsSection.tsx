@@ -94,7 +94,7 @@ export function getBuiltinModelSettingBuilders(
                         .onChange((value) => {
                             onUseGPUChange(value);
                             // Delay redraw to allow toggle animation to complete
-                            setTimeout(() => {
+                            window.setTimeout(() => {
                                 onRender(); // Redraw to update Apply button state
                             }, 150);
                         });

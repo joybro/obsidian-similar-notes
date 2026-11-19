@@ -159,28 +159,28 @@ const SearchResult = ({
     useLayoutEffect(() => {
         if (isCollapsed) {
             // When collapsing: Start the animation
-            // eslint-disable-next-line react-hooks/set-state-in-effect
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state must flip in the same layout pass
             setIsAnimating(true);
 
             // Remove from DOM after animation completes
-            const timer = setTimeout(() => {
+            const timer = window.setTimeout(() => {
                 setShouldRender(false);
                 setIsAnimating(false);
             }, animationDuration);
-            return () => clearTimeout(timer);
+            return () => window.clearTimeout(timer);
         }
         // When expanding:
         // 1. First render in collapsed state
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state must flip in the same layout pass
         setShouldRender(true);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- animation state must flip in the same layout pass
         setIsAnimating(true);
 
         // 2. Start animation in the next frame
-        const timer = setTimeout(() => {
+        const timer = window.setTimeout(() => {
             setIsAnimating(false);
         }, 20); // Short delay to ensure browser has time to render the collapsed state
-        return () => clearTimeout(timer);
+        return () => window.clearTimeout(timer);
     }, [isCollapsed]);
 
     const toggleCollapse = (e: React.MouseEvent) => {

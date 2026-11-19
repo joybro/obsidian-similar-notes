@@ -41,7 +41,7 @@ function collectSystemInfo(): SystemInfo {
         return empty;
     }
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+        // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- os exists only on desktop, loaded lazily inside try
         const os = require("os") as typeof import("os");
         return {
             totalMemoryGB: Math.round(os.totalmem() / 1024 ** 3),

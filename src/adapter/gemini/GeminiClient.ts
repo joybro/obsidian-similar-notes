@@ -99,7 +99,7 @@ export class GeminiClient {
                         parts: [{ text }],
                     },
                     taskType: "RETRIEVAL_DOCUMENT",
-                } as GeminiEmbedRequest),
+                }),
                 throw: false,
             });
             const elapsed = Date.now() - startTime;
@@ -149,7 +149,7 @@ export class GeminiClient {
                         },
                         taskType: "RETRIEVAL_DOCUMENT",
                     })),
-                } as GeminiBatchEmbedRequest),
+                }),
                 throw: false,
             });
             const elapsed = Date.now() - startTime;
@@ -189,7 +189,7 @@ export class GeminiClient {
                 headers: this.buildHeaders(),
                 body: JSON.stringify({
                     contents: [{ parts: [{ text }] }],
-                } as GeminiCountTokensRequest),
+                }),
                 throw: false,
             });
 

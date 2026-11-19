@@ -83,7 +83,7 @@ export class OpenAIClient {
                 body: JSON.stringify({
                     model,
                     input: text,
-                } as OpenAIEmbeddingRequest),
+                }),
                 throw: false,
             });
             const elapsed = Date.now() - startTime;
@@ -134,7 +134,7 @@ export class OpenAIClient {
                 body: JSON.stringify({
                     model,
                     input: texts,
-                } as OpenAIEmbeddingRequest),
+                }),
                 throw: false,
             });
             const elapsed = Date.now() - startTime;

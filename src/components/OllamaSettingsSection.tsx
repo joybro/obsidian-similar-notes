@@ -74,7 +74,7 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                 // Disable non-embedding model options via DOM
                 const options = dropdown.selectEl.querySelectorAll("option");
                 ollamaModels.forEach((model, index) => {
-                    const optionEl = options[index + 1] as HTMLOptionElement; // +1: skip "Select a model"
+                    const optionEl = options[index + 1]; // +1: skip "Select a model"
                     if (optionEl && !model.isEmbeddingModel) {
                         optionEl.disabled = true;
                     }

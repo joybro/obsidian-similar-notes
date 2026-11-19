@@ -22,7 +22,7 @@ import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 const MAX_ATTEMPTS = 3;
 
 export class NoteIndexingService {
-    private fileChangeLoopTimer: NodeJS.Timeout | null = null;
+    private fileChangeLoopTimer: number | null = null;
     private noteChangeCount$: BehaviorSubject<number>;
 
     constructor(
@@ -56,7 +56,7 @@ export class NoteIndexingService {
 
             const changes = await this.noteChangeQueue.pollFileChanges(concurrency);
             if (changes.length === 0) {
-                this.fileChangeLoopTimer = setTimeout(fileChangeLoop, 1000);
+                this.fileChangeLoopTimer = window.setTimeout(fileChangeLoop, 1000);
                 return;
             }
 
@@ -159,7 +159,7 @@ export class NoteIndexingService {
 
     stopLoop() {
         if (this.fileChangeLoopTimer) {
-            clearTimeout(this.fileChangeLoopTimer);
+            window.clearTimeout(this.fileChangeLoopTimer);
         }
     }
 
