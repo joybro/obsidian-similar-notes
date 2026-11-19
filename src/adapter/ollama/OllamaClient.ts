@@ -33,6 +33,16 @@ export interface OllamaEmbeddingResponse {
     embeddings: number[][];
 }
 
+/** The parts of Ollama's /api/show response this client reads. */
+interface OllamaShowResponse {
+    details?: {
+        parameter_size?: string;
+        quantization_level?: string;
+        family?: string;
+    };
+    model_info?: Record<string, number | undefined>;
+}
+
 export interface OllamaModelInfo {
     parameterSize: string;      // e.g., "566.70M"
     quantizationLevel: string;  // e.g., "F16"
@@ -87,7 +97,7 @@ export class OllamaClient {
                 throw new Error(`Failed to fetch models: ${response.statusText}`);
             }
             
-            const data: OllamaModelsResponse = await response.json();
+            const data = (await response.json()) as OllamaModelsResponse;
             
             if (!data.models || !Array.isArray(data.models)) {
                 log.warn("Ollama API returned invalid models data", data);
@@ -160,7 +170,7 @@ export class OllamaClient {
             }
 
             log.debug(`[Ollama] Embedding successful in ${elapsed}ms`);
-            const data: OllamaEmbeddingResponse = await response.json();
+            const data = (await response.json()) as OllamaEmbeddingResponse;
 
             if (
                 !data.embeddings ||
@@ -211,7 +221,7 @@ export class OllamaClient {
             }
 
             log.debug(`[Ollama] Batch embedding successful in ${elapsed}ms`);
-            const data: OllamaEmbeddingResponse = await response.json();
+            const data = (await response.json()) as OllamaEmbeddingResponse;
 
             // The embedding count MUST match the input count: NoteIndexingService
             // maps embeddings back to chunks by array index, so a short or
@@ -252,10 +262,10 @@ export class OllamaClient {
                 return null;
             }
 
-            const data = await response.json();
+            const data = (await response.json()) as OllamaShowResponse;
 
-            const details = data.details || {};
-            const modelInfo = data.model_info || {};
+            const details = data.details ?? {};
+            const modelInfo = data.model_info ?? {};
 
             // Find embedding length from model_info (varies by architecture)
             const embeddingLength =
