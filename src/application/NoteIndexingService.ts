@@ -18,13 +18,14 @@ import { computeIndexableTextHash } from "@/utils/indexableTextHash";
 import log from "loglevel";
 import type { App } from "obsidian";
 import { type Observable, BehaviorSubject } from "rxjs";
+import { NoteIndexingLoop } from "./NoteIndexingLoop";
 import type { SimilarNoteCoordinator } from "./SimilarNoteCoordinator";
 
 const MAX_ATTEMPTS = 3;
 
 export class NoteIndexingService {
-    private fileChangeLoopTimer: number | null = null;
     private noteChangeCount$: BehaviorSubject<number>;
+    private readonly indexingLoop: NoteIndexingLoop;
 
     constructor(
         private noteRepository: NoteRepository,
@@ -44,43 +45,16 @@ export class NoteIndexingService {
         this.noteChangeCount$ = new BehaviorSubject<number>(
             noteChangeQueue.getFileChangeCount()
         );
+        this.indexingLoop = new NoteIndexingLoop(
+            noteChangeQueue,
+            (change) => this.processChange(change),
+            () => embeddingService.supportsParallelProcessing(),
+            (count) => this.noteChangeCount$.next(count)
+        );
     }
 
     startLoop() {
-        const scheduleNext = () => {
-            this.fileChangeLoopTimer = window.setTimeout(() => void fileChangeLoop(), 1000);
-        };
-        const fileChangeLoop = async () => {
-            try {
-                const count = this.noteChangeQueue.getFileChangeCount();
-                this.noteChangeCount$.next(count);
-
-                // Determine concurrency based on provider capability
-                const supportsParallel = this.embeddingService.supportsParallelProcessing();
-                const concurrency = supportsParallel ? 5 : 1;
-
-                const changes = this.noteChangeQueue.pollFileChanges(concurrency);
-                if (changes.length === 0) {
-                    scheduleNext();
-                    return;
-                }
-
-                // Process files in parallel (or sequentially if concurrency=1)
-                await Promise.allSettled(
-                    changes.map((change) => this.processChange(change))
-                );
-            } catch (error) {
-                // A failed poll must not end indexing for the session: log and
-                // try again on the idle cadence.
-                log.error("[NoteIndexingService] Change loop failed, retrying in 1s:", error);
-                scheduleNext();
-                return;
-            }
-
-            void fileChangeLoop();
-        };
-
-        void fileChangeLoop();
+        this.indexingLoop.start();
     }
 
     /**
@@ -170,9 +144,7 @@ export class NoteIndexingService {
     }
 
     stopLoop() {
-        if (this.fileChangeLoopTimer) {
-            window.clearTimeout(this.fileChangeLoopTimer);
-        }
+        this.indexingLoop.stop();
     }
 
     /**

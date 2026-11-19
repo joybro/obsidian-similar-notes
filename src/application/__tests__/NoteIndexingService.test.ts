@@ -1,6 +1,6 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
 import { NoteIndexingService } from "../NoteIndexingService";
-import { firstValueFrom } from "rxjs";
+import { EMPTY, firstValueFrom } from "rxjs";
 import type { NoteChange } from "@/infrastructure/noteChangeQueue";
 import { computeIndexableTextHash } from "@/utils/indexableTextHash";
 
@@ -32,6 +32,7 @@ interface ChangeProcessor {
 // the note → chunk → embed pipeline.
 function makeService() {
     const queue = {
+        getReadyChanges$: () => EMPTY,
         requeue: vi.fn(),
         getFileChangeCount: vi.fn().mockReturnValue(0),
         getIndexableTextHash: vi.fn().mockReturnValue(undefined),

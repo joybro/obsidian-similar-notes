@@ -47,6 +47,7 @@ src/
 
 ### Application Services
 - **NoteIndexingService** (`application/NoteIndexingService.ts`): Manages background indexing of notes with progress tracking.
+- **NoteIndexingLoop** (`application/NoteIndexingLoop.ts`): Drains ready queue work within provider concurrency limits, waking immediately after the configured edit delay and serializing stop/restart across in-flight work. See `docs/indexing-wakeup-spec.md`.
 - **SettingsService** (`application/SettingsService.ts`): Handles plugin settings management and persistence.
 - **SimilarNoteCoordinator** (`application/SimilarNoteCoordinator.ts`): Coordinates similar note finding and UI updates.
 - **LeafViewCoordinator** (`application/LeafViewCoordinator.ts`): Manages Obsidian leaf views and bottom panel display.

@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **Similar notes refresh sooner after edits**: once a saved edit's indexing delay has passed, indexing starts without waiting for the next polling interval. Your delay setting stays the same. Stopping or reloading the indexer also no longer leaves an old processing loop running alongside the new one.
 -   **Excluded notes are no longer sent to a cloud API when you open them**: with OpenAI or Gemini as the provider, opening a note excluded by path or frontmatter no longer embeds its text on the fly, so it never leaves your device. That note's own Similar notes panel shows a line saying it is excluded instead of results. With a built-in model or Ollama nothing changes.
 -   **Newly excluded notes disappear from results right away**: after you exclude a note (path pattern or frontmatter rule), it no longer shows up in other notes' Similar notes panels, even ones whose results were already shown before. Previously those panels could keep showing it until the note you were viewing was edited.
 -   **Indexing no longer stops until restart after an unexpected error**: if an unexpected error happens while the plugin picks the next notes to index, it now logs the error and tries again a second later. Before, indexing quietly stopped until Obsidian was restarted.
