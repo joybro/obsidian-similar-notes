@@ -158,7 +158,7 @@ function useSemanticSearch(textSearchService: TextSearchService) {
 
     useEffect(() => {
         if (debounceRef.current) window.clearTimeout(debounceRef.current);
-        debounceRef.current = window.setTimeout(() => performSearch(query), DEBOUNCE_MS);
+        debounceRef.current = window.setTimeout(() => void performSearch(query), DEBOUNCE_MS);
         return () => {
             if (debounceRef.current) window.clearTimeout(debounceRef.current);
         };
