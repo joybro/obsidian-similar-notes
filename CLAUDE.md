@@ -41,8 +41,8 @@ When a change needs to be verified by hand in real Obsidian (e.g. memory/leak
 behavior, focus handling, anything not coverable by Vitest):
 
 1. `npm run install-local` — rebuilds and copies `main.js` / `manifest.json` /
-   `styles.css` into the **Test_local** vault
-   (`~/Obsidian/Test_local/.obsidian/plugins/similar-notes/`). This vault holds a
+   `styles.css` into the **PluginSandbox** vault
+   (`~/Obsidian/PluginSandbox/.obsidian/plugins/similar-notes/`). This vault holds a
    plain **copy**, so a bare `npm run build` does NOT update it — always go through
    `install-local` (or `./scripts/install-local.sh` if already built).
 2. In Obsidian, disable → re-enable the plugin (or restart) to load the new build.
@@ -50,11 +50,11 @@ behavior, focus handling, anything not coverable by Vitest):
 This is the canonical manual-verification path.
 
 `docs/ux-map.md` lists the plugin's user tasks and every (surface, state) pair
-with how to open it in Test_local (auto via CLI/CDP, manual, or not
+with how to open it in PluginSandbox (auto via CLI/CDP, manual, or not
 reproducible). `scripts/install-local.sh` is gitignored, so a fresh clone
-lacks it: the map gives the equivalent `cp` into the Test_local plugin folder.
+lacks it: the map gives the equivalent `cp` into the PluginSandbox plugin folder.
 
-The **Test_local vault is disposable test data**: freely edit, create, or delete
+The **PluginSandbox vault is disposable test data**: freely edit, create, or delete
 notes in it during verification (e.g. CDP typing tests) — do NOT spend effort
 restoring notes to their prior content afterwards.
 
@@ -66,9 +66,9 @@ via Settings → General → Command line interface). After `install-local`, run
 loop from a shell:
 
 ```bash
-obsidian vault=Test_local plugin:reload id=similar-notes        # load the fresh build
-obsidian vault=Test_local open path="Some Note.md"              # set the active note
-obsidian vault=Test_local command id=similar-notes:<command-id> # run the command
+obsidian vault=PluginSandbox plugin:reload id=similar-notes        # load the fresh build
+obsidian vault=PluginSandbox open path="Some Note.md"              # set the active note
+obsidian vault=PluginSandbox command id=similar-notes:<command-id> # run the command
 # then read whatever the command wrote (e.g. the export JSON)
 ```
 
@@ -152,3 +152,9 @@ obsidian dev:cdp method=Input.insertText params='{"text":";;query"}'  # real typ
 1. **Worker Loading**: If embedding service fails, check worker bundle generation in build config
 2. **Model Download**: First-time model download can take time; check network connectivity
 3. **Memory Usage**: Large vaults may consume significant memory for embeddings storage
+
+## Public repository content
+
+This is a public open-source repository. Commit only project code and documentation useful to contributors or users. Keep private operating notes, product strategy, personal paths, machine/account details, chat identifiers, private review identifiers and internal work-tracking numbers outside this repository. This applies to commit messages as well as file contents. Private approval provenance belongs in private project records; a generic technical rationale or a public issue link is sufficient here.
+
+Before committing or pushing, inspect every changed file and the outgoing commit subjects for private context. Never replay a commit that upstream deliberately removed. After fetching and rebasing, inspect the resulting tree and outgoing commits again before pushing. Keep local maintainer identity documents and execution plans outside version control.

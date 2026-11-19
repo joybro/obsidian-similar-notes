@@ -123,7 +123,7 @@ describe("SimilarNoteFinder search status (panel-empty-states spec)", () => {
         expect(r.status).toBe("ad-hoc-disallowed");
     });
 
-    it("an empty excluded note under a cloud provider reports the skip, not empty content (QA sim9)", async () => {
+    it("an empty excluded note under a cloud provider reports the skip, not empty content", async () => {
         const r = await makeFinder(ok).findSimilarNotesWithStatus(
             new Note("Private/d.md", "d", "", []),
             5,

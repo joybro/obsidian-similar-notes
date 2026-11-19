@@ -2,8 +2,7 @@
 
 ## Status
 
-Accepted by the maintainer 2026-11-19 (similar-notes-dev desk `decisions.md`
-"의미 검색에 제목 벡터 추가"), implemented in this change. Issue
+Implemented. Issue
 [#26](https://github.com/joybro/obsidian-similar-notes/issues/26).
 
 ## Problem
@@ -11,8 +10,7 @@ Accepted by the maintainer 2026-11-19 (similar-notes-dev desk `decisions.md`
 A note's title is embedded only as the first line of its first chunk
 (`${title}\n\n${content}`), so in a long note the title is a small part of one
 vector. Searching by part of a note's title (semantic search modal, `;;` link
-suggestion) often misses the note. Measured on two samples (similar-notes-dev
-desk `research/2026-11-19-title-weighting.md`), mean reciprocal rank for
+suggestion) often misses the note. Measured in a local benchmark on two samples, mean reciprocal rank for
 title-fragment queries: English 0.64, Korean 0.17.
 
 ## Decision
@@ -21,7 +19,7 @@ Each indexed note gets one extra vector for its title alone. Text queries score
 a note by the higher of its best body-chunk similarity and its title
 similarity. The Similar notes panel (note to note) does not use title vectors.
 
-Measured effect of this rule (same research): title-fragment MRR English 0.64
+Measured effect of this rule in the same local benchmark: title-fragment MRR English 0.64
 → 0.97, Korean 0.17 → 0.73; body-sentence queries change by -0.025 (English)
 and -0.014 (Korean).
 

@@ -1,8 +1,6 @@
 # Panel empty states
 
-Status: implemented 2026-11-19. Source: limehouse-cdo review
-`reviews/2026-11-19-0605-similar-notes-panel-empty-states.md` EY1~EY4 (CDO
-T1952; similar-notes-dev T14).
+Status: implemented.
 
 ## Problem
 
@@ -18,8 +16,7 @@ is still working.
 Same place, same `search-empty-state` line; only the text changes. No new
 controls. The line is grey except `embedding-failed`, which adds `is-error`
 (`var(--text-error)`): a confirmed failure that won't clear by itself reads red,
-while fixed guidance and self-resolving states stay grey (limehouse-cdo ET2,
-2026-11-19).
+while fixed guidance and self-resolving states stay grey.
 
 | Reason | When | Text |
 |---|---|---|
@@ -32,15 +29,15 @@ while fixed guidance and self-resolving states stay grey (limehouse-cdo ET2,
 
 Order: the first three are searches that never ran and win; `excluded-cloud`
 beats `unwritten`, so an empty excluded note under a cloud provider already
-says it is excluded (writing in it would not bring results; QA sim9); `below-threshold`
-only when results exist; `indexing` only when there are zero results (EY3: if
+says it is excluded (writing in it would not bring results); `below-threshold`
+only when results exist; `indexing` only when there are zero results (if
 indexed notes already produce results during indexing, they are shown and no
 indexing line appears).
 
 While the indexing line shows, the count updates live, and the coordinator
 searches again for the open note as the count drops, at most once every 10
 seconds (`INDEXING_RESEARCH_INTERVAL_MS`; the clock restarts on any search of
-the panel), so results fill in before the queue empties (QA sim7). The open
+the panel), so results fill in before the queue empties. The open
 note is usually not indexed yet, so each of these searches embeds it on the
 fly; 10 seconds keeps that to about six calls a minute on a long first index.
 Once results show, the panel leaves the indexing state and these searches
@@ -50,9 +47,9 @@ The pending count is published as soon as the startup queue is filled, before
 the indexing loop starts (which waits for the model, possibly a first
 download). If the panel already shows "No similar notes found." when notes
 become queued (count 0 to positive), it switches to the indexing line and drops
-that cached empty result, so the searches above run (QA sim8).
+that cached empty result, so the searches above run.
 
-Only notes other than the open one count toward this line (CDO IR3). The open
+Only notes other than the open one count toward this line. The open
 note's own queued edit (typing in a note with no results, then pausing) never
 fills its own panel, since a note is not in its own results, so the panel keeps
 "No similar notes found." instead of promising results and flickering at every
@@ -72,6 +69,6 @@ notes are queued.
 - The OpenAI provider pointed at an OpenAI-compatible server still says
   "OpenAI" (the URL is not inspected, same as frontmatter-exclusion spec §2.1).
 - What the panel shows while the built-in model is still downloading was not
-  observed in a running Obsidian (EY3 question); by code, an embedding call
+  observed in a running Obsidian; by code, an embedding call
   before the model is ready fails or waits, which maps to `embedding-failed`
   or a late result.

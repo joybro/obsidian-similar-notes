@@ -71,12 +71,10 @@ Exclusion removes a note as a recommendation *target*: it never appears in
 other notes' similar-notes results, because it has no indexed chunks. Opening
 an excluded note still shows its own similar-notes panel — the finder
 generates an ad-hoc query embedding when no indexed chunks exist. This is
-deliberate (owner decision, 2026-08-29) and matches how path-excluded notes
-have always behaved. Note the consequence for remote providers: viewing an
-excluded note still sends its content to the embedding API for the query-side
-embedding.
+deliberate for local providers and matches how path-excluded notes behave.
+Cloud providers skip the ad-hoc embedding as described below.
 
-Two consequences of keeping this behavior (QA ledger sim1, 2026-11-19):
+The exclusion behavior also has these consequences:
 
 - The ad-hoc query embedding applies `excludeRegexPatterns` to the note text
   first (`SimilarNoteCoordinator.getSimilarNotes`), so regex-excluded content
@@ -92,15 +90,13 @@ Two consequences of keeping this behavior (QA ledger sim1, 2026-11-19):
   device. Local providers (`builtin`, `ollama`) keep the panel as
   before. An `openai` provider pointed at a local OpenAI-compatible server is
   still treated as cloud (the URL is not inspected). The "Path patterns"
-  setting description states this, including "after you apply the rules"
-  (QA sim10). Owner decision: similar-notes-dev desk
-  `decisions.md`, 2026-11-19 request.
+  setting description states this, including "after you apply the rules".
 - The results cache (`SimilarNoteCoordinator`, keyed on the source note's
   mtime) does not decide exclusion. Every read and every refresh drops targets
   that are excluded *now* (path patterns or frontmatter rules), and an
   excluded source under a cloud provider bypasses the cache, so an exclusion
   applied after results were cached takes effect on the next open without
-  editing the source (QA sim6, 2026-11-19).
+  editing the source.
 
 ## §3 Status accounting
 

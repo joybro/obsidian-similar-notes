@@ -1,6 +1,6 @@
 # UX map — Similar Notes
 
-Format: limehouse `ux-map` skill (tasks, flows, screens; no visuals or copy).
+Format: tasks, flows and screens, without visuals or copy.
 Host app is Obsidian, so "screens" are the plugin's surfaces inside it: the
 footer panel under a note, the sidebar view, the semantic-search modal, the
 `;;` link suggestion popup, the status bar item and the settings tab. Feature
@@ -8,7 +8,7 @@ specs carry a "지도 변경분" (map delta) and the shipping change edits this 
 
 How each (screen, state) is reproduced is in **Reproduction** at the end:
 there is no DEBUG screen-entry hook in the plugin, so pairs are opened in the
-disposable **Test_local** vault through synthetic notes, settings and the
+disposable **PluginSandbox** vault through synthetic notes, settings and the
 Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
 `auto`, `manual` or `not reproducible`.
 
@@ -89,28 +89,28 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - 오류에서: close and fix the model id or provider
   - → settings (back): close
 
-## Reproduction (Test_local)
+## Reproduction (PluginSandbox)
 
-The vault `~/Obsidian/Test_local` is disposable test data. Never use the owner's own vault.
+The vault `~/Obsidian/PluginSandbox` is disposable test data.
 
-Install the build (the repo's `npm run install-local` calls `scripts/install-local.sh`, which is gitignored and exists only on the machine that made it; this is the same step):
+Install the build into the test vault:
 
 ```bash
 npm run build
-cp main.js manifest.json styles.css ~/Obsidian/Test_local/.obsidian/plugins/similar-notes/
+cp main.js manifest.json styles.css ~/Obsidian/PluginSandbox/.obsidian/plugins/similar-notes/
 PATH="$PATH:/Applications/Obsidian.app/Contents/MacOS"
-obsidian vault=Test_local plugin:reload id=similar-notes
+obsidian vault=PluginSandbox plugin:reload id=similar-notes
 ```
 
-Synthetic repro for T1 note-footer `ideal` (requires the Obsidian app running with Test_local open):
+Synthetic repro for T1 note-footer `ideal` (requires the Obsidian app running with PluginSandbox open):
 
 ```bash
-V=~/Obsidian/Test_local
+V=~/Obsidian/PluginSandbox
 printf '# Coffee brewing\nPour-over coffee needs a medium-fine grind and 93C water.\n' > "$V/ux-coffee-a.md"
 printf '# Espresso notes\nEspresso coffee uses a fine grind and high pressure.\n' > "$V/ux-coffee-b.md"
-obsidian vault=Test_local open path="ux-coffee-a.md"
+obsidian vault=PluginSandbox open path="ux-coffee-a.md"
 # wait for indexing (status bar idle), then count footer results:
-obsidian vault=Test_local eval code="document.querySelectorAll('.search-result-file-title').length"
+obsidian vault=PluginSandbox eval code="document.querySelectorAll('.search-result-file-title').length"
 ```
 
 | Pair | How | Kind |
@@ -133,4 +133,4 @@ obsidian vault=Test_local eval code="document.querySelectorAll('.search-result-f
 | settings ideal-mobile-warning | only on a phone (`Platform.isMobile`) | not reproducible on desktop |
 | load-model-modal * | Load & Apply in settings | manual (button in settings UI) |
 
-Status of this table (2026-11-19): written from the code at 17e83be..f02e85d. The CLI was turned on on the Mac mini the same day, and at 6334f42 the note-footer states empty-unwritten, empty-below-threshold, empty-excluded-note, loading-indexing, error-embedding and ideal were rendered and captured there (with runtime overrides for the cloud provider, the threshold and a failing embed; capture notes live in the similar-notes-dev desk `captures/2026-11-19-panel-states/README.md`). Over ssh the mini is reachable as `ssh mini '/Applications/Obsidian.app/Contents/MacOS/Obsidian vault=Test_local …'`; "Your Obsidian installer is out of date" is a harmless warning.
+The note-footer states empty-unwritten, empty-below-threshold, empty-excluded-note, loading-indexing, error-embedding and ideal were rendered in Obsidian with runtime overrides for the cloud provider, threshold and a failing embedding. The other states remain subject to the reproduction conditions above.

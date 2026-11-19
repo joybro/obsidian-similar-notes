@@ -188,7 +188,7 @@ describe("SimilarNotesViewReact", () => {
         );
         const el = await screen.findByText(text);
         expect(el).toBeInTheDocument();
-        // Only the confirmed failure is styled as an error (CDO ET2)
+        // Only the confirmed failure is styled as an error
         expect(el.classList.contains("is-error")).toBe(emptyReason.kind === "embedding-failed");
     });
 

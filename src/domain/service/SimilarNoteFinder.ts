@@ -53,7 +53,7 @@ export class SimilarNoteFinder {
         if (!note.content) {
             // An excluded note under a cloud provider is never embedded, so
             // writing in it will not bring results; say that rather than
-            // "write a few lines" (QA sim9).
+            // "write a few lines".
             if (!options.allowAdHocEmbedding) {
                 return { notes: [], status: "ad-hoc-disallowed" };
             }

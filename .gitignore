@@ -25,5 +25,9 @@ scripts/install-local.sh
 
 # shared AI workspace (symlink)
 
-# superpowers artifacts (specs/plans) — local only
+# Local agent artifacts
 .superpowers/
+
+# Private maintainer documents
+/PRODUCT.md
+/docs/plans/

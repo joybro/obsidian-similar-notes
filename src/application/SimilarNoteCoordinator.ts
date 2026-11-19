@@ -46,7 +46,7 @@ export class SimilarNoteCoordinator {
     private pendingIndexCount = 0;
     // How many of those queued changes are for a given path. The open note's
     // own queued edit never fills its own panel (it is not in its own
-    // results), so only the others count toward the indexing line (CDO IR3).
+    // results), so only the others count toward the indexing line.
     private queuedCountFor: (path: string) => number = () => 0;
     // Throttle for re-searching while the panel shows the indexing line.
     private lastIndexingSearchAt = 0;
@@ -114,9 +114,9 @@ export class SimilarNoteCoordinator {
      *
      * While the panel shows the indexing line it searches again as the count
      * drops (throttled, INDEXING_RESEARCH_INTERVAL_MS), so results fill in as
-     * notes are indexed, as the line promises (QA sim7), and once more when
+     * notes are indexed, as the line promises, and once more when
      * the queue reaches zero. A plain "none" panel switches to the indexing
-     * line when notes become queued (QA sim8: the open note may have been
+     * line when notes become queued (the open note may have been
      * searched before the first count was published).
      */
     watchPendingIndexCount(
@@ -387,7 +387,7 @@ export class SimilarNoteCoordinator {
         // The cache is keyed on the source's mtime only, so an exclusion
         // applied after caching (path pattern saved, frontmatter rule matched
         // on another note) does not invalidate it. Re-check exclusion on every
-        // read instead (frontmatter-exclusion spec §2.1, QA sim6).
+        // read instead (frontmatter-exclusion spec §2.1).
         const cacheEntry = this.cache.get(file.path);
         if (
             cacheEntry &&
