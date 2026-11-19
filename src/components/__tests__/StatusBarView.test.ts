@@ -152,3 +152,36 @@ describe("StatusBarView errored count (indexing-status spec §4.7)", () => {
         view.dispose();
     });
 });
+
+describe("StatusBarView model line names the active provider", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        capturedTitles.length = 0;
+    });
+
+    it.each([
+        ["builtin", "Built-in Models"],
+        ["ollama", "Ollama"],
+        ["openai", "OpenAI / Compatible"],
+        ["gemini", "Google Gemini"],
+    ])("provider %s is labeled %s", async (providerType, label) => {
+        const { config, statusBarItem } = createConfig();
+        (
+            config.modelService as unknown as {
+                getCurrentProviderType: () => string;
+            }
+        ).getCurrentProviderType = () => providerType;
+        const view = new StatusBarView(config);
+
+        const handler = statusBarItem.addEventListener.mock.calls[0][1] as (
+            evt: MouseEvent
+        ) => void;
+        handler({} as MouseEvent);
+
+        await vi.waitFor(() => {
+            expect(capturedTitles).toContain(`Model: m (${label})`);
+        });
+
+        view.dispose();
+    });
+});
