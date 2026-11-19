@@ -15,8 +15,11 @@ is still working.
 
 ## Behavior
 
-Same place, same grey `search-empty-state` line; only the text changes. No new
-controls.
+Same place, same `search-empty-state` line; only the text changes. No new
+controls. The line is grey except `embedding-failed`, which adds `is-error`
+(`var(--text-error)`): a confirmed failure that won't clear by itself reads red,
+while fixed guidance and self-resolving states stay grey (limehouse-cdo ET2,
+2026-11-19).
 
 | Reason | When | Text |
 |---|---|---|
