@@ -1,6 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 import { getOllamaSettingBuilders } from "../OllamaSettingsSection";
 import type { SimilarNotesSettings } from "@/application/SettingsService";
+import { OllamaClient } from "@/adapter/ollama";
+
+const notices = vi.hoisted(() => [] as string[]);
+vi.mock("obsidian", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("obsidian")>();
+    class Notice {
+        constructor(message: string) {
+            notices.push(message);
+        }
+    }
+    return { ...actual, Notice };
+});
 
 // A fake Setting that captures the onChange handler registered on its text input.
 function makeFakeSetting() {
@@ -77,5 +89,116 @@ describe("Ollama URL input (issue #43 — can only edit URL one character at a t
 
         expect(onOllamaUrlChange).toHaveBeenCalledWith("http://localhost:1143");
         expect(updateApplyButtonState).toHaveBeenCalled();
+    });
+});
+
+// A fake Setting that captures every handler the three Ollama rows register.
+function makeFullFakeSetting() {
+    const handlers: {
+        text?: (value: string) => void;
+        dropdown?: (value: string) => void;
+        clicks: Array<() => Promise<void> | void>;
+    } = { clicks: [] };
+    const setting = {
+        setName: () => setting,
+        setDesc: () => setting,
+        addText: (cb: (text: unknown) => void) => {
+            const text = {
+                setPlaceholder: () => text,
+                setValue: () => text,
+                onChange: (fn: (value: string) => void) => {
+                    handlers.text = fn;
+                    return text;
+                },
+            };
+            cb(text);
+            return setting;
+        },
+        addDropdown: (cb: (dropdown: unknown) => void) => {
+            const dropdown = {
+                addOption: () => dropdown,
+                setValue: () => dropdown,
+                onChange: (fn: (value: string) => void) => {
+                    handlers.dropdown = fn;
+                    return dropdown;
+                },
+            };
+            cb(dropdown);
+            return setting;
+        },
+        addButton: (cb: (button: unknown) => void) => {
+            const button = {
+                setButtonText: () => button,
+                setTooltip: () => button,
+                onClick: (fn: () => Promise<void> | void) => {
+                    handlers.clicks.push(fn);
+                    return button;
+                },
+            };
+            cb(button);
+            return setting;
+        },
+    };
+    return { setting, handlers };
+}
+
+describe("Ollama Test connection uses the values currently in the form", () => {
+    function build(tempOllamaModel: string | undefined) {
+        const result = getOllamaSettingBuilders({
+            settings: { ollamaUrl: "http://localhost:11434" } as SimilarNotesSettings,
+            tempOllamaUrl: undefined,
+            tempOllamaModel,
+            onOllamaUrlChange: vi.fn(),
+            onOllamaModelChange: vi.fn(),
+            updateApplyButtonState: vi.fn(),
+            onDropdownCreated: vi.fn(),
+        });
+        const { setting, handlers } = makeFullFakeSetting();
+        result.builders.forEach((builder) => builder(setting as never));
+        // Clicks: [Refresh, Test]
+        return handlers;
+    }
+
+    it("tests the model picked in the dropdown after the section was rendered", async () => {
+        notices.length = 0;
+        const testModel = vi
+            .spyOn(OllamaClient.prototype, "testModel")
+            .mockResolvedValue(true);
+        const handlers = build(undefined);
+
+        handlers.dropdown?.("nomic-embed-text");
+        await handlers.clicks[1]();
+
+        expect(notices).not.toContain("Please select a model first");
+        expect(testModel).toHaveBeenCalledWith("nomic-embed-text");
+        testModel.mockRestore();
+    });
+
+    it("tests the newly picked model, not the one shown at render", async () => {
+        notices.length = 0;
+        const testModel = vi
+            .spyOn(OllamaClient.prototype, "testModel")
+            .mockResolvedValue(true);
+        const handlers = build("old-model");
+
+        handlers.dropdown?.("new-model");
+        await handlers.clicks[1]();
+
+        expect(testModel).toHaveBeenCalledWith("new-model");
+        testModel.mockRestore();
+    });
+
+    it("names the URL typed after the section was rendered", async () => {
+        notices.length = 0;
+        const testModel = vi
+            .spyOn(OllamaClient.prototype, "testModel")
+            .mockResolvedValue(true);
+        const handlers = build("nomic-embed-text");
+
+        handlers.text?.("http://192.168.0.5:11434");
+        await handlers.clicks[1]();
+
+        expect(notices[0]).toContain("http://192.168.0.5:11434");
+        testModel.mockRestore();
     });
 });
