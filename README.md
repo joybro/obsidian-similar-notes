@@ -140,7 +140,8 @@ For driving the command from an agent (CLI flow, validation tips, drop-in skill 
 The plugin makes network requests only for the provider you choose:
 
 - **Built-in models (default)**: downloads the model files from `huggingface.co` the first time a model is loaded, and the ONNX Runtime JavaScript loader (`ort-wasm-simd-threaded.jsep.mjs`) and WebAssembly file (`ort-wasm-simd-threaded.jsep.wasm`) from `cdn.jsdelivr.net`, as part of [Transformers.js](https://github.com/huggingface/transformers.js) / [ONNX Runtime Web](https://github.com/microsoft/onnxruntime). The JavaScript module is imported and executed at runtime to load the WebAssembly engine. Model files are cached by Transformers.js; runtime files rely on the browser's HTTP cache and may be downloaded again. Your notes are not sent anywhere. The model picker also reads model details from the `huggingface.co` API.
-- **OpenAI-compatible, Gemini, Ollama**: sends note text to the server URL you configure (by default `api.openai.com`, `generativelanguage.googleapis.com`, or `localhost:11434`).
+- **OpenAI-compatible, Ollama**: sends note text to the server URL you configure (by default `api.openai.com` or `localhost:11434`).
+- **Gemini**: sends note text to Google (`generativelanguage.googleapis.com`).
 - **github.com**: only the "Report a bug" button in settings, which opens this repository's issue page in your browser.
 
 There is no telemetry or analytics. The downloaded JavaScript loader and WebAssembly engine run the built-in embedding model; they come from those upstream libraries and are not built from this repository's source. Release assets (`main.js`, `manifest.json`, `styles.css`) are built by GitHub Actions from this repository and, from 1.8.0 on, carry GitHub artifact attestations.
