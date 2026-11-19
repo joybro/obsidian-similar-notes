@@ -51,6 +51,12 @@ export class SimilarNoteFinder {
         options: { allowAdHocEmbedding: boolean } = { allowAdHocEmbedding: true }
     ): Promise<SimilarNoteSearchResult> {
         if (!note.content) {
+            // An excluded note under a cloud provider is never embedded, so
+            // writing in it will not bring results; say that rather than
+            // "write a few lines" (QA sim9).
+            if (!options.allowAdHocEmbedding) {
+                return { notes: [], status: "ad-hoc-disallowed" };
+            }
             return { notes: [], status: "empty-content" };
         }
 

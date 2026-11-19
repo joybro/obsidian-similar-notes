@@ -123,6 +123,15 @@ describe("SimilarNoteFinder search status (panel-empty-states spec)", () => {
         expect(r.status).toBe("ad-hoc-disallowed");
     });
 
+    it("an empty excluded note under a cloud provider reports the skip, not empty content (QA sim9)", async () => {
+        const r = await makeFinder(ok).findSimilarNotesWithStatus(
+            new Note("Private/d.md", "d", "", []),
+            5,
+            { allowAdHocEmbedding: false }
+        );
+        expect(r).toEqual({ notes: [], status: "ad-hoc-disallowed" });
+    });
+
     it("reports a failed embedding", async () => {
         const r = await makeFinder(async () => {
             throw new Error("model not loaded");
