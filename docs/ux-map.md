@@ -46,7 +46,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - empty-unwritten: the note has no text (after exclusion patterns): "Write a few lines and similar notes will appear here."
   - empty-below-threshold: results exist but all are under Minimum similarity: "No notes above the minimum similarity (0.50)."
   - empty-excluded-note: the open note is excluded and the provider is OpenAI or Gemini, so it is not embedded on the fly (frontmatter-exclusion spec §2.1): "This note is excluded from the index, so it isn't sent to OpenAI." (or Gemini); with a local provider it shows results like partial-not-indexed
-  - loading-indexing: the search found nothing while notes are queued for indexing: "Indexing your vault: N notes left. Results fill in as notes are indexed." N follows the status bar's "N to index"; when the queue empties the panel searches again
+  - loading-indexing: the search found nothing while notes are queued for indexing: "Indexing your vault: N notes left. Results fill in as notes are indexed." N follows the status bar's "N to index"; while it shows, the panel searches again at most every 10 s as N drops (results replace the line), and once more when the queue empties; a "No similar notes found." panel switches to this line when notes become queued
   - partial-not-indexed: the open note has no indexed chunks yet; results come from an on-the-fly embedding
   - error-embedding: on-the-fly embedding failed; Notice plus "Couldn't analyze this note. Check the model in Settings, then reopen the note."
   - → hover-preview (overlay): Cmd+hover a result

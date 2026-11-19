@@ -18,7 +18,7 @@ const MAX_ATTEMPTS = 3;
 
 export class NoteIndexingService {
     private fileChangeLoopTimer: NodeJS.Timeout | null = null;
-    private noteChangeCount$ = new BehaviorSubject<number>(0);
+    private noteChangeCount$: BehaviorSubject<number>;
 
     constructor(
         private noteRepository: NoteRepository,
@@ -30,7 +30,15 @@ export class NoteIndexingService {
         private settingsService: SettingsService,
         private app: App,
         private erroredNoteStore: ErroredNoteStore
-    ) {}
+    ) {
+        // The queue is filled before this service exists, but the loop (which
+        // republishes the count) starts only after the model is ready, possibly
+        // after a long first download. Publish the startup count now so the
+        // status bar and an empty panel know notes are waiting (QA sim8).
+        this.noteChangeCount$ = new BehaviorSubject<number>(
+            noteChangeQueue.getFileChangeCount()
+        );
+    }
 
     startLoop() {
         const fileChangeLoop = async () => {

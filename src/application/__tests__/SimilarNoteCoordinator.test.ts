@@ -2,7 +2,7 @@ import type { NoteRepository } from "@/domain/repository/NoteRepository";
 import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
 import type { TFile, Vault } from "obsidian";
 import { BehaviorSubject, Subject, firstValueFrom } from "rxjs";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { SimilarNoteCoordinator } from "../SimilarNoteCoordinator";
 import type {
     SettingsService,
@@ -690,6 +690,73 @@ describe("SimilarNoteCoordinator", () => {
                 expect(view.similarNoteEntries).toHaveLength(1);
             });
             expect(view.emptyReason).toBeUndefined();
+        });
+
+        describe("sim7: results fill in while the vault is still indexing", () => {
+            beforeEach(() => {
+                vi.useFakeTimers({ toFake: ["Date"] });
+                vi.setSystemTime(new Date(2026, 10, 19, 12, 0, 0));
+            });
+            afterEach(() => {
+                vi.useRealTimers();
+            });
+
+            test("searches again (throttled) as the count drops, before it reaches zero", async () => {
+                const finder =
+                    similarNoteFinder.findSimilarNotesWithStatus as ReturnType<typeof vi.fn>;
+                const pending$ = new BehaviorSubject(1240);
+                const coord = make();
+                coord.watchPendingIndexCount(pending$);
+                withStatus("ok", []);
+                expect(await reasonAfterOpen(coord)).toEqual({
+                    kind: "indexing",
+                    remaining: 1240,
+                });
+                const callsAfterOpen = finder.mock.calls.length;
+
+                // Indexed neighbours now exist; the queue drains one note
+                // every 100 ms.
+                withStatus("ok", [neighbor(0.9)]);
+                pending$.next(1239);
+                // Within the interval: count updates, no new search yet.
+                expect(finder.mock.calls.length).toBe(callsAfterOpen);
+
+                for (let count = 1238; count >= 600; count--) {
+                    vi.advanceTimersByTime(100);
+                    pending$.next(count);
+                    await Promise.resolve();
+                }
+                await vi.waitFor(async () => {
+                    const view = await firstValueFrom(
+                        coord.getNoteBottomViewModelObservable()
+                    );
+                    expect(view.similarNoteEntries).toHaveLength(1);
+                    expect(view.emptyReason).toBeUndefined();
+                });
+                // 64 s of indexing: one search per 10 s at most, and none
+                // once results show (the panel left the indexing state).
+                expect(finder.mock.calls.length - callsAfterOpen).toBeLessThanOrEqual(7);
+                expect(finder.mock.calls.length - callsAfterOpen).toBe(1);
+            });
+        });
+
+        test("sim8: a plain empty panel switches to the indexing line when notes get queued", async () => {
+            const pending$ = new BehaviorSubject(0);
+            const coord = make();
+            coord.watchPendingIndexCount(pending$);
+            withStatus("ok", []);
+            expect(await reasonAfterOpen(coord)).toEqual({ kind: "none" });
+
+            pending$.next(1240);
+            let view = await firstValueFrom(coord.getNoteBottomViewModelObservable());
+            expect(view.emptyReason).toEqual({ kind: "indexing", remaining: 1240 });
+
+            withStatus("ok", [neighbor(0.9)]);
+            pending$.next(0);
+            await vi.waitFor(async () => {
+                view = await firstValueFrom(coord.getNoteBottomViewModelObservable());
+                expect(view.similarNoteEntries).toHaveLength(1);
+            });
         });
 
         test("results during indexing show normally (no indexing line)", async () => {

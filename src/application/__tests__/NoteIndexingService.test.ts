@@ -1,5 +1,6 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
 import { NoteIndexingService } from "../NoteIndexingService";
+import { firstValueFrom } from "rxjs";
 import type { NoteChange } from "@/infrastructure/noteChangeQueue";
 import { computeIndexableTextHash } from "@/utils/indexableTextHash";
 
@@ -32,6 +33,7 @@ interface ChangeProcessor {
 function makeService() {
     const queue = {
         requeue: vi.fn(),
+        getFileChangeCount: vi.fn().mockReturnValue(0),
         getIndexableTextHash: vi.fn().mockReturnValue(undefined),
         clearIndexableTextHash: vi.fn().mockResolvedValue(undefined),
         markNoteChangeProcessed: vi.fn().mockResolvedValue(undefined),
@@ -848,5 +850,24 @@ describe("frontmatter exclusion at processing time (frontmatter-exclusion spec Â
         await (service as unknown as ChangeProcessor).processChange(change);
 
         expect(erroredStore.delete).toHaveBeenCalledWith("note.md");
+    });
+});
+
+describe("pending count before the indexing loop starts (QA sim8)", () => {
+    test("the queue filled at startup is published before startLoop", async () => {
+        const parts = makeService();
+        parts.queue.getFileChangeCount.mockReturnValue(1240);
+        const service = new NoteIndexingService(
+            parts.noteRepository as never,
+            parts.noteChunkRepository as never,
+            parts.queue as never,
+            parts.noteChunkingService as never,
+            parts.embeddingService as never,
+            parts.similarNoteCoordinator as never,
+            parts.settingsService as never,
+            parts.app as never,
+            parts.erroredStore as never
+        );
+        expect(await firstValueFrom(service.getNoteChangeCount$())).toBe(1240);
     });
 });
