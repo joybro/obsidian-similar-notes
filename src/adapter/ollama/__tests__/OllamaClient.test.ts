@@ -1,22 +1,26 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { requestUrl, type RequestUrlParam } from "obsidian";
+import { describe, expect, test, vi } from "vitest";
 import { OllamaClient } from "../OllamaClient";
 
-// Hermetic: stub global fetch, never touch a real Ollama server.
-function stubFetchOnce(jsonBody: unknown, ok = true, status = 200) {
-    const fetchMock = vi.fn().mockResolvedValue({
-        ok,
+vi.mock("obsidian", () => ({ requestUrl: vi.fn() }));
+
+// Hermetic: stub Obsidian's requestUrl, never touch a real Ollama server.
+// requestUrl resolves with json/text as properties, not methods.
+function stubRequestOnce(jsonBody: unknown, status = 200) {
+    const mock = vi.mocked(requestUrl);
+    mock.mockResolvedValue({
         status,
-        statusText: ok ? "OK" : "Internal Server Error",
-        json: async () => jsonBody,
-        text: async () => JSON.stringify(jsonBody),
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    return fetchMock;
+        headers: {},
+        arrayBuffer: new ArrayBuffer(0),
+        json: jsonBody,
+        text: JSON.stringify(jsonBody),
+    } as never);
+    return mock;
 }
 
-afterEach(() => {
-    vi.unstubAllGlobals();
-});
+function call(mock: ReturnType<typeof stubRequestOnce>, i = 0): RequestUrlParam {
+    return mock.mock.calls[i][0] as RequestUrlParam;
+}
 
 // #46: notes whose chunks tokenize past the model context were rejected by
 // Ollama with HTTP 500 "input length exceeds the context length", because the
@@ -25,15 +29,17 @@ afterEach(() => {
 // instead of erroring, guaranteeing a note can never fail from context overflow.
 describe("OllamaClient.generateEmbedding — modern /api/embed endpoint (#46)", () => {
     test("POSTs to /api/embed with input + truncate:true", async () => {
-        const fetchMock = stubFetchOnce({ embeddings: [[0.1, 0.2, 0.3]] });
+        const mock = stubRequestOnce({ embeddings: [[0.1, 0.2, 0.3]] });
         const client = new OllamaClient("http://localhost:11434");
 
         await client.generateEmbedding("nomic-embed-text", "hello world");
 
-        expect(fetchMock).toHaveBeenCalledTimes(1);
-        const [url, init] = fetchMock.mock.calls[0];
-        expect(url).toBe("http://localhost:11434/api/embed");
-        const body = JSON.parse((init as RequestInit).body as string);
+        expect(mock).toHaveBeenCalledTimes(1);
+        const req = call(mock);
+        expect(req.url).toBe("http://localhost:11434/api/embed");
+        expect(req.method).toBe("POST");
+        expect(req.throw).toBe(false);
+        const body = JSON.parse(req.body as string);
         expect(body).toEqual({
             model: "nomic-embed-text",
             input: "hello world",
@@ -42,7 +48,7 @@ describe("OllamaClient.generateEmbedding — modern /api/embed endpoint (#46)", 
     });
 
     test("returns the single embedding vector from the embeddings array", async () => {
-        stubFetchOnce({ embeddings: [[0.1, 0.2, 0.3]] });
+        stubRequestOnce({ embeddings: [[0.1, 0.2, 0.3]] });
         const client = new OllamaClient("http://localhost:11434");
 
         const result = await client.generateEmbedding("nomic-embed-text", "hi");
@@ -51,7 +57,7 @@ describe("OllamaClient.generateEmbedding — modern /api/embed endpoint (#46)", 
     });
 
     test("throws when the response has no embeddings", async () => {
-        stubFetchOnce({ embeddings: [] });
+        stubRequestOnce({ embeddings: [] });
         const client = new OllamaClient("http://localhost:11434");
 
         await expect(
@@ -65,15 +71,15 @@ describe("OllamaClient.generateEmbedding — modern /api/embed endpoint (#46)", 
 // instead of one HTTP round-trip per chunk.
 describe("OllamaClient.generateEmbeddings — batched /api/embed (#46 fast-follow)", () => {
     test("POSTs the whole input array in a single /api/embed request", async () => {
-        const fetchMock = stubFetchOnce({ embeddings: [[1], [2], [3]] });
+        const mock = stubRequestOnce({ embeddings: [[1], [2], [3]] });
         const client = new OllamaClient("http://localhost:11434");
 
         await client.generateEmbeddings("nomic-embed-text", ["a", "b", "c"]);
 
-        expect(fetchMock).toHaveBeenCalledTimes(1);
-        const [url, init] = fetchMock.mock.calls[0];
-        expect(url).toBe("http://localhost:11434/api/embed");
-        expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+        expect(mock).toHaveBeenCalledTimes(1);
+        const req = call(mock);
+        expect(req.url).toBe("http://localhost:11434/api/embed");
+        expect(JSON.parse(req.body as string)).toEqual({
             model: "nomic-embed-text",
             input: ["a", "b", "c"],
             truncate: true,
@@ -81,7 +87,7 @@ describe("OllamaClient.generateEmbeddings — batched /api/embed (#46 fast-follo
     });
 
     test("returns one embedding per input, in order", async () => {
-        stubFetchOnce({ embeddings: [[1, 1], [2, 2], [3, 3]] });
+        stubRequestOnce({ embeddings: [[1, 1], [2, 2], [3, 3]] });
         const client = new OllamaClient("http://localhost:11434");
 
         const out = await client.generateEmbeddings("m", ["a", "b", "c"]);
@@ -92,9 +98,59 @@ describe("OllamaClient.generateEmbeddings — batched /api/embed (#46 fast-follo
     test("throws when the embedding count does not match the input count", async () => {
         // Guards the index→chunk mapping in NoteIndexingService: a short
         // response would silently misalign embeddings with chunks.
-        stubFetchOnce({ embeddings: [[1]] });
+        stubRequestOnce({ embeddings: [[1]] });
         const client = new OllamaClient("http://localhost:11434");
 
         await expect(client.generateEmbeddings("m", ["a", "b"])).rejects.toThrow();
+    });
+});
+
+// Obsidian review asks plugins to use requestUrl instead of fetch; requestUrl
+// also skips CORS, so a LAN Ollama server works without OLLAMA_ORIGINS.
+describe("OllamaClient over requestUrl", () => {
+    test("lists models with a GET to /api/tags", async () => {
+        const mock = stubRequestOnce({ models: [{ name: "nomic-embed-text:latest", details: { family: "nomic-bert" } }] });
+        const client = new OllamaClient("http://192.168.0.5:11434/");
+
+        const models = await client.getModelsWithEmbeddingInfo();
+
+        expect(call(mock)).toMatchObject({ url: "http://192.168.0.5:11434/api/tags", method: "GET", throw: false });
+        expect(models).toEqual([{ name: "nomic-embed-text:latest", isEmbeddingModel: true }]);
+    });
+
+    test("an error status rejects with the status and the server's message", async () => {
+        stubRequestOnce({ error: 'model "nope" not found, try pulling it first' }, 404);
+        const client = new OllamaClient();
+
+        await expect(client.generateEmbedding("nope", "hi")).rejects.toThrow(
+            /HTTP 404.*model \\"nope\\" not found/
+        );
+    });
+
+    test("testConnection is false on an error status and on a network failure", async () => {
+        stubRequestOnce({}, 500);
+        expect(await new OllamaClient().testConnection()).toBe(false);
+
+        vi.mocked(requestUrl).mockRejectedValue(new Error("net::ERR_CONNECTION_REFUSED"));
+        expect(await new OllamaClient().testConnection()).toBe(false);
+    });
+
+    test("getModelInfo POSTs the model name to /api/show and reads its details", async () => {
+        const mock = stubRequestOnce({
+            details: { parameter_size: "137M", quantization_level: "F16", family: "nomic-bert" },
+            model_info: { "nomic_bert.embedding_length": 768, "nomic_bert.context_length": 2048 },
+        });
+
+        const info = await new OllamaClient().getModelInfo("nomic-embed-text");
+
+        expect(call(mock)).toMatchObject({ url: "http://localhost:11434/api/show", method: "POST" });
+        expect(JSON.parse(call(mock).body as string)).toEqual({ name: "nomic-embed-text" });
+        expect(info).toEqual({
+            parameterSize: "137M",
+            quantizationLevel: "F16",
+            family: "nomic-bert",
+            embeddingLength: 768,
+            contextLength: 2048,
+        });
     });
 });

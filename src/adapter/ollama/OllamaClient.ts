@@ -1,4 +1,5 @@
 import log from "loglevel";
+import { requestUrl, type RequestUrlResponse } from "obsidian";
 
 export interface OllamaModel {
     name: string;
@@ -79,6 +80,31 @@ function isEmbeddingModel(model: OllamaModel): boolean {
     return false;
 }
 
+/**
+ * Ollama calls go through Obsidian's requestUrl, not the browser fetch:
+ * requestUrl is not subject to CORS, so a phone or a desktop pointing at a LAN
+ * Ollama server does not need OLLAMA_ORIGINS set, and it is what Obsidian's
+ * plugin review asks for. `throw: false` keeps the status checks below in
+ * charge of 4xx/5xx instead of requestUrl throwing.
+ */
+function ollamaRequest(url: string, body?: string): Promise<RequestUrlResponse> {
+    return requestUrl(
+        body === undefined
+            ? { url, method: "GET", throw: false }
+            : {
+                url,
+                method: "POST",
+                contentType: "application/json",
+                body,
+                throw: false,
+            }
+    );
+}
+
+function isOk(response: RequestUrlResponse): boolean {
+    return response.status >= 200 && response.status < 300;
+}
+
 export class OllamaClient {
     private baseUrl: string;
 
@@ -91,13 +117,13 @@ export class OllamaClient {
      */
     async getModels(): Promise<OllamaModel[]> {
         try {
-            const response = await fetch(`${this.baseUrl}/api/tags`);
+            const response = await ollamaRequest(`${this.baseUrl}/api/tags`);
             
-            if (!response.ok) {
-                throw new Error(`Failed to fetch models: ${response.statusText}`);
+            if (!isOk(response)) {
+                throw new Error(`Failed to fetch models: HTTP ${response.status}`);
             }
             
-            const data = (await response.json()) as OllamaModelsResponse;
+            const data = response.json as OllamaModelsResponse;
             
             if (!data.models || !Array.isArray(data.models)) {
                 log.warn("Ollama API returned invalid models data", data);
@@ -154,23 +180,17 @@ export class OllamaClient {
             log.debug(`[Ollama] Request payload size: ${requestSize} bytes`);
 
             const startTime = Date.now();
-            const response = await fetch(`${this.baseUrl}/api/embed`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: requestBody
-            });
+            const response = await ollamaRequest(`${this.baseUrl}/api/embed`, requestBody);
             const elapsed = Date.now() - startTime;
 
-            if (!response.ok) {
-                const errorText = await response.text();
+            if (!isOk(response)) {
+                const errorText = response.text;
                 log.error(`[Ollama] Embedding failed after ${elapsed}ms - status: ${response.status}, text length: ${textLength}, request size: ${requestSize} bytes`);
-                throw new Error(`Failed to generate embedding: ${response.statusText}. ${errorText}`);
+                throw new Error(`Failed to generate embedding: HTTP ${response.status}. ${errorText}`);
             }
 
             log.debug(`[Ollama] Embedding successful in ${elapsed}ms`);
-            const data = (await response.json()) as OllamaEmbeddingResponse;
+            const data = response.json as OllamaEmbeddingResponse;
 
             if (
                 !data.embeddings ||
@@ -205,23 +225,17 @@ export class OllamaClient {
             log.debug(`[Ollama] Embedding batch of ${inputs.length} input(s), payload ${requestSize} bytes`);
 
             const startTime = Date.now();
-            const response = await fetch(`${this.baseUrl}/api/embed`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: requestBody
-            });
+            const response = await ollamaRequest(`${this.baseUrl}/api/embed`, requestBody);
             const elapsed = Date.now() - startTime;
 
-            if (!response.ok) {
-                const errorText = await response.text();
+            if (!isOk(response)) {
+                const errorText = response.text;
                 log.error(`[Ollama] Batch embedding failed after ${elapsed}ms - status: ${response.status}, inputs: ${inputs.length}, request size: ${requestSize} bytes`);
-                throw new Error(`Failed to generate embedding: ${response.statusText}. ${errorText}`);
+                throw new Error(`Failed to generate embedding: HTTP ${response.status}. ${errorText}`);
             }
 
             log.debug(`[Ollama] Batch embedding successful in ${elapsed}ms`);
-            const data = (await response.json()) as OllamaEmbeddingResponse;
+            const data = response.json as OllamaEmbeddingResponse;
 
             // The embedding count MUST match the input count: NoteIndexingService
             // maps embeddings back to chunks by array index, so a short or
@@ -249,20 +263,17 @@ export class OllamaClient {
      */
     async getModelInfo(modelName: string): Promise<OllamaModelInfo | null> {
         try {
-            const response = await fetch(`${this.baseUrl}/api/show`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ name: modelName })
-            });
+            const response = await ollamaRequest(
+                `${this.baseUrl}/api/show`,
+                JSON.stringify({ name: modelName })
+            );
 
-            if (!response.ok) {
-                log.warn(`Failed to get model info for ${modelName}: ${response.statusText}`);
+            if (!isOk(response)) {
+                log.warn(`Failed to get model info for ${modelName}: HTTP ${response.status}`);
                 return null;
             }
 
-            const data = (await response.json()) as OllamaShowResponse;
+            const data = response.json as OllamaShowResponse;
 
             const details = data.details ?? {};
             const modelInfo = data.model_info ?? {};
@@ -299,8 +310,8 @@ export class OllamaClient {
      */
     async testConnection(): Promise<boolean> {
         try {
-            const response = await fetch(`${this.baseUrl}/api/tags`);
-            return response.ok;
+            const response = await ollamaRequest(`${this.baseUrl}/api/tags`);
+            return isOk(response);
         } catch (error) {
             log.error("Failed to connect to Ollama server", error);
             return false;
