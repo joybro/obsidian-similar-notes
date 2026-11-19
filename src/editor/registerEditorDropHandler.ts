@@ -1,3 +1,4 @@
+import type { EditorView } from "@codemirror/view";
 import { type App, type Plugin, TFile } from "obsidian";
 
 /**
@@ -33,8 +34,9 @@ export function registerEditorDropHandler(plugin: Plugin): void {
             const linkMarkup = `[[${linktext}]]`;
 
             // Try to insert at drop position using CodeMirror's posAtCoords
-            // @ts-expect-error - Accessing internal CodeMirror EditorView
-            const editorView = info?.editor?.cm;
+            // Obsidian's Editor exposes its CodeMirror EditorView as `cm`
+            // (not in the public typings).
+            const editorView = (info?.editor as { cm?: EditorView } | undefined)?.cm;
             if (editorView?.posAtCoords) {
                 const pos = editorView.posAtCoords({
                     x: evt.clientX,
