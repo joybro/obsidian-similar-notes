@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+-   **README tip: keep the similar notes list in view** (#4): a CSS snippet that pins the list at the bottom of the editor while you scroll through a long note.
+
 ### Changed
 
 -   **Title search gives a small boost to titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title shares character pairs with what you typed now gets a small ranking boost among the search candidates, so it can rank above a note whose title only means something similar when their scores are close. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.

@@ -128,6 +128,26 @@ On error (e.g. no active markdown file, search failure), the same file is writte
 
 For driving the command from an agent (CLI flow, validation tips, drop-in skill snippet), see [docs/agent-export.md](docs/agent-export.md).
 
+## Tips
+
+### Keep the bottom list in view while you scroll
+
+By default the similar notes list sits at the end of the note, so in a long note you only see it after scrolling to the bottom. To keep it pinned to the bottom of the editor while you read and write, add this [CSS snippet](https://obsidian.md/help/snippets) and turn it on in **Settings → Appearance → CSS snippets**:
+
+```css
+/* Keep the Similar Notes list at the bottom of the editor while scrolling */
+.cm-sizer > .embedded-similar-notes {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: var(--background-primary);
+}
+```
+
+Change `200px` to give the list more or less room. This works in the editing view (Live Preview and Source mode), where the list appears.
+
 ## Technical Details
 
 - **Transformers.js**: Runs Hugging Face models directly in Obsidian
