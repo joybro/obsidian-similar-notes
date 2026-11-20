@@ -1,8 +1,9 @@
 import { getNoteDisplayText } from "@/utils/displayUtils";
 import type { HoverParent, MarkdownView, TFile, Workspace } from "obsidian";
-import { MarkdownView as MarkdownViewClass, Menu, Notice } from "obsidian";
+import { Menu } from "obsidian";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Observable } from "rxjs";
+import { AddLinkButton, useAddNoteLink } from "./noteLinkAction";
 import { triggerHoverLink } from "./hoverLinkPreview";
 import { logRejection } from "@/utils/logRejection";
 
@@ -137,7 +138,6 @@ const SearchResult = ({
     onNoteHover,
     onContextMenu,
     onAddLink,
-    showLinkButton,
     noteDisplayMode,
     allSimilarNotes,
 }: {
@@ -145,8 +145,8 @@ const SearchResult = ({
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
     onNoteHover: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
-    onAddLink: (file: TFile) => void;
-    showLinkButton: boolean;
+    /** Present only when the Link button setting is on. */
+    onAddLink?: (file: TFile) => void;
     noteDisplayMode: "title" | "path" | "smart";
     allSimilarNotes: SimilarNoteEntry[];
 }) => {
@@ -263,20 +263,9 @@ const SearchResult = ({
                         allSimilarNotes.map((entry) => entry.file)
                     )}
                 </div>
-                <div className={`tree-item-flair-outer${showLinkButton && !note.isLinked ? " similar-notes-result-actions" : ""}`}>
-                    {showLinkButton && !note.isLinked && (
-                        <button
-                            type="button"
-                            className="similar-notes-add-link"
-                            aria-label={`Add link to ${note.title} at the end of this note`}
-                            title="Add link at the end of this note"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAddLink(note.file);
-                            }}
-                        >
-                            Link
-                        </button>
+                <div className={`tree-item-flair-outer${onAddLink && !note.isLinked ? " similar-notes-result-actions" : ""}`}>
+                    {onAddLink && !note.isLinked && (
+                        <AddLinkButton title={note.title} onClick={() => onAddLink(note.file)} />
                     )}
                     <div className="tree-item-flair">
                         {note.similarity.toFixed(2)}
@@ -301,7 +290,6 @@ const SearchResultsContainer = ({
     onNoteHover,
     onContextMenu,
     onAddLink,
-    showLinkButton,
     noteDisplayMode,
 }: {
     similarNotes: SimilarNoteEntry[];
@@ -309,8 +297,8 @@ const SearchResultsContainer = ({
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
     onNoteHover: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
-    onAddLink: (file: TFile) => void;
-    showLinkButton: boolean;
+    /** Present only when the Link button setting is on. */
+    onAddLink?: (file: TFile) => void;
     noteDisplayMode: "title" | "path" | "smart";
 }) => {
     if (similarNotes.length === 0) {
@@ -342,7 +330,6 @@ const SearchResultsContainer = ({
                         onNoteHover={onNoteHover}
                         onContextMenu={onContextMenu}
                         onAddLink={onAddLink}
-                        showLinkButton={showLinkButton}
                         noteDisplayMode={noteDisplayMode}
                         allSimilarNotes={similarNotes}
                     />
@@ -365,7 +352,6 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     const [emptyReason, setEmptyReason] = useState<EmptyReason | undefined>();
     const [sourceFile, setSourceFile] = useState<TFile | null>(null);
     const [showLinkButton, setShowLinkButton] = useState(false);
-    const pendingLinks = useRef(new Set<string>());
     const [noteDisplayMode, setNoteDisplayMode] = useState<
         "title" | "path" | "smart"
     >("title");
@@ -397,49 +383,17 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
         openNote(file, e.ctrlKey || e.metaKey);
     };
 
-    const handleAddLink = async (target: TFile) => {
-        const source = sourceFile;
-        if (!source || leaf.file !== source) {
-            new Notice("The current note has changed. Wait for similar notes to refresh.");
-            return;
-        }
-        const key = `${source.path}\0${target.path}`;
-        if (pendingLinks.current.has(key)) return;
-        pendingLinks.current.add(key);
-
-        try {
-            const app = leaf.app;
-            const link = app.fileManager.generateMarkdownLink(target, source.path);
-            const activeView = viewType === "bottom"
-                ? leaf
-                : workspace.getActiveViewOfType(MarkdownViewClass);
-            if (activeView?.file === source && activeView.getMode() === "source") {
-                const editor = activeView.editor;
-                const lastLine = editor.lastLine();
-                const line = editor.getLine(lastLine);
-                editor.replaceRange(`${line ? "\n" : ""}${link}\n`, {
-                    line: lastLine,
-                    ch: line.length,
-                });
-            } else {
-                await app.vault.process(source, (content) =>
-                    `${content}${content && !content.endsWith("\n") ? "\n" : ""}${link}\n`
-                );
-            }
-            setSimilarNotes((notes) =>
-                leaf.file === source
-                    ? notes.map((note) =>
-                        note.file.path === target.path ? { ...note, isLinked: true } : note
-                    )
-                    : notes
-            );
-        } catch (error) {
-            console.error("Failed to add a similar note link", error);
-            new Notice("Could not add the link to the current note.");
-        } finally {
-            pendingLinks.current.delete(key);
-        }
-    };
+    const handleAddLink = useAddNoteLink({
+        leaf,
+        workspace,
+        viewType,
+        sourceFile,
+        markLinked: (target) => setSimilarNotes((notes) =>
+            notes.map((note) =>
+                note.file.path === target.path ? { ...note, isLinked: true } : note
+            )
+        ),
+    });
 
     // Page Preview only reads/writes `.hoverPopover` on the parent, so a plain
     // stable object is a sufficient HoverParent for this React component.
@@ -497,8 +451,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                         onNoteClick={handleNoteClick}
                         onNoteHover={handleNoteHover}
                         onContextMenu={handleContextMenu}
-                        onAddLink={handleAddLink}
-                        showLinkButton={showLinkButton}
+                        onAddLink={showLinkButton ? handleAddLink : undefined}
                         noteDisplayMode={noteDisplayMode}
                     />
                 )}

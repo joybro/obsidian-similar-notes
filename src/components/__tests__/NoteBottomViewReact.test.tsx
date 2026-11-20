@@ -286,7 +286,7 @@ describe("SimilarNotesViewReact", () => {
         expect(generateMarkdownLink).toHaveBeenCalledWith(bottomViewModelSubject$.value.similarNoteEntries[0].file, currentFile.path);
         expect(editor.replaceRange).toHaveBeenCalledWith("\n[Target](folder/Target.md)\n", { line: 1, ch: 12 });
         expect(mockOpenLinkText).not.toHaveBeenCalled();
-        expect(screen.getByLabelText("Already linked")).toBeInTheDocument();
+        expect(await screen.findByLabelText("Already linked")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Add link to Similar Note 1 at the end of this note" })).not.toBeInTheDocument();
     });
 
@@ -312,7 +312,7 @@ describe("SimilarNotesViewReact", () => {
         expect(process).toHaveBeenCalledTimes(1);
         expect(process).toHaveBeenCalledWith(currentFile, expect.any(Function));
         await act(async () => { finish?.(); });
-        expect(screen.getByLabelText("Already linked")).toBeInTheDocument();
+        expect(await screen.findByLabelText("Already linked")).toBeInTheDocument();
     });
 
     test("does not add a link to a different note when the displayed results are stale", async () => {
