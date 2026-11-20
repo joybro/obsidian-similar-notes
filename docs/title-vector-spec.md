@@ -90,6 +90,14 @@ Helpers: `TITLE_CHUNK_INDEX`, `isTitleChunk`, `titleFromPath` and
   The carried body rows' `title` field is rewritten to the new title in the
   same write (their embeddings are kept). A rename with an unchanged basename
   (folder move) carries the title row too and writes nothing more.
+- Queued rename sequences keep the original indexed source until processing.
+  If `A` becomes `B` and then `C` before processing, carry `A` directly to `C`.
+  Replacing a pending rename with an edit, deletion or move to an excluded
+  path must still remove its original source rows and metadata. An edit after
+  a queued rename embeds the final content at the destination. Rename and
+  delete events cancel older pending edit timers, so a delayed edit cannot
+  erase a newer rename's source-path information. These rules concern work
+  still in the queue, not changes already doing I/O.
 - Indexable-text hash skip (indexable-text-hash spec): when the hash says the
   body is unchanged, the title row is left as is; the title cannot change
   without a rename.
