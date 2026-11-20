@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+-   **Similar Notes settings show up in Obsidian's settings search** (Obsidian 1.13 and later): typing a setting's name in the settings search box finds it, and clicking the result opens the Similar Notes tab at that setting. The exclusion settings also match the words people use for them (exclude folders, exclude files, exclude by property, YAML, exclude content), and provider names (OpenAI, Gemini, Ollama, OpenRouter), "API key" and "Server URL" lead to the model provider picker. On Obsidian 1.11 and 1.12 the settings tab looks and works as before.
+
 ### Fixed
 
 -   **Semantic search no longer flashes "No similar notes found" while you type**: the message now appears only after the query you typed has actually been searched and found nothing. Before, from the third character on, it showed after each keystroke while the search was still waiting to start.

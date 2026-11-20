@@ -16,25 +16,24 @@ import {
 } from "./fileExclusionSettings";
 import log from "loglevel";
 import type { App, Setting } from "obsidian";
-import { Notice, SettingGroup } from "obsidian";
+import { Notice } from "obsidian";
 import type MainPlugin from "../main";
 import { renderErroredFilesList } from "./erroredFilesList";
 import { RegexpExclusionTester } from "./regexpExclusionTester";
 import { LoadModelModal } from "./LoadModelModal";
-import type { SettingBuilder } from "./OpenAISettingsSection";
+import { unnamedRow, type SettingRow, type SettingRowGroup } from "./settingDefinitions";
 
 interface IndexSettingsSectionProps {
-    containerEl: HTMLElement;
     plugin: MainPlugin;
     settingsService: SettingsService;
     app: App;
-    mTimeStore?: IndexedNoteMTimeStore;
-    erroredStore?: ErroredNoteStore;
-    noteChunkRepository?: NoteChunkRepository;
+    // Read on each use: the stores can be set after the tab is created.
+    readonly mTimeStore?: IndexedNoteMTimeStore;
+    readonly erroredStore?: ErroredNoteStore;
+    readonly noteChunkRepository?: NoteChunkRepository;
 }
 
 export class IndexSettingsSection {
-    private sectionContainer?: HTMLElement;
     private statsContainer?: HTMLElement;
     private indexedStat?: HTMLElement;
     private erroredStat?: HTMLElement;
@@ -114,38 +113,51 @@ export class IndexSettingsSection {
     }
 
     /**
-     * Render the index settings section
+     * The "Index", "Exclude files from index" and "Exclude content from index"
+     * groups as setting definitions (settings-search spec).
+     *
+     * File exclusion (which files are indexed — path patterns and frontmatter
+     * rules) and content exclusion (what text within a file is indexed) are
+     * distinct concerns, so each gets its own group. SettingGroup can't nest
+     * and Setting-level sub-headings render poorly, so sibling groups are the
+     * clean way to separate them.
      */
-    render(currentStats: {
+    getDefinitionGroups(getStats: () => {
         indexedNoteCount: number;
         indexedChunkCount: number;
-    }): void {
-        const section = this.initializeSectionContainer();
+    }): SettingRowGroup[] {
+        const indexRows = this.getIndexSettingBuilders();
+        // The first row starts a render cycle of this section: drop the
+        // element refs of the previous render, and once every row is in the
+        // DOM fill the stats and the errored/excluded lists.
+        const [statsRow, ...restIndexRows] = indexRows;
+        const firstRow: SettingRow = {
+            ...statsRow,
+            render: (setting, group) => {
+                this.resetRenderState();
+                statsRow.render(setting, group);
+                window.setTimeout(() => {
+                    this.renderStats(getStats().indexedChunkCount);
+                    this.updateErroredFilesList();
+                    this.updateExcludedFilesList();
+                    this.regexpTester.run();
+                }, 0);
+            },
+        };
 
-        const indexedChunkCount = currentStats.indexedChunkCount;
-
-        // Index group: general config, statistics, and error recovery.
-        const indexGroup = new SettingGroup(section).setHeading("Index");
-        this.getIndexSettingBuilders().forEach((builder) => indexGroup.addSetting(builder));
-
-        // File exclusion (which files are indexed — path patterns and
-        // frontmatter rules) and content exclusion (what text within a file is
-        // indexed) are distinct concerns, so each gets its own group.
-        // SettingGroup can't nest and Setting-level sub-headings render
-        // poorly, so sibling groups are the clean way to separate them.
-        const fileExclusionGroup = new SettingGroup(section).setHeading("Exclude files from index");
-        this.getFileExclusionSettingBuilders().forEach((builder) => fileExclusionGroup.addSetting(builder));
-
-        const contentExclusionGroup = new SettingGroup(section).setHeading("Exclude content from index");
-        this.getContentExclusionSettingBuilders().forEach((builder) => contentExclusionGroup.addSetting(builder));
-
-        // Initialize stats and excluded/errored files lists
-        window.setTimeout(() => {
-            this.renderStats(indexedChunkCount);
-            this.updateErroredFilesList();
-            this.updateExcludedFilesList();
-            this.regexpTester.run();
-        }, 0);
+        return [
+            { type: "group", heading: "Index", items: [firstRow, ...restIndexRows] },
+            {
+                type: "group",
+                heading: "Exclude files from index",
+                items: this.getFileExclusionSettingBuilders(),
+            },
+            {
+                type: "group",
+                heading: "Exclude content from index",
+                items: this.getContentExclusionSettingBuilders(),
+            },
+        ];
     }
 
     /**
@@ -154,13 +166,13 @@ export class IndexSettingsSection {
      * ({@link getFolderExclusionSettingBuilders},
      * {@link getContentExclusionSettingBuilders}).
      */
-    private getIndexSettingBuilders(): SettingBuilder[] {
+    private getIndexSettingBuilders(): SettingRow[] {
         const { plugin, settingsService } = this.props;
         const settings = settingsService.get();
 
         return [
             // Index statistics
-            (setting) => {
+            { name: "Index statistics", render: (setting) => {
                 setting.setName("Index statistics");
                 if (!this.statsContainer) {
                     this.statsContainer = setting.descEl.createDiv("similar-notes-stats-container");
@@ -168,9 +180,9 @@ export class IndexSettingsSection {
                     this.erroredStat = this.statsContainer.createDiv("similar-notes-stat-item");
                     this.excludedStat = this.statsContainer.createDiv("similar-notes-stat-item");
                 }
-            },
+            } },
             // Indexing delay
-            (setting) => {
+            { name: "Indexing delay", render: (setting) => {
                 setting
                     .setName("Indexing delay")
                     .setDesc("Wait time (seconds) after file changes before indexing. Higher values reduce API costs for paid providers.")
@@ -188,9 +200,9 @@ export class IndexSettingsSection {
                             }
                         });
                     });
-            },
+            } },
             // Include frontmatter
-            (setting) => {
+            { name: "Include frontmatter in indexing and search", render: (setting) => {
                 setting
                     .setName("Include frontmatter in indexing and search")
                     .setDesc("If enabled, the frontmatter of each note will be included in the similarity index and search.")
@@ -199,9 +211,9 @@ export class IndexSettingsSection {
                             await settingsService.update({ includeFrontmatter: value });
                         });
                     });
-            },
+            } },
             // Reindex notes — the action that rebuilds the index from the config above
-            (setting) => {
+            { name: "Reindex notes", render: (setting) => {
                 setting
                     .setName("Reindex notes")
                     .setDesc("Rebuild the similarity index for all notes")
@@ -210,18 +222,18 @@ export class IndexSettingsSection {
                             await plugin.reindexNotes();
                         });
                     });
-            },
+            } },
             // Errored files preview — mirrors the Excluded files preview exactly:
             // empty name/desc so the info column stays minimal and the box claims
             // the full control width (renders wide). The count label goes in
             // descEl; the explanation + Retry action live in the row below.
-            (setting) => {
+            unnamedRow((setting) => {
                 setting.setDesc("");
                 this.erroredFilesDescription = setting.descEl;
                 this.erroredFilesList = setting.controlEl.createDiv("similar-notes-errored-files-list");
-            },
+            }),
             // Retry errored notes
-            (setting) => {
+            { name: "Retry errored notes", render: (setting) => {
                 setting
                     .setName("Retry errored notes")
                     .setDesc(
@@ -237,7 +249,7 @@ export class IndexSettingsSection {
                                 this.updateErroredFilesList();
                             });
                     });
-            },
+            } },
         ];
     }
 
@@ -246,7 +258,7 @@ export class IndexSettingsSection {
      * indexed: the path-glob input, the frontmatter-rule input, the preview of
      * excluded files, and the Apply action that syncs the index against both.
      */
-    private getFileExclusionSettingBuilders(): SettingBuilder[] {
+    private getFileExclusionSettingBuilders(): SettingRow[] {
         const { settingsService } = this.props;
         const settings = settingsService.get();
 
@@ -254,17 +266,28 @@ export class IndexSettingsSection {
 
         return [
             // Exclude by path pattern
-            (setting) => buildExcludePathsSetting(setting, settings, settingsService, onExclusionChanged),
+            {
+                name: "Path patterns",
+                // Users' words for this (issue #14 "Folder exclusion setting"):
+                // Obsidian's search does not index the group heading.
+                aliases: ["Exclude folders", "Exclude files"],
+                render: (setting) => buildExcludePathsSetting(setting, settings, settingsService, onExclusionChanged),
+            },
             // Exclude by frontmatter rule
-            (setting) => buildExcludeFrontmatterSetting(setting, settings, settingsService, onExclusionChanged),
+            {
+                name: "Frontmatter properties",
+                // Issue #42 "yaml metadata based exclusions".
+                aliases: ["Exclude by property", "YAML"],
+                render: (setting) => buildExcludeFrontmatterSetting(setting, settings, settingsService, onExclusionChanged),
+            },
             // Excluded files preview
-            (setting) => {
+            unnamedRow((setting) => {
                 setting.setDesc("");
                 this.excludedFilesDescription = setting.descEl;
                 this.excludedFilesList = setting.controlEl.createDiv("similar-notes-excluded-files-list");
-            },
+            }),
             // Apply exclusion rules (path patterns + frontmatter rules)
-            (setting) => {
+            { name: "Apply exclusion rules", render: (setting) => {
                 setting
                     .setName("Apply exclusion rules")
                     .setDesc("Add or remove files to match the current path patterns and frontmatter rules, without a full reindex. Content patterns apply only on reindex or when a note is edited.")
@@ -274,7 +297,7 @@ export class IndexSettingsSection {
                             .setTooltip("Sync indexed files with the current exclusion rules")
                             .onClick(async () => this.handleApplyExclusionPatterns());
                     });
-            },
+            } },
         ];
     }
 
@@ -282,15 +305,19 @@ export class IndexSettingsSection {
      * Builders for the "Exclude content from index" group — what text within a
      * file is indexed: the regex input followed by its tester.
      */
-    private getContentExclusionSettingBuilders(): SettingBuilder[] {
+    private getContentExclusionSettingBuilders(): SettingRow[] {
         const { settingsService } = this.props;
         const settings = settingsService.get();
 
         return [
             // Exclude content
-            (setting) => this.buildExcludeContentSetting(setting, settings, settingsService),
+            {
+                name: "Content patterns",
+                aliases: ["Exclude content"],
+                render: (setting) => this.buildExcludeContentSetting(setting, settings, settingsService),
+            },
             // RegExp tester (tests the content-exclusion patterns above)
-            (setting) => this.regexpTester.render(setting),
+            unnamedRow((setting) => this.regexpTester.render(setting)),
         ];
     }
 
@@ -345,17 +372,7 @@ export class IndexSettingsSection {
             });
     }
 
-    private initializeSectionContainer(): HTMLElement {
-        const { containerEl } = this.props;
-
-        let section = this.sectionContainer;
-        if (!section || !section.parentElement) {
-            section = containerEl.createDiv("index-settings-section");
-            this.sectionContainer = section;
-        } else {
-            section.empty();
-        }
-
+    private resetRenderState(): void {
         // Reset state
         this.statsContainer = undefined;
         this.indexedStat = undefined;
@@ -367,8 +384,6 @@ export class IndexSettingsSection {
         this.erroredFilesList = undefined;
         this.retryErroredButton = undefined;
         this.regexpTester.reset();
-
-        return section;
     }
 
     private updateErroredFilesList(): void {
