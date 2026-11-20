@@ -1,9 +1,9 @@
 import { GeminiClient } from "@/adapter/gemini";
 import type { SimilarNotesSettings } from "@/application/SettingsService";
 import { Notice } from "obsidian";
-import type { Setting } from "obsidian";
+import type { SettingRow } from "./settingDefinitions";
 
-export type SettingBuilder = (setting: Setting) => void;
+export type { SettingBuilder } from "./settingDefinitions";
 
 interface GeminiSettingsSectionProps {
     settings: SimilarNotesSettings;
@@ -21,7 +21,7 @@ const GEMINI_MODELS = [
     { id: "gemini-embedding-001", name: "gemini-embedding-001 (Recommended)" },
 ];
 
-export function getGeminiSettingBuilders(props: GeminiSettingsSectionProps): SettingBuilder[] {
+export function getGeminiSettingBuilders(props: GeminiSettingsSectionProps): SettingRow[] {
     const {
         settings,
         tempGeminiApiKey,
@@ -36,9 +36,9 @@ export function getGeminiSettingBuilders(props: GeminiSettingsSectionProps): Set
     const geminiModel = tempGeminiModel ?? settings.geminiModel ?? "gemini-embedding-001";
     const isCustomModel = !GEMINI_MODELS.some((m) => m.id === geminiModel);
 
-    const builders: SettingBuilder[] = [
+    const builders: SettingRow[] = [
         // API Key
-        (setting) => {
+        { name: "API key", render: (setting) => {
             setting
                 .setName("API key")
                 .setDesc("Your Google AI Studio API key (get it from aistudio.google.com)")
@@ -51,9 +51,9 @@ export function getGeminiSettingBuilders(props: GeminiSettingsSectionProps): Set
                     // Make it a password field
                     text.inputEl.type = "password";
                 });
-        },
+        } },
         // Model dropdown
-        (setting) => {
+        { name: "Model", render: (setting) => {
             setting
                 .setName("Model")
                 .setDesc("Select an embedding model")
@@ -78,12 +78,12 @@ export function getGeminiSettingBuilders(props: GeminiSettingsSectionProps): Set
                         onRender();
                     });
                 });
-        },
+        } },
     ];
 
     // Show custom model input if custom is selected
     if (isCustomModel) {
-        builders.push((setting) => {
+        builders.push({ name: "Custom model ID", render: (setting) => {
             setting
                 .setName("Custom model ID")
                 .setDesc("Enter the Gemini model ID")
@@ -94,11 +94,11 @@ export function getGeminiSettingBuilders(props: GeminiSettingsSectionProps): Set
                             onGeminiModelChange(value);
                         });
                 });
-        });
+        } });
     }
 
     // Test connection
-    builders.push((setting) => {
+    builders.push({ name: "Test connection", render: (setting) => {
         setting
             .setName("Test connection")
             .setDesc("Test the connection to the Gemini API")
@@ -136,7 +136,7 @@ export function getGeminiSettingBuilders(props: GeminiSettingsSectionProps): Set
                     }
                 });
             });
-    });
+    } });
 
     return builders;
 }

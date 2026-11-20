@@ -83,6 +83,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - 행동: change provider/model, Load & Apply, edit exclusions, Apply rules, Reindex, Clear
   - → load-model-modal (modal): Load & Apply
   - → settings (back): close settings
+  - → settings (push): Obsidian settings search result (Obsidian 1.13+; rows come from `getSettingDefinitions()`, provider rows only for the selected provider, the Model provider row also matches provider names, API key and Server URL; exclusion rows also match Exclude folders/files, Exclude by property, YAML, Exclude content; opening a result scrolls the tab to that row, no lasting highlight, checked in Obsidian 1.15.1 2026-11-19)
 
 - screen: load-model-modal | states: loading, ideal, error
   - 무엇을 보여주나: confirmation and progress for switching model (re-embeds the whole vault)

@@ -13,13 +13,41 @@ export const Platform = {
     isLinux: true,
 };
 
+export const apiVersion = "1.12.0";
+
+// Tests flip this to exercise the Obsidian 1.13+ declarative path.
+export const mockApiState = { version: "1.12.0" };
+
+function compareVersions(a: string, b: string): number {
+    const pa = a.split(".").map(Number);
+    const pb = b.split(".").map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+        if (d !== 0) return d;
+    }
+    return 0;
+}
+
+export function requireApiVersion(version: string): boolean {
+    return compareVersions(mockApiState.version, version) >= 0;
+}
+
 export class PluginSettingTab {
     app: unknown;
     containerEl: HTMLElement;
+    updateCalls = 0;
 
     constructor(app: unknown, _plugin: unknown) {
         this.app = app;
         this.containerEl = document.createElement("div");
+    }
+
+    update(): void {
+        this.updateCalls++;
+    }
+
+    refreshDomState(): void {
+        // Mock implementation
     }
 
     display(): void {
@@ -95,11 +123,30 @@ export class Setting {
 
     constructor(containerEl: HTMLElement) {
         this.settingEl = document.createElement("div");
+        this.settingEl.className = "setting-item";
         this.infoEl = document.createElement("div");
+        this.infoEl.className = "setting-item-info";
         this.nameEl = document.createElement("div");
+        this.nameEl.className = "setting-item-name";
         this.descEl = document.createElement("div");
+        this.descEl.className = "setting-item-description";
         this.controlEl = document.createElement("div");
+        this.controlEl.className = "setting-item-control";
+        this.infoEl.appendChild(this.nameEl);
+        this.infoEl.appendChild(this.descEl);
+        this.settingEl.appendChild(this.infoEl);
+        this.settingEl.appendChild(this.controlEl);
         containerEl.appendChild(this.settingEl);
+    }
+
+    setClass(cls: string): this {
+        this.settingEl.classList.add(cls);
+        return this;
+    }
+
+    addTextArea(callback: (text: MockText) => void): this {
+        callback(makeMockText(document.createElement("textarea")));
+        return this;
     }
 
     setName(name: string): this {
@@ -117,12 +164,7 @@ export class Setting {
     }
 
     addText(callback: (text: MockText) => void): this {
-        const mockText: MockText = {
-            setValue: (_value: string) => mockText,
-            onChange: (_callback: (value: string) => void) => mockText,
-            setPlaceholder: (_placeholder: string) => mockText,
-        };
-        callback(mockText);
+        callback(makeMockText(document.createElement("input")));
         return this;
     }
 
@@ -131,7 +173,7 @@ export class Setting {
             addOption: (_value: string, _text: string) => mockDropdown,
             setValue: (_value: string) => mockDropdown,
             onChange: (_callback: (value: string) => void) => mockDropdown,
-            selectEl: { empty: () => { return; } },
+            selectEl: Object.assign(document.createElement("select"), { empty: () => { return; } }),
         };
         callback(mockDropdown);
         return this;
@@ -154,8 +196,35 @@ export class Setting {
             setDisabled: (_disabled: boolean) => mockButton,
             setCta: () => mockButton,
             removeCta: () => mockButton,
+            buttonEl: document.createElement("button"),
         };
         callback(mockButton);
+        return this;
+    }
+}
+
+// Mock SettingGroup: a heading element followed by its settings, in the
+// container, so tests can read "heading -> setting names" from the DOM.
+export class SettingGroup {
+    groupEl: HTMLElement;
+    headingEl: HTMLElement;
+
+    constructor(containerEl: HTMLElement) {
+        this.groupEl = document.createElement("div");
+        this.groupEl.className = "setting-group";
+        this.headingEl = document.createElement("div");
+        this.headingEl.className = "setting-group-heading";
+        this.groupEl.appendChild(this.headingEl);
+        containerEl.appendChild(this.groupEl);
+    }
+
+    setHeading(heading: string): this {
+        this.headingEl.textContent = heading;
+        return this;
+    }
+
+    addSetting(cb: (setting: Setting) => void): this {
+        cb(new Setting(this.groupEl));
         return this;
     }
 }
@@ -165,13 +234,24 @@ interface MockText {
     setValue: (value: string) => MockText;
     onChange: (callback: (value: string) => void) => MockText;
     setPlaceholder: (placeholder: string) => MockText;
+    inputEl: HTMLInputElement | HTMLTextAreaElement;
+}
+
+function makeMockText(inputEl: HTMLInputElement | HTMLTextAreaElement): MockText {
+    const mockText: MockText = {
+        setValue: (_value: string) => mockText,
+        onChange: (_callback: (value: string) => void) => mockText,
+        setPlaceholder: (_placeholder: string) => mockText,
+        inputEl,
+    };
+    return mockText;
 }
 
 interface MockDropdown {
     addOption: (value: string, text: string) => MockDropdown;
     setValue: (value: string) => MockDropdown;
     onChange: (callback: (value: string) => void) => MockDropdown;
-    selectEl: { empty: () => void };
+    selectEl: HTMLSelectElement & { empty: () => void };
 }
 
 interface MockToggle {
@@ -186,6 +266,7 @@ interface MockButton {
     setDisabled: (disabled: boolean) => MockButton;
     setCta: () => MockButton;
     removeCta: () => MockButton;
+    buttonEl: HTMLButtonElement;
 }
 
 // Obsidian-style methods type for prototype extension
@@ -215,6 +296,53 @@ if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
             this.appendChild(el);
             return el;
         };
+    }
+}
+
+// Further Obsidian DOM helpers the settings tab uses (addClass, setText, ...).
+type ObsidianDomInfo = { cls?: string; text?: string };
+type ObsidianHTMLElementExtras = {
+    addClass(...cls: string[]): void;
+    removeClass(...cls: string[]): void;
+    setText(text: string): void;
+    empty(): void;
+    isShown(): boolean;
+    createSpan(o?: ObsidianDomInfo | string): HTMLSpanElement;
+};
+
+if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test' && typeof window !== 'undefined') {
+    const proto = HTMLElement.prototype as unknown as ObsidianHTMLElementExtras & ObsidianHTMLElementMethods;
+    const applyInfo = <T extends HTMLElement>(el: T, o?: ObsidianDomInfo | string): T => {
+        if (typeof o === "string") el.className = o;
+        else if (o) {
+            if (o.cls) el.className = o.cls;
+            if (o.text) el.textContent = o.text;
+        }
+        return el;
+    };
+    if (!proto.addClass) {
+        proto.addClass = function (this: HTMLElement, ...cls: string[]) { this.classList.add(...cls); };
+        proto.removeClass = function (this: HTMLElement, ...cls: string[]) { this.classList.remove(...cls); };
+        proto.setText = function (this: HTMLElement, text: string) { this.textContent = text; };
+        proto.empty = function (this: HTMLElement) { this.replaceChildren(); };
+        proto.isShown = function (this: HTMLElement) { return this.isConnected; };
+        proto.createDiv = function (this: HTMLElement, o?: ObsidianDomInfo | string) {
+            const div = applyInfo(document.createElement("div"), o);
+            this.appendChild(div);
+            return div;
+        };
+        proto.createSpan = function (this: HTMLElement, o?: ObsidianDomInfo | string) {
+            const span = applyInfo(document.createElement("span"), o);
+            this.appendChild(span);
+            return span;
+        };
+        proto.createEl = function (this: HTMLElement, tag: string, o?: ObsidianDomInfo | string) {
+            const el = applyInfo(document.createElement(tag), o);
+            this.appendChild(el);
+            return el;
+        };
+        (globalThis as unknown as { createDiv: (o?: ObsidianDomInfo | string) => HTMLDivElement }).createDiv =
+            (o?: ObsidianDomInfo | string) => applyInfo(document.createElement("div"), o);
     }
 }
 

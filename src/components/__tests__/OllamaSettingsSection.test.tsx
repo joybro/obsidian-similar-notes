@@ -61,7 +61,7 @@ function buildUrlOnChange(overrides: {
     );
     const { setting, getTextOnChange } = makeFakeSetting();
     // builders[0] is the "Server URL" setting.
-    result.builders[0](setting as never);
+    result.builders[0].render(setting as never, undefined as never);
 
     const onChange = getTextOnChange();
     expect(onChange).toBeDefined();
@@ -154,7 +154,7 @@ describe("Ollama Test connection uses the values currently in the form", () => {
             onDropdownCreated: vi.fn(),
         });
         const { setting, handlers } = makeFullFakeSetting();
-        result.builders.forEach((builder) => builder(setting as never));
+        result.builders.forEach((row) => row.render(setting as never, undefined as never));
         // Clicks: [Refresh, Test]
         return handlers;
     }

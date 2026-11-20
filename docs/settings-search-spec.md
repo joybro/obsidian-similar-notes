@@ -2,7 +2,9 @@
 
 ## Status
 
-Draft. Not implemented. Planned after the 1.8.0 release. No user-visible copy changes.
+Implemented, not released yet. Planned to ship after the 1.8.0 release so the
+settings tab does not change while 1.8.0 is checked. No user-visible copy
+changes.
 
 ## Problem
 
@@ -66,6 +68,19 @@ warnings left on the 1.8.0 branch.
    search. Builders keep their own `setName`/`setDesc` (same strings) so the
    fallback path renders unchanged; a unit test asserts each definition's
    `name` equals the name its builder sets, so they cannot drift.
+7. **Users' words as aliases, distinct render keys.** Obsidian searches row
+   names and aliases, not group headings (Obsidian 1.15.1: "exclude" and
+   "Exclude files from index" found no Similar Notes row). The exclusion rows
+   carry the words users wrote in their requests (#14 "Folder exclusion
+   setting", #42 "yaml metadata based exclusions"): Path patterns ←
+   `Exclude folders`, `Exclude files`; Frontmatter properties ←
+   `Exclude by property`, `YAML`; Content patterns ← `Exclude content`. No
+   aliases without a user's words behind them (no "threshold", "ignore").
+   Provider rows that share a name ("Model", "API key", "Server URL",
+   "Test connection") get `id: "<provider>:<name>"`: Obsidian 1.15.1 keys a
+   render row by `id`, else `name`, and logs `duplicate setting key` for
+   repeats in one list on every render. `id` is not in the public types
+   (obsidian 1.14.4); an app that ignores it keys by name, as before.
 
 ## Map delta (docs/ux-map.md)
 
@@ -95,12 +110,59 @@ warnings left on the 1.8.0 branch.
   index statistics still update live.
 - Lint: `prefer-setting-definitions` gone; `npm run lint` 0 errors.
 
+## Implementation notes
+
+- `src/components/settingDefinitions.ts`: `SettingRow` (= `SettingDefinitionRender`),
+  `unnamedRow()` and `renderSettingGroups()` (the `display()` fallback).
+  `getSettingDefinitions()` returns `[]` unless `requireApiVersion("1.13.0")`,
+  so 1.11/1.12 always take `display()`.
+- Definitions carry `name` (and `aliases` on Model provider) but no `desc`:
+  several descriptions are dynamic (current model, Apply, token usage) and
+  copying every static description into a second literal would double the
+  copy to keep in sync. Search therefore matches names and aliases only.
+  Adding static `desc` is a follow-up if search by description is wanted.
+- Rows without a name (errored-files and excluded-files previews, the regex
+  tester) are `name: ""`, `searchable: false`.
+- Download progress and model errors update the "Current model" description
+  in place (like index statistics) instead of re-rendering; the price field's
+  blur refreshes the cost text in place instead of re-rendering (a full tab
+  re-render there would take focus from the field the user moved to).
+- `obsidianmd/no-unsupported-api` does not flag `getSettingDefinitions`,
+  `update` or `SettingDefinition*` types; the remaining warnings are the 1.11
+  `SettingGroup` calls, now only in `settingDefinitions.ts`.
+- `obsidianmd/settings-tab/prefer-setting-definitions` did not fire in this
+  repo's `npm run lint` before or after the change (eslint-plugin-obsidianmd
+  0.6.0); the community scan is where it was reported.
+
 ## Open questions (answer while implementing, then fold into this spec)
+
+Answered by testing a branch build with the aliases in Obsidian 1.15.1
+(2026-11-19):
+
+- Opening a result: clicking the "Path patterns" result opens the Similar
+  Notes tab scrolled so the row is in view (scrollTop 1148 of 3471, row at
+  y 234~497 of a 670px pane); no lasting highlight on the row.
+- Scroll across a full re-render: `update()` with the pane scrolled to the
+  bottom drops scrollTop 2801 → 2754 for a moment and Obsidian restores 2801
+  within a second; the GPU toggle keeps 252 → 252. No scroll handling needed.
+- Provider switch with ids: rows shown per provider unchanged (builtin,
+  Ollama, OpenAI, Gemini), no `duplicate setting key` errors.
+- Search follows the provider switch: after picking OpenAI (not yet
+  applied), "API key" and "Server URL" return those rows next to Model
+  provider; back on built-in, only Model provider. So `visible` is
+  re-evaluated for search after `update()`.
+
+Observed in Obsidian 1.15.1 (2026-11-19, branch build, through `app.setting.searchComponent` and `searchResultsEl`): the tab
+is in `app.setting.searchIndex.tabs` with its 6 groups; "Path patterns",
+"Minimum similarity" and "Report a bug" each return the Similar Notes row of
+that name; "OpenAI" and "API key" (built-in provider selected) return
+"Model provider" only, so hidden provider rows are not searched and the aliases
+carry those queries.(Where a click lands: answered above.)
+
 
 - Does the framework set the row's name from the definition before calling
   `render`, or does the builder's `setName` win? Either is fine under rule 6;
-  record which.
-- What does opening a search result do (scroll and highlight the row, or just
-  open the tab)? Record it in the map delta.
-- Is `visible` re-evaluated for search after `update()`, so switching provider
-  changes which rows are searchable?
+  record which. (Not answerable from obsidian.d.ts 1.14.4: `render` receives
+  a `Setting` and the docs say `name` is "used for rendering and search".
+  Since the builder calls `setName` after, the builder's value is what shows
+  if the framework sets it first; the unit test keeps them equal.)

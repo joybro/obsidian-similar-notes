@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+-   **Similar Notes settings show up in Obsidian's settings search** (Obsidian 1.13 and later): typing a setting's name in the settings search box finds it, and clicking the result opens the Similar Notes tab at that setting. The exclusion settings also match the words people use for them (exclude folders, exclude files, exclude by property, YAML, exclude content), and provider names (OpenAI, Gemini, Ollama, OpenRouter), "API key" and "Server URL" lead to the model provider picker. On Obsidian 1.11 and 1.12 the settings tab looks and works as before.
+
 ### Changed
 
 -   **Title search favors titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title contains the characters you typed now ranks above a note whose title only means something similar. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.
