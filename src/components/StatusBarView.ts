@@ -3,6 +3,7 @@ import { Menu, Notice, setIcon, setTooltip } from "obsidian";
 import { Subscription, type Observable } from "rxjs";
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
+import { computeIndexStatus } from "@/application/indexStatus";
 import type { ErroredNoteStore } from "@/infrastructure/ErroredNoteStore";
 import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeStore";
 import { logRejection } from "@/utils/logRejection";
@@ -199,12 +200,19 @@ export class StatusBarView {
             menu.addSeparator();
         } else {
             // Normal state menu - show stats
-            const indexedNoteCount =
-                this.config.indexedNotesMTimeStore.getCurrentIndexedNoteCount();
+            // Same count as the Indexed line in settings: a note indexed
+            // before an exclusion rule matched it keeps its mtime entry until
+            // the rules are applied, so the raw store size could exceed the
+            // total of non-excluded notes.
             const isExcluded = this.config.isExcluded ?? (() => false);
-            const totalNoteCount = this.config.app.vault
-                .getMarkdownFiles()
-                .filter((file) => !isExcluded(file.path)).length;
+            const status = computeIndexStatus(
+                this.config.app.vault.getMarkdownFiles().map((f) => f.path),
+                isExcluded,
+                this.config.indexedNotesMTimeStore.getAllPaths(),
+                this.config.erroredNoteStore?.getAllPaths() ?? []
+            );
+            const indexedNoteCount = status.indexed;
+            const totalNoteCount = status.total - status.excluded;
 
             let chunkCount = 0;
             try {
