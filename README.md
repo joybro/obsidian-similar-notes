@@ -12,7 +12,7 @@ Find semantically similar notes using AI. Choose local models for privacy or clo
 
 ### Semantic Search
 
-Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not just keywords.
+Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not just keywords. A few words of a note's title are enough to find it.
 
 ![Semantic Search Demo](images/semantic-search-demo.gif)
 
