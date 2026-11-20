@@ -68,8 +68,14 @@ function createConfig() {
         noteChangeCount$,
         downloadProgress$,
         modelError$,
-        indexedNotesMTimeStore: { getCurrentIndexedNoteCount: () => 0 },
-        erroredNoteStore: { getErroredCount$: () => erroredCount$ },
+        indexedNotesMTimeStore: {
+            getCurrentIndexedNoteCount: () => 0,
+            getAllPaths: () => [] as string[],
+        },
+        erroredNoteStore: {
+            getErroredCount$: () => erroredCount$,
+            getAllPaths: () => [] as string[],
+        },
         noteChunkRepository: { count: async () => 0 },
         modelService: {
             getCurrentModelId: () => "m",
@@ -204,9 +210,49 @@ describe("StatusBarView indexed count leaves out excluded notes", () => {
         ).vault.getMarkdownFiles = () => files;
         (
             config.indexedNotesMTimeStore as unknown as {
-                getCurrentIndexedNoteCount: () => number;
+                getAllPaths: () => string[];
             }
-        ).getCurrentIndexedNoteCount = () => 2;
+        ).getAllPaths = () => ["a.md", "b.md"];
+        (
+            config as unknown as { isExcluded: (p: string) => boolean }
+        ).isExcluded = (p) => p.startsWith("Private/");
+        const view = new StatusBarView(config);
+
+        const handler = statusBarItem.addEventListener.mock.calls[0][1] as (
+            evt: MouseEvent
+        ) => void;
+        handler({} as MouseEvent);
+
+        await vi.waitFor(() => {
+            expect(capturedTitles).toContain("Indexed: 2/2 notes (0 chunks)");
+        });
+
+        view.dispose();
+    });
+
+    it("leaves a newly excluded note out of the indexed count before Apply rules", async () => {
+        const { config, statusBarItem } = createConfig();
+        const files = ["a.md", "b.md", "Private/c.md"].map((path) => ({
+            path,
+        }));
+        (
+            config.app as unknown as {
+                vault: { getMarkdownFiles: () => { path: string }[] };
+            }
+        ).vault.getMarkdownFiles = () => files;
+        // Private/c.md was indexed before the rule was added, so its mtime
+        // entry is still in the store until the rules are applied.
+        (
+            config.indexedNotesMTimeStore as unknown as {
+                getCurrentIndexedNoteCount: () => number;
+                getAllPaths: () => string[];
+            }
+        ).getCurrentIndexedNoteCount = () => 3;
+        (
+            config.indexedNotesMTimeStore as unknown as {
+                getAllPaths: () => string[];
+            }
+        ).getAllPaths = () => ["a.md", "b.md", "Private/c.md"];
         (
             config as unknown as { isExcluded: (p: string) => boolean }
         ).isExcluded = (p) => p.startsWith("Private/");
