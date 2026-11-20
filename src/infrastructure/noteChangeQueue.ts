@@ -195,6 +195,12 @@ export class NoteChangeQueue {
                     (change) => change.path === oldPath && change.reason === "renamed"
                 )?.oldPath ?? oldPath;
                 const cleanup = this.sourceDeletions(superseded, file.path);
+                // A retry may have already moved rows to the intermediate
+                // path before its title embed failed. Never strand those rows
+                // when coalescing the retry with a subsequent rename.
+                if (sourcePath !== oldPath && oldPath !== file.path) {
+                    cleanup.push({ path: oldPath, reason: "deleted" });
+                }
 
                 const isNewPathIncluded =
                     filterMarkdownFiles([file], settings.excludeFolderPatterns)

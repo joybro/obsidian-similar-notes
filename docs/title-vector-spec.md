@@ -83,6 +83,10 @@ Helpers: `TITLE_CHUNK_INDEX`, `isTitleChunk`, `titleFromPath` and
   delete events cancel older pending edit timers, so a delayed edit cannot
   erase a newer rename's source-path information. These rules concern work
   still in the queue, not changes already doing I/O.
+  A queued retry may already have moved rows to its intermediate destination
+  before title embedding failed. Coalescing a subsequent rename therefore
+  also schedules removal of that intermediate path. If the original source
+  no longer has rows, normal fresh indexing at the final path is the fallback.
 - Indexable-text hash skip (indexable-text-hash spec): when the hash says the
   body is unchanged, the title row is left as is; the title cannot change
   without a rename.

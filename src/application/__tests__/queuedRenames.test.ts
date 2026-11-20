@@ -109,12 +109,30 @@ async function makeWorld() {
         }
         throw new Error("Queue did not drain within 30 changes");
     };
-    return { file, files, events, metadata, repo, embedded, bodyEmbedding, rename, drain, values };
+    return { file, files, events, metadata, repo, embedded, bodyEmbedding, rename, drain, values, queue, embedding, service };
 }
 
 afterEach(() => { vi.useRealTimers(); });
 
 describe("queued rename sequences", () => {
+    test("renaming a failed title update cleans its partially moved intermediate rows", async () => {
+        const w = await makeWorld();
+        w.rename("B.md");
+        const embedTexts = w.embedding.embedTexts;
+        w.embedding.embedTexts = async () => { throw new Error("temporary title embedding failure"); };
+        const [change] = w.queue.pollFileChanges(1);
+        await (w.service as unknown as { processChange: (change: NoteChange) => Promise<void> }).processChange(change);
+        expect(w.queue.getFileChangeCount()).toBe(1);
+        expect([...new Set(w.repo.rows.map((row) => row.path))]).toEqual(["B.md"]);
+        expect([...w.metadata.keys()]).toEqual(["A.md"]);
+        w.embedding.embedTexts = embedTexts;
+        w.rename("C.md");
+        await w.drain();
+        expect([...new Set(w.repo.rows.map((row) => row.path))]).toEqual(["C.md"]);
+        expect([...w.metadata.keys()]).toEqual(["C.md"]);
+        expect(w.repo.rows.filter((row) => row.chunkIndex < 0).map((row) => row.content)).toEqual(["C"]);
+    });
+
     test("consecutive renames preserve the body and update the final title", async () => {
         const w = await makeWorld();
         w.rename("B.md");

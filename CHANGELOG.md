@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
--   **Quick renames no longer leave the old note in the search index**: when a rename is still waiting in the indexing queue, renaming the note again, editing it or deleting it now cleans up the original path too. Consecutive renames keep the existing body embeddings and update only the final title. A pending edit timer can no longer overwrite a newer rename.
+-   **Quick renames no longer leave the old note in the search index**: when a rename is still waiting in the indexing queue, renaming the note again, editing it or deleting it now cleans up the original path too. Consecutive renames that have not started indexing reuse the existing body embeddings and update only the final title. Renaming again while retrying a failed title update also removes the intermediate path. A pending edit timer can no longer overwrite a newer rename.
 -   **The status bar's Indexed count no longer includes excluded notes**: the total in "Indexed: X/Y notes" now leaves out notes your exclusion rules match, so it reaches Y once indexing finishes and matches the Indexed line in settings.
 -   **Token usage "Today" follows your local day**: the usage counter for OpenAI and Gemini now starts a new day at your local midnight instead of midnight UTC.
 -   **Similar notes refresh sooner after edits**: once a saved edit's indexing delay has passed, indexing starts without waiting for the next polling interval. Your delay setting stays the same. Stopping or reloading the indexer also no longer leaves an old processing loop running alongside the new one.
