@@ -46,11 +46,34 @@ export default defineConfig([
             ...reactHooks.configs.recommended.rules,
             indent: ["error", 4, { SwitchCase: 1 }],
             "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }],
-            "max-lines-per-function": ["error", { max: 150, skipBlankLines: true, skipComments: true }],
+            "max-lines-per-function": ["error", { max: 80, skipBlankLines: true, skipComments: true }],
             "@typescript-eslint/no-unused-vars": ["error", {
                 argsIgnorePattern: "^_",
                 varsIgnorePattern: "^_",
             }],
+        },
+    },
+    {
+        // Functions that were already longer than 80 lines when the limit was
+        // lowered from 150. They keep the old limit so they cannot grow further;
+        // remove a path from this list once its functions fit in 80 lines.
+        files: [
+            "src/application/NoteIndexingService.ts",
+            "src/application/SimilarNoteCoordinator.ts",
+            "src/components/GeminiSettingsSection.tsx",
+            "src/components/NoteBottomViewReact.tsx",
+            "src/components/OllamaSettingsSection.tsx",
+            "src/components/OpenAISettingsSection.tsx",
+            "src/components/SemanticSearchModal.tsx",
+            "src/components/SimilarNotesSettingTab.tsx",
+            "src/components/StatusBarView.ts",
+            "src/domain/service/EmbeddingService.ts",
+            "src/domain/service/SimilarNoteFinder.ts",
+            "src/infrastructure/noteChangeQueue.ts",
+            "src/main.ts",
+        ],
+        rules: {
+            "max-lines-per-function": ["error", { max: 150, skipBlankLines: true, skipComments: true }],
         },
     },
     {
