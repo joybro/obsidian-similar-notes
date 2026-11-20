@@ -51,6 +51,7 @@ export function emptyStateText(reason: EmptyReason | undefined): string {
 export interface NoteBottomViewModel {
     currentFile: TFile | null;
     similarNoteEntries: SimilarNoteEntry[];
+    showLinkButton: boolean;
     emptyReason?: EmptyReason;
     noteDisplayMode: "title" | "path" | "smart";
     sidebarResultCount: number;
@@ -136,6 +137,7 @@ const SearchResult = ({
     onNoteHover,
     onContextMenu,
     onAddLink,
+    showLinkButton,
     noteDisplayMode,
     allSimilarNotes,
 }: {
@@ -144,6 +146,7 @@ const SearchResult = ({
     onNoteHover: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
     onAddLink: (file: TFile) => void;
+    showLinkButton: boolean;
     noteDisplayMode: "title" | "path" | "smart";
     allSimilarNotes: SimilarNoteEntry[];
 }) => {
@@ -260,13 +263,13 @@ const SearchResult = ({
                         allSimilarNotes.map((entry) => entry.file)
                     )}
                 </div>
-                <div className="tree-item-flair-outer">
-                    {!note.isLinked && (
+                <div className={`tree-item-flair-outer${showLinkButton && !note.isLinked ? " similar-notes-result-actions" : ""}`}>
+                    {showLinkButton && !note.isLinked && (
                         <button
                             type="button"
                             className="similar-notes-add-link"
-                            aria-label={`Add link to ${note.title}`}
-                            title="Add link to current note"
+                            aria-label={`Add link to ${note.title} at the end of this note`}
+                            title="Add link at the end of this note"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onAddLink(note.file);
@@ -298,6 +301,7 @@ const SearchResultsContainer = ({
     onNoteHover,
     onContextMenu,
     onAddLink,
+    showLinkButton,
     noteDisplayMode,
 }: {
     similarNotes: SimilarNoteEntry[];
@@ -306,6 +310,7 @@ const SearchResultsContainer = ({
     onNoteHover: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
     onAddLink: (file: TFile) => void;
+    showLinkButton: boolean;
     noteDisplayMode: "title" | "path" | "smart";
 }) => {
     if (similarNotes.length === 0) {
@@ -337,6 +342,7 @@ const SearchResultsContainer = ({
                         onNoteHover={onNoteHover}
                         onContextMenu={onContextMenu}
                         onAddLink={onAddLink}
+                        showLinkButton={showLinkButton}
                         noteDisplayMode={noteDisplayMode}
                         allSimilarNotes={similarNotes}
                     />
@@ -358,6 +364,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
     const [emptyReason, setEmptyReason] = useState<EmptyReason | undefined>();
     const [sourceFile, setSourceFile] = useState<TFile | null>(null);
+    const [showLinkButton, setShowLinkButton] = useState(false);
     const pendingLinks = useRef(new Set<string>());
     const [noteDisplayMode, setNoteDisplayMode] = useState<
         "title" | "path" | "smart"
@@ -373,6 +380,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 ? model.sidebarResultCount
                 : model.bottomResultCount;
             setSourceFile(model.currentFile);
+            setShowLinkButton(model.showLinkButton);
             setSimilarNotes(model.similarNoteEntries.slice(0, limit));
             setEmptyReason(model.emptyReason);
             setNoteDisplayMode(model.noteDisplayMode);
@@ -490,6 +498,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                         onNoteHover={handleNoteHover}
                         onContextMenu={handleContextMenu}
                         onAddLink={handleAddLink}
+                        showLinkButton={showLinkButton}
                         noteDisplayMode={noteDisplayMode}
                     />
                 )}

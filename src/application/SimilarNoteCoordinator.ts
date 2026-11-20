@@ -37,6 +37,7 @@ export class SimilarNoteCoordinator {
     private noteBottomViewModel$ = new BehaviorSubject<NoteBottomViewModel>({
         currentFile: null,
         similarNoteEntries: [],
+        showLinkButton: false,
         noteDisplayMode: "title", // Will be properly initialized in constructor
         sidebarResultCount: 10,   // Will be properly initialized in constructor
         bottomResultCount: 5,     // Will be properly initialized in constructor
@@ -67,6 +68,7 @@ export class SimilarNoteCoordinator {
         const currentModel = this.noteBottomViewModel$.value;
         this.noteBottomViewModel$.next({
             ...currentModel,
+            showLinkButton: settings.showLinkButton,
             noteDisplayMode: settings.noteDisplayMode,
             sidebarResultCount: settings.sidebarResultCount,
             bottomResultCount: settings.bottomResultCount,
@@ -100,6 +102,7 @@ export class SimilarNoteCoordinator {
                 const currentModel = this.noteBottomViewModel$.value;
                 this.noteBottomViewModel$.next({
                     ...currentModel,
+                    showLinkButton: settings.showLinkButton,
                     noteDisplayMode: settings.noteDisplayMode,
                     sidebarResultCount: settings.sidebarResultCount,
                     bottomResultCount: settings.bottomResultCount,
@@ -202,6 +205,7 @@ export class SimilarNoteCoordinator {
             this.noteBottomViewModel$.next({
                 currentFile: null,
                 similarNoteEntries: [],
+                showLinkButton: settings.showLinkButton,
                 noteDisplayMode: settings.noteDisplayMode,
                 sidebarResultCount: settings.sidebarResultCount,
                 bottomResultCount: settings.bottomResultCount,
@@ -316,6 +320,7 @@ export class SimilarNoteCoordinator {
         this.noteBottomViewModel$.next({
             currentFile: file,
             similarNoteEntries: filtered,
+            showLinkButton: settings.showLinkButton,
             emptyReason:
                 filtered.length > 0
                     ? undefined

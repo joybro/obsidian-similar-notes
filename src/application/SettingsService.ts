@@ -40,6 +40,7 @@ export interface SimilarNotesSettings {
     usageStats?: UsageStats; // API usage statistics
     includeFrontmatter: boolean; // Whether to include frontmatter in indexing
     showSourceChunk: boolean; // Whether to show the original chunk in the results
+    showLinkButton: boolean; // Whether to show the link button on unlinked results
     useGPU: boolean; // Whether to use GPU acceleration for model inference
     excludeFolderPatterns: string[]; // Glob patterns to exclude folders/files from indexing
     excludeRegexPatterns: string[]; // Regular expressions to exclude content from indexing
@@ -61,6 +62,7 @@ const DEFAULT_SETTINGS: SimilarNotesSettings = {
     modelId: "sentence-transformers/all-MiniLM-L6-v2",
     includeFrontmatter: false,
     showSourceChunk: false,
+    showLinkButton: false,
     useGPU: true, // Use GPU acceleration by default
     // Excalidraw/ holds drawings stored as base64-compressed JSON — binary data
     // that can't be embedded and isn't meaningful to index (#46). Only applies to

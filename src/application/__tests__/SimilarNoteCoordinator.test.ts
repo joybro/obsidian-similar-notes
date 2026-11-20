@@ -26,6 +26,7 @@ function makeSettings(
         modelId: "test-model",
         includeFrontmatter: false,
         showSourceChunk: false,
+        showLinkButton: false,
         useGPU: false,
         excludeFolderPatterns: [],
         excludeRegexPatterns: [],
@@ -85,6 +86,19 @@ describe("SimilarNoteCoordinator", () => {
             get: vi.fn(() => settings),
             getNewSettingsObservable: vi.fn(() => settingsChange$),
         } as unknown as SettingsService;
+    });
+
+    test("updates the link button setting in the current view without a new search", async () => {
+        const coord = new SimilarNoteCoordinator(vault, noteRepository, similarNoteFinder, settingsService);
+        await coord.onFileOpen(makeFile("open.md"));
+        expect((await firstValueFrom(coord.getNoteBottomViewModelObservable())).showLinkButton).toBe(false);
+        vi.mocked(similarNoteFinder.findSimilarNotes).mockClear();
+        settings.showLinkButton = true;
+        settingsChange$.next({ showLinkButton: true });
+        expect((await firstValueFrom(coord.getNoteBottomViewModelObservable())).showLinkButton).toBe(true);
+        expect(similarNoteFinder.findSimilarNotes).not.toHaveBeenCalled();
+        await coord.onFileOpen(null);
+        expect((await firstValueFrom(coord.getNoteBottomViewModelObservable())).showLinkButton).toBe(true);
     });
 
     describe("#39.1: sidebar should not show stale results when the active note is closed", () => {
