@@ -5,11 +5,18 @@ import type { IndexedNoteMTimeStore } from "@/infrastructure/IndexedNoteMTimeSto
 import type { NoteChunkRepository } from "@/domain/repository/NoteChunkRepository";
 import { collectEnvironmentInfo, formatEnvironmentInfoAsMarkdown } from "@/utils/environmentInfo";
 import log from "loglevel";
-import { apiVersion, Notice, PluginSettingTab, SettingGroup, type Setting } from "obsidian";
+import {
+    apiVersion,
+    Notice,
+    PluginSettingTab,
+    requireApiVersion,
+    type Setting,
+    type SettingDefinitionItem,
+} from "obsidian";
 import type MainPlugin from "../main";
 import { ModelSettingsSection } from "./ModelSettingsSection";
 import { IndexSettingsSection } from "./IndexSettingsSection";
-import type { SettingBuilder } from "./OpenAISettingsSection";
+import { renderSettingGroups, type SettingRow, type SettingRowGroup } from "./settingDefinitions";
 import { logRejection } from "@/utils/logRejection";
 
 const GITHUB_ISSUES_URL = "https://github.com/joybro/obsidian-similar-notes/issues";
@@ -80,7 +87,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                     indexedChunkCount: this.indexedChunkCount
                 });
             } else {
-                this.display();
+                this.rerender();
             }
         }
     }
@@ -124,7 +131,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             indexedChunkCount: this.indexedChunkCount
                         });
                     } else {
-                        this.display();
+                        this.rerender();
                     }
                 }
             } catch (error) {
@@ -163,56 +170,92 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
         }
     }
 
+    /**
+     * The tab's structure for Obsidian 1.13+: rendered by Obsidian and indexed
+     * by its settings search (docs/settings-search-spec.md). Below 1.13 this
+     * returns [] (the base class never calls it there), and display() renders
+     * the same definitions imperatively.
+     */
+    getSettingDefinitions(): SettingDefinitionItem[] {
+        if (!requireApiVersion("1.13.0")) return [];
+        return this.buildSettingDefinitions();
+    }
+
+    /** Fallback for Obsidian 1.11 and 1.12: the same definitions, rendered imperatively. */
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
+        renderSettingGroups(containerEl, this.buildSettingDefinitions());
+    }
 
-        // Initialize and render model settings section
+    /**
+     * Re-render the whole tab after a structure change (provider switch,
+     * applied model, usage reset): update() when Obsidian renders the
+     * definitions, display() when it does not (spec rule 4).
+     */
+    private rerender(): void {
+        if (requireApiVersion("1.13.0")) {
+            this.update();
+        } else if (this.containerEl.isShown()) {
+            this.display();
+        }
+    }
+
+    /** Every group and row of the tab, in screen order. */
+    buildSettingDefinitions(): SettingRowGroup[] {
+        // Sections read the late-bound services through getters, so building
+        // definitions for search indexing before they exist is safe.
+        const services = {
+            modelService: () => this.modelService,
+            mTimeStore: () => this.mTimeStore,
+            erroredStore: () => this.erroredStore,
+            noteChunkRepository: () => this.noteChunkRepository,
+        };
         if (!this.modelSettingsSection) {
             this.modelSettingsSection = new ModelSettingsSection({
-                containerEl,
                 plugin: this.plugin,
                 settingsService: this.settingsService,
-                modelService: this.modelService,
-                app: this.app
+                get modelService() {
+                    return services.modelService();
+                },
+                app: this.app,
+                rerender: () => this.rerender(),
             });
         }
-        this.modelSettingsSection.render();
-
-        // Initialize and render index settings section
         if (!this.indexSettingsSection) {
             this.indexSettingsSection = new IndexSettingsSection({
-                containerEl,
                 plugin: this.plugin,
                 settingsService: this.settingsService,
                 app: this.app,
-                mTimeStore: this.mTimeStore,
-                erroredStore: this.erroredStore,
-                noteChunkRepository: this.noteChunkRepository
+                get mTimeStore() {
+                    return services.mTimeStore();
+                },
+                get erroredStore() {
+                    return services.erroredStore();
+                },
+                get noteChunkRepository() {
+                    return services.noteChunkRepository();
+                },
             });
         }
-        this.indexSettingsSection.render({
-            indexedNoteCount: this.indexedNoteCount,
-            indexedChunkCount: this.indexedChunkCount
-        });
 
-        // Display settings group
-        const displayGroup = new SettingGroup(containerEl).setHeading("Display");
-        const displayBuilders = this.getDisplaySettingBuilders();
-        displayBuilders.forEach(builder => displayGroup.addSetting(builder));
-
-        // Debug and support settings group
-        const debugGroup = new SettingGroup(containerEl).setHeading("Debug and support");
-        const debugBuilders = this.getDebugSettingBuilders();
-        debugBuilders.forEach(builder => debugGroup.addSetting(builder));
+        return [
+            ...this.modelSettingsSection.getDefinitionGroups(),
+            ...this.indexSettingsSection.getDefinitionGroups(() => ({
+                indexedNoteCount: this.indexedNoteCount,
+                indexedChunkCount: this.indexedChunkCount,
+            })),
+            { type: "group", heading: "Display", items: this.getDisplaySettingBuilders() },
+            { type: "group", heading: "Debug and support", items: this.getDebugSettingBuilders() },
+        ];
     }
 
-    private getDisplaySettingBuilders(): SettingBuilder[] {
+    private getDisplaySettingBuilders(): SettingRow[] {
         const settings = this.settingsService.get();
 
         return [
             // Show at bottom
-            (setting: Setting) => {
+            { name: "Show similar notes at the bottom of notes", render: (setting: Setting) => {
                 setting
                     .setName("Show similar notes at the bottom of notes")
                     .setDesc("Display similar notes section at the bottom of each note")
@@ -221,9 +264,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             logRejection(this.settingsService.update({ showAtBottom: value }), "save setting");
                         });
                     });
-            },
+            } },
             // Note display mode
-            (setting: Setting) => {
+            { name: "Note display mode", render: (setting: Setting) => {
                 setting
                     .setName("Note display mode")
                     .setDesc("Choose how note names are displayed in the results")
@@ -239,9 +282,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                                 });
                             });
                     });
-            },
+            } },
             // Semantic link trigger
-            (setting: Setting) => {
+            { name: "Semantic link trigger", render: (setting: Setting) => {
                 setting
                     .setName("Semantic link trigger")
                     .setDesc(
@@ -262,9 +305,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             });
                         text.inputEl.addClass("similar-notes-input-w80");
                     });
-            },
+            } },
             // Show source chunk
-            (setting: Setting) => {
+            { name: "Show source chunk in results", render: (setting: Setting) => {
                 setting
                     .setName("Show source chunk in results")
                     .setDesc(
@@ -279,8 +322,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                                 });
                             });
                     });
-            },
-            (setting: Setting) => {
+            } },
+            // Show link button
+            { name: "Show link button on results", render: (setting: Setting) => {
                 setting
                     .setName("Show link button on results")
                     .setDesc("Show a Link button on each unlinked result. Clicking it adds a link to that note at the end of the current note.")
@@ -289,9 +333,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             logRejection(this.settingsService.update({ showLinkButton: value }), "save setting");
                         });
                     });
-            },
+            } },
             // Sidebar result count
-            (setting: Setting) => {
+            { name: "Number of results in sidebar", render: (setting: Setting) => {
                 setting
                     .setName("Number of results in sidebar")
                     .setDesc("Maximum number of similar notes to display in the sidebar (1-50)")
@@ -311,9 +355,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         text.inputEl.max = "50";
                         text.inputEl.addClass("similar-notes-input-w60");
                     });
-            },
+            } },
             // Bottom result count
-            (setting: Setting) => {
+            { name: "Number of results at bottom", render: (setting: Setting) => {
                 setting
                     .setName("Number of results at bottom")
                     .setDesc("Maximum number of similar notes to display at the bottom of notes (1-20)")
@@ -333,9 +377,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         text.inputEl.max = "20";
                         text.inputEl.addClass("similar-notes-input-w60");
                     });
-            },
+            } },
             // Minimum similarity threshold
-            (setting: Setting) => {
+            { name: "Minimum similarity", render: (setting: Setting) => {
                 setting
                     .setName("Minimum similarity")
                     .setDesc(
@@ -358,14 +402,14 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                         text.inputEl.step = "0.05";
                         text.inputEl.addClass("similar-notes-input-w70");
                     });
-            },
+            } },
         ];
     }
 
-    private getDebugSettingBuilders(): SettingBuilder[] {
+    private getDebugSettingBuilders(): SettingRow[] {
         return [
             // Log level
-            (setting: Setting) => {
+            { name: "Log level", render: (setting: Setting) => {
                 setting
                     .setName("Log level")
                     .setDesc("Set the logging level for debugging purposes")
@@ -384,9 +428,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                                 );
                             });
                     });
-            },
+            } },
             // Copy environment info
-            (setting: Setting) => {
+            { name: "Copy environment info", render: (setting: Setting) => {
                 setting
                     .setName("Copy environment info")
                     .setDesc("Copy your environment and settings info to clipboard for bug reports")
@@ -411,9 +455,9 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             );
                         });
                     });
-            },
+            } },
             // Report a bug
-            (setting: Setting) => {
+            { name: "Report a bug", render: (setting: Setting) => {
                 setting
                     .setName("Report a bug")
                     .setDesc("Open GitHub issues page to report bugs or request features")
@@ -422,7 +466,7 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             window.open(GITHUB_ISSUES_URL, "_blank");
                         });
                     });
-            },
+            } },
         ];
     }
 

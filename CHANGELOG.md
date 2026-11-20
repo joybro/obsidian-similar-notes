@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 -   **Link similar notes**: Enable **Show link button on results** in Display settings to add a Link button to unlinked results in the sidebar and bottom panel. The button appends a link to the current note.
 -   **Sidebar toolbar with Expand all and Semantic search**: the Similar notes sidebar has two buttons under its header. **Expand all** opens every result's preview and keeps them open as you move between notes and after you restart Obsidian, until you choose **Collapse all**; a single row's arrow still opens or closes just that row. **Semantic search…** opens the semantic search box, same as the command. The panel under a note is unchanged.
 -   **README tip: keep the similar notes list in view** (#4): a CSS snippet that pins the list at the bottom of the editor while you scroll through a long note.
+-   **Similar Notes settings show up in Obsidian's settings search** (Obsidian 1.13 and later): typing a setting's name in the settings search box finds it, and clicking the result opens the Similar Notes tab at that setting. The exclusion settings also match the words people use for them (exclude folders, exclude files, exclude by property, YAML, exclude content), and provider names (OpenAI, Gemini, Ollama, OpenRouter), "API key" and "Server URL" lead to the model provider picker. On Obsidian 1.11 and 1.12 the settings tab looks and works as before.
 
 ### Fixed
 

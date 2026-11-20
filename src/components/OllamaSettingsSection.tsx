@@ -2,7 +2,7 @@ import { OllamaClient, type OllamaModelWithEmbeddingInfo } from "@/adapter/ollam
 import type { SimilarNotesSettings } from "@/application/SettingsService";
 import { Notice } from "obsidian";
 import type { DropdownComponent } from "obsidian";
-import type { SettingBuilder } from "./OpenAISettingsSection";
+import type { SettingRow } from "./settingDefinitions";
 
 interface OllamaSettingsSectionProps {
     settings: SimilarNotesSettings;
@@ -15,7 +15,7 @@ interface OllamaSettingsSectionProps {
 }
 
 export interface OllamaSettingsResult {
-    builders: SettingBuilder[];
+    builders: SettingRow[];
     fetchModels: () => Promise<void>;
 }
 
@@ -96,9 +96,9 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
         }
     };
 
-    const builders: SettingBuilder[] = [
+    const builders: SettingRow[] = [
         // Server URL
-        (setting) => {
+        { name: "Server URL", render: (setting) => {
             setting
                 .setName("Server URL")
                 .setDesc("URL of your Ollama server (default: http://localhost:11434)")
@@ -117,9 +117,9 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                             updateApplyButtonState();
                         });
                 });
-        },
+        } },
         // Model dropdown
-        (setting) => {
+        { name: "Model", render: (setting) => {
             setting
                 .setName("Model")
                 .setDesc("Select an Ollama model for embeddings")
@@ -144,9 +144,9 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                             await fetchOllamaModels();
                         });
                 });
-        },
+        } },
         // Test connection
-        (setting) => {
+        { name: "Test connection", render: (setting) => {
             setting
                 .setName("Test connection")
                 .setDesc("Test the connection to Ollama server and selected model")
@@ -176,7 +176,7 @@ export function getOllamaSettingBuilders(props: OllamaSettingsSectionProps): Oll
                         }
                     });
                 });
-        },
+        } },
     ];
 
     return {

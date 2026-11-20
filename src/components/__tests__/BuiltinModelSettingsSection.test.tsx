@@ -59,9 +59,9 @@ function baseProps(
 }
 
 function capturedSettings(isMobile: boolean) {
-    return getBuiltinModelSettingBuilders(baseProps(isMobile)).map((build) => {
+    return getBuiltinModelSettingBuilders(baseProps(isMobile)).map((row) => {
         const { setting, captured } = makeFakeSetting();
-        build(setting);
+        row.render(setting, undefined as never);
         return captured;
     });
 }

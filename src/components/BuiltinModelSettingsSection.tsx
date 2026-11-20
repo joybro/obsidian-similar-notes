@@ -1,6 +1,6 @@
 import type { SimilarNotesSettings } from "@/application/SettingsService";
 import type { ButtonComponent, Setting } from "obsidian";
-import type { SettingBuilder } from "./OpenAISettingsSection";
+import type { SettingRow } from "./settingDefinitions";
 
 export interface BuiltinModelSettingsSectionProps {
     settings: SimilarNotesSettings;
@@ -18,7 +18,7 @@ export interface BuiltinModelSettingsSectionProps {
 
 export function getBuiltinModelSettingBuilders(
     props: BuiltinModelSettingsSectionProps
-): SettingBuilder[] {
+): SettingRow[] {
     const {
         settings,
         tempModelId,
@@ -40,18 +40,18 @@ export function getBuiltinModelSettingBuilders(
         // phones. Shown above the model options so it's seen before "Load & Apply".
         ...(isMobile
             ? [
-                (setting: Setting) => {
+                { name: "⚠️ Built-in models on mobile", render: (setting: Setting) => {
                     setting
                         .setName("⚠️ Built-in models on mobile")
                         .setDesc(
                             "Built-in models process your notes on-device (the model itself is downloaded once from Hugging Face) and need a lot of memory. On low-memory phones this can crash Obsidian. For mobile, a cloud provider (OpenAI or Gemini) is recommended."
                         )
                         .setClass("similar-notes-mobile-warning");
-                },
+                } },
             ]
             : []),
         // Recommended models dropdown
-        (setting) => {
+        { name: "Recommended models", render: (setting) => {
             setting
                 .setName("Recommended models")
                 .setDesc("Select from recommended embedding models")
@@ -65,9 +65,9 @@ export function getBuiltinModelSettingBuilders(
                         onRender(); // Redraw to update Apply button state
                     });
                 });
-        },
+        } },
         // Custom model input
-        (setting) => {
+        { name: "Custom model", render: (setting) => {
             setting
                 .setName("Custom model")
                 .setDesc(
@@ -80,9 +80,9 @@ export function getBuiltinModelSettingBuilders(
                         updateApplyButtonState();
                     });
                 });
-        },
+        } },
         // GPU acceleration toggle
-        (setting) => {
+        { name: "Use GPU acceleration", render: (setting) => {
             setting
                 .setName("Use GPU acceleration")
                 .setDesc(
@@ -99,7 +99,7 @@ export function getBuiltinModelSettingBuilders(
                             }, 150);
                         });
                 });
-        },
+        } },
     ];
 }
 
@@ -110,7 +110,7 @@ interface ApplyButtonProps {
     onButtonCreated: (button: ButtonComponent) => void;
 }
 
-export function getApplyButtonBuilder(props: ApplyButtonProps): SettingBuilder {
+export function getApplyButtonBuilder(props: ApplyButtonProps): SettingRow {
     const {
         hasChanges,
         tempModelProvider,
@@ -124,7 +124,7 @@ export function getApplyButtonBuilder(props: ApplyButtonProps): SettingBuilder {
         ? "Apply the selected model configuration. This will rebuild the similarity index."
         : "No changes to apply. Modify settings above to enable this button.";
 
-    return (setting) => {
+    return { name: "Apply model changes", render: (setting) => {
         setting
             .setName("Apply model changes")
             .setDesc(buttonDesc)
@@ -143,5 +143,5 @@ export function getApplyButtonBuilder(props: ApplyButtonProps): SettingBuilder {
                     button.setCta();
                 }
             });
-    };
+    } };
 }

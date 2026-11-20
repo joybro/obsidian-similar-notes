@@ -1,7 +1,7 @@
 import type { SettingsService } from "@/application/SettingsService";
 import type { SimilarNotesSettings } from "@/application/SettingsService";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
-import { Platform, SettingGroup } from "obsidian";
+import { Platform } from "obsidian";
 import type { App, ButtonComponent } from "obsidian";
 import type MainPlugin from "../main";
 import {
@@ -12,15 +12,18 @@ import { getGeminiSettingBuilders } from "./GeminiSettingsSection";
 import { applyModelChanges } from "./modelChangesApplier";
 import { buildCurrentModelDescription } from "./modelDescriptionBuilder";
 import { getOllamaSettingBuilders } from "./OllamaSettingsSection";
-import { getOpenAISettingBuilders, type SettingBuilder } from "./OpenAISettingsSection";
+import { getOpenAISettingBuilders } from "./OpenAISettingsSection";
+import type { SettingRow, SettingRowGroup } from "./settingDefinitions";
 import { UsageStatsSection } from "./UsageStatsSection";
 
 interface ModelSettingsSectionProps {
-    containerEl: HTMLElement;
     plugin: MainPlugin;
     settingsService: SettingsService;
-    modelService?: EmbeddingService;
+    /** Read on each render: the service can be set after the tab is created. */
+    readonly modelService?: EmbeddingService;
     app: App;
+    /** Re-renders the whole settings tab (update() on 1.13+, display() before). */
+    rerender: () => void;
 }
 
 export class ModelSettingsSection {
@@ -29,9 +32,8 @@ export class ModelSettingsSection {
     private settingsSubscription?: { unsubscribe: () => void };
     private currentDownloadProgress = 100;
     private currentModelError: string | null = null;
-    private sectionContainer?: HTMLElement;
-    private usageStatsSectionContainer?: HTMLElement;
-    private usageStatsSection?: UsageStatsSection;
+    private currentModelDescEl?: HTMLElement;
+    private usageStatsSection: UsageStatsSection;
 
     // Temporary state for model changes (not saved until Apply is clicked)
     private tempModelProvider?: "builtin" | "ollama" | "openai" | "gemini";
@@ -50,6 +52,10 @@ export class ModelSettingsSection {
     private applyButton?: ButtonComponent;
 
     constructor(private props: ModelSettingsSectionProps) {
+        this.usageStatsSection = new UsageStatsSection({
+            settingsService: props.settingsService,
+            onRender: () => props.rerender(),
+        });
         if (props.modelService) {
             this.setupModelService(props.modelService);
         }
@@ -66,7 +72,7 @@ export class ModelSettingsSection {
             .getNewSettingsObservable()
             .subscribe((changedSettings: Partial<SimilarNotesSettings>) => {
                 // Only re-render usage stats section when usageStats changes
-                if ("usageStats" in changedSettings && this.usageStatsSectionContainer) {
+                if ("usageStats" in changedSettings) {
                     this.rerenderUsageStatsSection();
                 }
             });
@@ -76,8 +82,6 @@ export class ModelSettingsSection {
      * Update only the usage stats without re-rendering the entire section
      */
     private rerenderUsageStatsSection(): void {
-        if (!this.usageStatsSection) return;
-
         const settings = this.props.settingsService.get();
         // Check if current provider supports usage tracking
         if (!this.props.modelService?.supportsUsageTracking()) return;
@@ -106,9 +110,9 @@ export class ModelSettingsSection {
             .subscribe((progress) => {
                 const previousProgress = this.currentDownloadProgress;
                 this.currentDownloadProgress = progress;
-                // Redraw the settings if progress changed
+                // Update the "Current model" text if progress changed
                 if (previousProgress !== progress) {
-                    this.render();
+                    this.refreshCurrentModel();
                 }
             });
 
@@ -118,9 +122,9 @@ export class ModelSettingsSection {
             .subscribe((error) => {
                 const previousError = this.currentModelError;
                 this.currentModelError = error;
-                // Redraw the settings if error changed
+                // Update the "Current model" text if error changed
                 if (previousError !== error) {
-                    this.render();
+                    this.refreshCurrentModel();
                 }
             });
     }
@@ -144,19 +148,14 @@ export class ModelSettingsSection {
     }
 
     /**
-     * Render the model settings section
+     * The "Model" group (and the "API usage" group for providers that track
+     * usage) as setting definitions (settings-search spec). Rebuilt on every
+     * tab render; provider-specific rows stay in the list with `visible`, so
+     * switching provider is a re-render, not a structure change of its own.
      */
-    render(): void {
-        const { containerEl, settingsService } = this.props;
+    getDefinitionGroups(): SettingRowGroup[] {
+        const { settingsService } = this.props;
         const settings = settingsService.get();
-
-        // Create or clear the section container
-        // Check if sectionContainer exists and is still connected to the DOM
-        if (!this.sectionContainer || !this.sectionContainer.parentElement) {
-            this.sectionContainer = containerEl.createDiv("model-settings-section");
-        } else {
-            this.sectionContainer.empty();
-        }
 
         // Initialize temporary state from current settings
         this.tempModelProvider = this.tempModelProvider ?? settings.modelProvider;
@@ -171,11 +170,57 @@ export class ModelSettingsSection {
         this.tempGeminiApiKey = this.tempGeminiApiKey ?? settings.geminiApiKey;
         this.tempGeminiModel = this.tempGeminiModel ?? settings.geminiModel;
 
-        const sectionContainer = this.sectionContainer;
+        const modelItems: SettingRow[] = [
+            {
+                name: "Current model",
+                render: (setting) => {
+                    setting.setName("Current model").setDesc(this.currentModelDescription());
+                    this.currentModelDescEl = setting.descEl;
+                },
+            },
+            {
+                name: "Model provider",
+                // Provider rows are hidden unless their provider is selected,
+                // so searching for them lands on this picker instead (spec rule 5).
+                aliases: ["OpenAI", "OpenRouter", "Gemini", "Ollama", "API key", "Server URL"],
+                render: (setting) => {
+                    setting
+                        .setName("Model provider")
+                        .setDesc("Choose between built-in models, Ollama, OpenAI API, or Google Gemini")
+                        .addDropdown((dropdown) => {
+                            dropdown
+                                .addOption("builtin", "Built-in Models")
+                                .addOption("ollama", "Ollama")
+                                .addOption("openai", "OpenAI / Compatible")
+                                .addOption("gemini", "Google Gemini")
+                                .setValue(this.tempModelProvider || "builtin")
+                                .onChange((value: "builtin" | "ollama" | "openai" | "gemini") => {
+                                    this.tempModelProvider = value;
+                                    // Redraw settings to show/hide provider-specific options
+                                    this.props.rerender();
+                                });
+                        });
+                },
+            },
+            ...this.getProviderSettingRows(settings),
+            this.getApplyButtonBuilder(settings),
+        ];
 
-        // Current model display - use cached model info from settings
-        const cachedInfo = settings.cachedModelInfo;
-        let currentModelDesc = buildCurrentModelDescription(settings, cachedInfo);
+        const groups: SettingRowGroup[] = [
+            { type: "group", heading: "Model", items: modelItems },
+        ];
+
+        // Usage stats (only for providers that support usage tracking)
+        if (this.props.modelService?.supportsUsageTracking()) {
+            groups.push(this.usageStatsSection.getDefinitionGroup());
+        }
+        return groups;
+    }
+
+    /** "Current model" text: model info plus download progress or error. */
+    private currentModelDescription(): string {
+        const settings = this.props.settingsService.get();
+        let currentModelDesc = buildCurrentModelDescription(settings, settings.cachedModelInfo);
 
         // Add download progress if downloading
         if (
@@ -191,151 +236,130 @@ export class ModelSettingsSection {
         if (this.currentModelError) {
             currentModelDesc += ` - Error: ${this.currentModelError}`;
         }
-
-        // Build the unified settings group
-        const settingGroup = new SettingGroup(sectionContainer)
-            .setHeading("Model")
-            .addSetting((setting) => {
-                setting.setName("Current model").setDesc(currentModelDesc);
-            })
-            .addSetting((setting) => {
-                setting
-                    .setName("Model provider")
-                    .setDesc("Choose between built-in models, Ollama, OpenAI API, or Google Gemini")
-                    .addDropdown((dropdown) => {
-                        dropdown
-                            .addOption("builtin", "Built-in Models")
-                            .addOption("ollama", "Ollama")
-                            .addOption("openai", "OpenAI / Compatible")
-                            .addOption("gemini", "Google Gemini")
-                            .setValue(this.tempModelProvider || "builtin")
-                            .onChange((value: "builtin" | "ollama" | "openai" | "gemini") => {
-                                this.tempModelProvider = value;
-                                // Redraw settings to show/hide provider-specific options
-                                this.render();
-                            });
-                    });
-            });
-
-        // Get provider-specific setting builders
-        const providerBuilders = this.getProviderSettingBuilders(settings);
-        providerBuilders.forEach(builder => settingGroup.addSetting(builder));
-
-        // Get apply button builder
-        const applyButtonBuilder = this.getApplyButtonBuilder(settings);
-        settingGroup.addSetting(applyButtonBuilder);
-
-        // Usage stats section (only for providers that support usage tracking)
-        if (this.props.modelService?.supportsUsageTracking()) {
-            // Only create if it doesn't exist or was removed
-            if (!this.usageStatsSectionContainer || !this.usageStatsSectionContainer.parentElement) {
-                // Create and insert usage stats container right after model section
-                this.usageStatsSectionContainer = createDiv({ cls: "usage-stats-section" });
-                sectionContainer.insertAdjacentElement("afterend", this.usageStatsSectionContainer);
-
-                // Create new UsageStatsSection instance
-                this.usageStatsSection = new UsageStatsSection({
-                    sectionContainer: this.usageStatsSectionContainer,
-                    settings,
-                    settingsService: this.props.settingsService,
-                    onRender: () => this.render(),
-                });
-                this.usageStatsSection.render();
-            }
-        } else {
-            // Remove usage stats section if provider doesn't support it
-            if (this.usageStatsSectionContainer) {
-                this.usageStatsSectionContainer.remove();
-                this.usageStatsSectionContainer = undefined;
-                this.usageStatsSection = undefined;
-            }
-        }
+        return currentModelDesc;
     }
 
-    private getProviderSettingBuilders(settings: SimilarNotesSettings): SettingBuilder[] {
-        if (this.tempModelProvider === "builtin") {
-            return getBuiltinModelSettingBuilders({
-                settings,
-                tempModelId: this.tempModelId,
-                tempUseGPU: this.tempUseGPU,
-                onModelIdChange: (value: string) => {
-                    this.tempModelId = value;
-                },
-                onUseGPUChange: (value: boolean) => {
-                    this.tempUseGPU = value;
-                },
-                onRender: () => this.render(),
-                updateApplyButtonState: () => this.updateApplyButtonState(settings),
-                isMobile: Platform.isMobileApp,
-            });
-        } else if (this.tempModelProvider === "ollama") {
-            const result = getOllamaSettingBuilders({
-                settings,
-                tempOllamaUrl: this.tempOllamaUrl,
-                tempOllamaModel: this.tempOllamaModel,
-                onOllamaUrlChange: (value: string) => {
-                    this.tempOllamaUrl = value;
-                },
-                onOllamaModelChange: (value: string) => {
-                    this.tempOllamaModel = value;
-                },
-                updateApplyButtonState: () => this.updateApplyButtonState(settings),
-                onDropdownCreated: () => {
-                    // Dropdown reference handled internally
-                },
-            });
-            // Fetch models after render
-            window.setTimeout(() => void result.fetchModels(), 0);
-            return result.builders;
-        } else if (this.tempModelProvider === "openai") {
-            return getOpenAISettingBuilders({
-                settings,
-                tempOpenaiUrl: this.tempOpenaiUrl,
-                tempOpenaiApiKey: this.tempOpenaiApiKey,
-                tempOpenaiModel: this.tempOpenaiModel,
-                tempOpenaiMaxTokens: this.tempOpenaiMaxTokens,
-                onOpenaiUrlChange: (value: string) => {
-                    this.tempOpenaiUrl = value;
-                },
-                onOpenaiApiKeyChange: (value: string) => {
-                    this.tempOpenaiApiKey = value;
-                },
-                onOpenaiModelChange: (value: string) => {
-                    this.tempOpenaiModel = value;
-                },
-                onOpenaiMaxTokensChange: (value: number | undefined) => {
-                    this.tempOpenaiMaxTokens = value;
-                },
-                onRender: () => this.render(),
-                getTempValues: () => ({
-                    url: this.tempOpenaiUrl,
-                    apiKey: this.tempOpenaiApiKey,
-                    model: this.tempOpenaiModel,
-                    maxTokens: this.tempOpenaiMaxTokens,
-                }),
-            });
-        } else if (this.tempModelProvider === "gemini") {
-            return getGeminiSettingBuilders({
-                settings,
-                tempGeminiApiKey: this.tempGeminiApiKey,
-                tempGeminiModel: this.tempGeminiModel,
-                onGeminiApiKeyChange: (value: string) => {
-                    this.tempGeminiApiKey = value;
-                },
-                onGeminiModelChange: (value: string) => {
-                    this.tempGeminiModel = value;
-                },
-                onRender: () => this.render(),
-                getTempValues: () => ({
-                    apiKey: this.tempGeminiApiKey,
-                    model: this.tempGeminiModel,
-                }),
-            });
-        }
-        return [];
+    /**
+     * Download progress and model errors change only the "Current model" text:
+     * update it in place, like the index statistics, instead of re-rendering.
+     */
+    private refreshCurrentModel(): void {
+        this.currentModelDescEl?.setText(this.currentModelDescription());
     }
 
-    private getApplyButtonBuilder(settings: SimilarNotesSettings): SettingBuilder {
+    private getProviderSettingRows(settings: SimilarNotesSettings): SettingRow[] {
+        const onRender = () => this.props.rerender();
+        const shownFor = (provider: NonNullable<typeof this.tempModelProvider>) =>
+            (row: SettingRow): SettingRow => ({
+                ...row,
+                id: `${provider}:${row.name}`,
+                visible: () => this.tempModelProvider === provider,
+            });
+
+        const builtin = getBuiltinModelSettingBuilders({
+            settings,
+            tempModelId: this.tempModelId,
+            tempUseGPU: this.tempUseGPU,
+            onModelIdChange: (value: string) => {
+                this.tempModelId = value;
+            },
+            onUseGPUChange: (value: boolean) => {
+                this.tempUseGPU = value;
+            },
+            onRender,
+            updateApplyButtonState: () => this.updateApplyButtonState(settings),
+            isMobile: Platform.isMobileApp,
+        }).map(shownFor("builtin"));
+
+        const ollama = this.getOllamaRows(settings).map(shownFor("ollama"));
+        const openai = this.getOpenAIRows(settings, onRender).map(shownFor("openai"));
+
+        const gemini = getGeminiSettingBuilders({
+            settings,
+            tempGeminiApiKey: this.tempGeminiApiKey,
+            tempGeminiModel: this.tempGeminiModel,
+            onGeminiApiKeyChange: (value: string) => {
+                this.tempGeminiApiKey = value;
+            },
+            onGeminiModelChange: (value: string) => {
+                this.tempGeminiModel = value;
+            },
+            onRender,
+            getTempValues: () => ({
+                apiKey: this.tempGeminiApiKey,
+                model: this.tempGeminiModel,
+            }),
+        }).map(shownFor("gemini"));
+
+        return [...builtin, ...ollama, ...openai, ...gemini];
+    }
+
+    /** Ollama rows; the first row fetches the model list once it renders. */
+    private getOllamaRows(settings: SimilarNotesSettings): SettingRow[] {
+        const ollamaResult = getOllamaSettingBuilders({
+            settings,
+            tempOllamaUrl: this.tempOllamaUrl,
+            tempOllamaModel: this.tempOllamaModel,
+            onOllamaUrlChange: (value: string) => {
+                this.tempOllamaUrl = value;
+            },
+            onOllamaModelChange: (value: string) => {
+                this.tempOllamaModel = value;
+            },
+            updateApplyButtonState: () => this.updateApplyButtonState(settings),
+            onDropdownCreated: () => {
+                // Dropdown reference handled internally
+            },
+        });
+        const ollama = [...ollamaResult.builders];
+        // Fetch models after the Ollama rows render (only when they are shown,
+        // not when definitions are built for search indexing).
+        if (ollama.length > 0) {
+            const first = ollama[0];
+            ollama[0] = {
+                ...first,
+                render: (setting, group) => {
+                    first.render(setting, group);
+                    window.setTimeout(() => void ollamaResult.fetchModels(), 0);
+                },
+            };
+        }
+        return ollama;
+    }
+
+    private getOpenAIRows(
+        settings: SimilarNotesSettings,
+        onRender: () => void
+    ): SettingRow[] {
+        return getOpenAISettingBuilders({
+            settings,
+            tempOpenaiUrl: this.tempOpenaiUrl,
+            tempOpenaiApiKey: this.tempOpenaiApiKey,
+            tempOpenaiModel: this.tempOpenaiModel,
+            tempOpenaiMaxTokens: this.tempOpenaiMaxTokens,
+            onOpenaiUrlChange: (value: string) => {
+                this.tempOpenaiUrl = value;
+            },
+            onOpenaiApiKeyChange: (value: string) => {
+                this.tempOpenaiApiKey = value;
+            },
+            onOpenaiModelChange: (value: string) => {
+                this.tempOpenaiModel = value;
+            },
+            onOpenaiMaxTokensChange: (value: number | undefined) => {
+                this.tempOpenaiMaxTokens = value;
+            },
+            onRender,
+            getTempValues: () => ({
+                url: this.tempOpenaiUrl,
+                apiKey: this.tempOpenaiApiKey,
+                model: this.tempOpenaiModel,
+                maxTokens: this.tempOpenaiMaxTokens,
+            }),
+        });
+    }
+
+    private getApplyButtonBuilder(settings: SimilarNotesSettings): SettingRow {
         const hasChanges = this.hasModelChanges(settings);
 
         return getApplyButtonBuilder({
@@ -360,7 +384,7 @@ export class ModelSettingsSection {
                     tempGeminiModel: this.tempGeminiModel,
                     onComplete: () => {
                         this.clearTempState();
-                        this.render();
+                        this.props.rerender();
                     },
                 });
             },

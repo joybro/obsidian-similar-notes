@@ -1,9 +1,9 @@
 import { OpenAIClient } from "@/adapter/openai";
 import type { SimilarNotesSettings } from "@/application/SettingsService";
 import { Notice } from "obsidian";
-import type { Setting } from "obsidian";
+import type { SettingRow } from "./settingDefinitions";
 
-export type SettingBuilder = (setting: Setting) => void;
+export type { SettingBuilder } from "./settingDefinitions";
 
 interface OpenAISettingsSectionProps {
     settings: SimilarNotesSettings;
@@ -29,7 +29,7 @@ const OPENAI_MODELS = [
 
 const DEFAULT_OPENAI_URL = "https://api.openai.com/v1";
 
-export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): SettingBuilder[] {
+export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): SettingRow[] {
     const {
         settings,
         tempOpenaiUrl,
@@ -49,9 +49,9 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
     const openaiModel = tempOpenaiModel ?? settings.openaiModel ?? "text-embedding-3-small";
     const isCustomModel = !OPENAI_MODELS.some((m) => m.id === openaiModel);
 
-    const builders: SettingBuilder[] = [
+    const builders: SettingRow[] = [
         // Server URL
-        (setting) => {
+        { name: "Server URL", render: (setting) => {
             setting
                 .setName("Server URL")
                 .setDesc("URL of your OpenAI-compatible server (default: https://api.openai.com/v1)")
@@ -62,9 +62,9 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
                             onOpenaiUrlChange(value);
                         });
                 });
-        },
+        } },
         // API Key
-        (setting) => {
+        { name: "API key", render: (setting) => {
             setting
                 .setName("API key")
                 .setDesc("Your OpenAI API key (required for OpenAI, optional for local servers)")
@@ -77,9 +77,9 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
                     // Make it a password field
                     text.inputEl.type = "password";
                 });
-        },
+        } },
         // Model dropdown
-        (setting) => {
+        { name: "Model", render: (setting) => {
             setting
                 .setName("Model")
                 .setDesc("Select an embedding model")
@@ -104,12 +104,12 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
                         onRender();
                     });
                 });
-        },
+        } },
     ];
 
     // Show custom model input if custom is selected
     if (isCustomModel) {
-        builders.push((setting) => {
+        builders.push({ name: "Custom model ID", render: (setting) => {
             setting
                 .setName("Custom model ID")
                 .setDesc("Enter the model ID for your OpenAI-compatible server")
@@ -120,11 +120,11 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
                             onOpenaiModelChange(value);
                         });
                 });
-        });
+        } });
 
         // Max tokens input for custom models
         const openaiMaxTokens = tempOpenaiMaxTokens ?? settings.openaiMaxTokens;
-        builders.push((setting) => {
+        builders.push({ name: "Max tokens", render: (setting) => {
             setting
                 .setName("Max tokens")
                 .setDesc("Maximum input tokens this model accepts. Note chunks and search text are kept within this limit.")
@@ -136,11 +136,11 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
                             onOpenaiMaxTokensChange(isNaN(parsed) ? undefined : parsed);
                         });
                 });
-        });
+        } });
     }
 
     // Test connection
-    builders.push((setting) => {
+    builders.push({ name: "Test connection", render: (setting) => {
         setting
             .setName("Test connection")
             .setDesc("Test the connection to the server and model")
@@ -174,7 +174,7 @@ export function getOpenAISettingBuilders(props: OpenAISettingsSectionProps): Set
                     }
                 });
             });
-    });
+    } });
 
     return builders;
 }
