@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
--   **Title search favors titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title contains the characters you typed now ranks above a note whose title only means something similar. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.
+-   **Title search gives a small boost to titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title shares character pairs with what you typed now gets a small ranking boost among the search candidates, so it can rank above a note whose title only means something similar when their scores are close. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.
 
 ## [1.8.0] - 2026-11-19
 
