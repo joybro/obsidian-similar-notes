@@ -1,0 +1,50 @@
+# Obsidian Host Integration Specification
+
+How the plugin uses Obsidian's own facilities where a browser API or a
+plugin-side shortcut would also work. Each choice changes something a user
+can see, so it is recorded here rather than only in code comments.
+
+## 1. Ollama requests use `requestUrl`
+
+Every call to an Ollama server (model list, model info, embeddings,
+connection and model tests) goes through Obsidian's `requestUrl`, not the
+browser `fetch`.
+
+- `requestUrl` is not subject to CORS. A desktop or phone pointing at an
+  Ollama server on another machine on the LAN works without setting
+  `OLLAMA_ORIGINS` on that server. With `fetch` the request was blocked
+  unless the server's allowed origins included Obsidian's.
+- Requests pass `throw: false`, so 4xx/5xx responses still reach the
+  client's own status checks and produce the same error messages as before
+  (`Failed to generate embedding: HTTP <status>. <body>`).
+- Obsidian's plugin review asks plugins to use `requestUrl` for network
+  calls.
+
+The OpenAI-compatible and Gemini clients are out of scope for this section.
+
+## 2. The sidebar view survives a plugin reload
+
+`onunload` does not detach the Similar notes sidebar leaves. When the
+plugin is disabled and enabled again, or updated, Obsidian restores the
+sidebar in the same place. Detaching the leaves on unload closed the
+sidebar on every update, and Obsidian's plugin guidelines ask plugins not
+to detach their leaves.
+
+Obsidian does not await `onunload`; service teardown runs as one async
+step after it returns, and a failure there is logged, not thrown.
+
+## 3. The editor drop handler defers to earlier handlers
+
+The `editor-drop` handler that turns a dragged Similar notes result into a
+link does nothing when the drop event is already `defaultPrevented`
+(another plugin or Obsidian took it). It also does nothing unless the
+dragged `[[path]]` resolves to a file (`TFile`), so a dropped folder path
+or a stale path is left to Obsidian's default handling.
+
+## 4. Verification
+
+- `src/adapter/ollama/__tests__/OllamaClient.test.ts` covers the
+  `requestUrl` calls and the error paths.
+- Sections 2 and 3 are checked by hand in a test vault: reload the plugin
+  with the sidebar open and confirm it reopens in place; drag a result into
+  a note and confirm one link is inserted.
