@@ -134,7 +134,7 @@ gh release list -R <owner>/<repo> -L 3      # X.Y.Z should show "Latest", not "D
 
 Gotchas:
 - `gh release view --json isLatest` **errors** — `isLatest` is not a valid field for `release view`. Use `gh release list` (the "Latest" column) to confirm instead.
-- This repo has two remotes (`origin` = the public `joybro/obsidian-similar-notes`, plus `novatera-io`). Tags, releases, and issues all live on the public repo — push the tag to `origin` and target that repo with `gh`.
+- Remote names vary by clone. Run `git remote -v` before pushing and select the remote whose URL is the public `joybro/obsidian-similar-notes` repository. Target that repository explicitly with `gh -R joybro/obsidian-similar-notes`.
 - Publishing the release is external-visible, but the user delegating "release it" covers push + tag + publish. It does **not** auto-cover the issue announcements in step 6 — those ping reporters directly, so still confirm wording before posting.
 
 ### 6. After publish: announce on tracked issues
