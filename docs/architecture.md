@@ -79,6 +79,8 @@ src/
 
 10. **Title vectors**: Each indexed note has one extra chunk row with `chunkIndex = -1` whose content is the note title and whose embedding is the title alone. Text queries (semantic search modal, `;;` link suggest) score a note by max(body, title) through best-hit-per-note grouping; the Similar notes panel ignores title rows on both the query and candidate side (`bodyChunksOnly`), and `count()` counts body chunks only. Renames re-embed only the title row; vaults indexed before this get title rows through a `title-backfill` queue pass on load. See `docs/title-vector-spec.md`.
 
+10. **Obsidian host integration**: Ollama calls use Obsidian's `requestUrl` (no CORS setup for LAN servers), the sidebar view is not detached on unload so Obsidian restores it in place, and the editor drop handler steps aside when another handler already took the drop. See `docs/obsidian-host-integration-spec.md`.
+
 10. **Settings Storage**: Plugin settings are stored in Obsidian's data.json. UI for settings uses React components.
 
    - **Sectioning**: The settings tab is divided into top-level sections using Obsidian's `SettingGroup` (`@since 1.11.0`) — one per area (e.g. Model, Index, Exclude files from index, Exclude content from index, Display, Debug and support). Each section is built by a `*SettingsSection` class (e.g. `IndexSettingsSection`) that returns `SettingBuilder` arrays.
