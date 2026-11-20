@@ -141,25 +141,19 @@ export class NoteChangeQueue {
                 const files = filterMarkdownFiles([file], settings.excludeFolderPatterns);
                 if (files.length > 0) {
                     // Clear existing pending timeout for this file
-                    const existingTimeout = this.pendingModifications.get(file.path);
-                    if (existingTimeout) {
-                        window.clearTimeout(existingTimeout);
-                    }
+                    this.cancelPendingModification(file.path);
 
                     // Set debounced queue addition
                     const delayMs = (settings.indexingDelaySeconds ?? 1) * 1000;
                     const timeout = window.setTimeout(() => {
                         this.pendingModifications.delete(file.path);
 
-                        // Remove the file from the queue if it exists
-                        this.queue = this.queue.filter(
-                            (change) => change.path !== file.path
-                        );
+                        const superseded = this.takeQueuedChanges([file.path]);
 
                         // A fresh edit supersedes any prior terminal error.
                         void this.erroredNoteStore.delete(file.path);
                         // Add to queue
-                        this.enqueue([{
+                        this.enqueue([...this.sourceDeletions(superseded, file.path), {
                             path: file.path,
                             reason: "modified" as const,
                             mtime: file.stat.mtime,
@@ -175,13 +169,11 @@ export class NoteChangeQueue {
         // Register callback for file deletion
         const deleteRef = this.vault.on("delete", (file: TFile) => {
             if (file.extension === "md") {
-                // Remove the file from the queue if it exists
-                this.queue = this.queue.filter(
-                    (change) => change.path !== file.path
-                );
+                this.cancelPendingModification(file.path);
+                const superseded = this.takeQueuedChanges([file.path]);
 
                 // Add to queue (no hash for deleted files)
-                this.enqueue([{
+                this.enqueue([...this.sourceDeletions(superseded, file.path), {
                     path: file.path,
                     reason: "deleted" as const,
                 }]);
@@ -194,10 +186,15 @@ export class NoteChangeQueue {
             if (file instanceof TFile && file.extension === "md") {
                 const settings = this.settingsService.get();
 
-                // Drop any pending changes for either path — they're stale now.
-                this.queue = this.queue.filter(
-                    (change) => change.path !== oldPath && change.path !== file.path
-                );
+                this.cancelPendingModification(oldPath);
+                this.cancelPendingModification(file.path);
+                const superseded = this.takeQueuedChanges([oldPath, file.path]);
+                // A second rename must carry from the original indexed path,
+                // not from an intermediate name that never reached the index.
+                const sourcePath = superseded.find(
+                    (change) => change.path === oldPath && change.reason === "renamed"
+                )?.oldPath ?? oldPath;
+                const cleanup = this.sourceDeletions(superseded, file.path);
 
                 const isNewPathIncluded =
                     filterMarkdownFiles([file], settings.excludeFolderPatterns)
@@ -205,7 +202,7 @@ export class NoteChangeQueue {
 
                 if (!isNewPathIncluded) {
                     // New location is excluded — drop the old index entry and stop.
-                    this.enqueue([{ path: oldPath, reason: "deleted" }]);
+                    this.enqueue([...cleanup, { path: oldPath, reason: "deleted" }]);
                     log.info(`File renamed/moved to excluded location: ${oldPath} -> ${file.path}`);
                     return;
                 }
@@ -214,21 +211,23 @@ export class NoteChangeQueue {
                 // we previously indexed should still match. If it does, the
                 // embedding is still valid — carry it over to the new path
                 // instead of re-embedding (issue #39, sub-issue 5).
-                const indexedMtime = this.mTimeStore.getMTime(oldPath);
+                const indexedMtime = this.mTimeStore.getMTime(sourcePath);
                 if (indexedMtime !== undefined && indexedMtime === file.stat.mtime) {
-                    this.enqueue([{
-                        path: file.path,
-                        reason: "renamed",
-                        oldPath,
-                        mtime: file.stat.mtime,
-                    }]);
+                    this.enqueue([
+                        ...cleanup.filter((change) => change.path !== sourcePath),
+                        {
+                            path: file.path,
+                            reason: "renamed",
+                            oldPath: sourcePath,
+                            mtime: file.stat.mtime,
+                        }]);
                     log.info(`File renamed/moved (embedding preserved): ${oldPath} -> ${file.path}`);
                     return;
                 }
 
                 // Mtime changed, or the old path was never indexed — fall back
                 // to full re-embed.
-                this.enqueue([{ path: oldPath, reason: "deleted" }]);
+                this.enqueue([...cleanup, { path: oldPath, reason: "deleted" }]);
                 this.enqueue([{
                     path: file.path,
                     reason: "new",
@@ -238,6 +237,30 @@ export class NoteChangeQueue {
             }
         });
         this.eventRefs.push(renameRef);
+    }
+
+    private cancelPendingModification(path: string): void {
+        const timer = this.pendingModifications.get(path);
+        if (timer !== undefined) window.clearTimeout(timer);
+        this.pendingModifications.delete(path);
+    }
+
+    /** Removing a pending rename must not lose its source cleanup obligation. */
+    private takeQueuedChanges(paths: string[]): NoteChange[] {
+        const selected = new Set(paths);
+        const removed = this.queue.filter((change) => selected.has(change.path));
+        this.queue = this.queue.filter((change) => !selected.has(change.path));
+        return removed;
+    }
+
+    private sourceDeletions(changes: NoteChange[], destination: string): NoteChange[] {
+        const sources = new Set<string>();
+        for (const change of changes) {
+            if (change.reason === "renamed" && change.oldPath && change.oldPath !== destination) {
+                sources.add(change.oldPath);
+            }
+        }
+        return [...sources].map((path) => ({ path, reason: "deleted" }));
     }
 
     /**
