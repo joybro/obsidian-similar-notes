@@ -283,7 +283,8 @@ export default class MainPlugin extends Plugin {
             (leaf) =>
                 new SimilarNotesSidebarView(
                     leaf,
-                    this.similarNoteCoordinator.getNoteBottomViewModelObservable()
+                    this.similarNoteCoordinator.getNoteBottomViewModelObservable(),
+                    (onDismissed) => SemanticSearchCommand.openModal(this.app, this.textSearchService, this.settingsService, { onDismissed })
                 )
         );
         this.sidebarViewRegistered = true;

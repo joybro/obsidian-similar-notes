@@ -1,12 +1,31 @@
 import type { App, Plugin } from "obsidian";
 import type { SettingsService } from "@/application/SettingsService";
 import type { TextSearchService } from "@/domain/service/TextSearchService";
-import { SemanticSearchModal } from "@/components/SemanticSearchModal";
+import {
+    SemanticSearchModal,
+    type SemanticSearchModalOptions,
+} from "@/components/SemanticSearchModal";
 import type { Command } from "./Command";
 
 export class SemanticSearchCommand implements Command {
     id = "semantic-search";
     name = "Semantic search";
+
+    /** Opens the semantic search modal; shared by the command and the sidebar button. */
+    static openModal(
+        app: App,
+        textSearchService: TextSearchService,
+        settingsService: SettingsService,
+        options: SemanticSearchModalOptions = {}
+    ): void {
+        const settings = settingsService.get();
+        new SemanticSearchModal(
+            app,
+            textSearchService,
+            settings.noteDisplayMode,
+            options
+        ).open();
+    }
 
     constructor(
         private app: App,
@@ -25,13 +44,11 @@ export class SemanticSearchCommand implements Command {
                 },
             ],
             callback: () => {
-                const settings = this.settingsService.get();
-                const modal = new SemanticSearchModal(
+                SemanticSearchCommand.openModal(
                     this.app,
                     this.textSearchService,
-                    settings.noteDisplayMode
+                    this.settingsService
                 );
-                modal.open();
             },
         });
     }

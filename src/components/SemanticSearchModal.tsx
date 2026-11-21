@@ -114,7 +114,10 @@ interface SemanticSearchContentProps {
     app: App;
     textSearchService: TextSearchService;
     noteDisplayMode: "title" | "path" | "smart";
+    /** Close after opening a note or creating one. */
     onClose: () => void;
+    /** Close without acting (Esc). */
+    onDismiss: () => void;
 }
 
 function useSemanticSearch(textSearchService: TextSearchService) {
@@ -173,6 +176,7 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
     textSearchService,
     noteDisplayMode,
     onClose,
+    onDismiss,
 }) => {
     const { query, setQuery, results, selectedIndex, setSelectedIndex, isSearching, tokenWarning } =
         useSemanticSearch(textSearchService);
@@ -240,10 +244,10 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                 createNote: () => {
                     void createNote();
                 },
-                close: onClose,
+                close: onDismiss,
             });
         },
-        [results, selectedIndex, setSelectedIndex, openNote, insertLink, createNote, onClose]
+        [results, selectedIndex, setSelectedIndex, openNote, insertLink, createNote, onDismiss]
     );
 
     return (
@@ -299,19 +303,31 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
     );
 };
 
+export interface SemanticSearchModalOptions {
+    /**
+     * Runs after the modal closes without opening or creating a note
+     * (Esc, click outside), so the caller can take focus back.
+     */
+    onDismissed?: () => void;
+}
+
 export class SemanticSearchModal extends Modal {
     private root: Root | null = null;
     private textSearchService: TextSearchService;
     private noteDisplayMode: "title" | "path" | "smart";
+    private options: SemanticSearchModalOptions;
+    private actedOn = false;
 
     constructor(
         app: App,
         textSearchService: TextSearchService,
-        noteDisplayMode: "title" | "path" | "smart"
+        noteDisplayMode: "title" | "path" | "smart",
+        options: SemanticSearchModalOptions = {}
     ) {
         super(app);
         this.textSearchService = textSearchService;
         this.noteDisplayMode = noteDisplayMode;
+        this.options = options;
     }
 
     onOpen() {
@@ -334,7 +350,11 @@ export class SemanticSearchModal extends Modal {
                 app={this.app}
                 textSearchService={this.textSearchService}
                 noteDisplayMode={this.noteDisplayMode}
-                onClose={() => this.close()}
+                onClose={() => {
+                    this.actedOn = true;
+                    this.close();
+                }}
+                onDismiss={() => this.close()}
             />
         );
     }
@@ -346,5 +366,10 @@ export class SemanticSearchModal extends Modal {
         }
         const { contentEl } = this;
         contentEl.empty();
+        const { onDismissed } = this.options;
+        if (!this.actedOn && onDismissed) {
+            // After Obsidian finishes its own close handling.
+            window.setTimeout(onDismissed, 0);
+        }
     }
 }
