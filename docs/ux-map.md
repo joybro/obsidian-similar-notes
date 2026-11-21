@@ -58,7 +58,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - 무엇을 보여주나: same list as note-footer for the active note, in a right-sidebar leaf (sidebar result count setting), under a toolbar row with two buttons (`docs/sidebar-toolbar-spec.md`)
   - 행동: same as note-footer; Expand all / Collapse all (hidden in empty); Semantic search…
   - ideal: rows collapsed (default mode); per-row chevrons open single rows
-  - ideal-expanded: after Expand all every row shows its preview; the mode stays when the active note changes or results refresh, until Collapse all. Per-row toggles hold while the same note's results refresh and reset on note switch
+  - ideal-expanded: after Expand all every row shows its preview; the mode stays when the active note changes, results refresh or Obsidian restarts (saved in the view state), until Collapse all. Per-row toggles hold while the same note's results refresh and reset on note switch
   - → hover-preview (overlay): Cmd+hover a result
   - → search-modal (modal): Semantic search button (Enter or Space too)
   - → sidebar (back): close the leaf
