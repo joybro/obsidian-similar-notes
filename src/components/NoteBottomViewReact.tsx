@@ -4,8 +4,15 @@ import { Menu } from "obsidian";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Observable } from "rxjs";
 import { triggerHoverLink } from "./hoverLinkPreview";
-import { SidebarToolbar, useRowExpansion } from "./SidebarToolbar";
+import {
+    type SavedExpandMode,
+    SidebarToolbar,
+    useRowExpansion,
+} from "./SidebarToolbar";
 import { logRejection } from "@/utils/logRejection";
+import { type EmptyReason, emptyStateText } from "./emptyStateText";
+
+export { type EmptyReason, emptyStateText };
 
 export interface SimilarNoteEntry {
     file: TFile;
@@ -14,39 +21,6 @@ export interface SimilarNoteEntry {
     preview: string;
     sourceChunk?: string;
     isLinked: boolean;
-}
-
-/**
- * Why the results list is empty, so the panel can say something true
- * (docs/panel-empty-states-spec.md). Undefined means "not computed" and
- * reads like "none".
- */
-export type EmptyReason =
-    | { kind: "unwritten" }
-    | { kind: "excluded-cloud"; provider: "OpenAI" | "Gemini" }
-    | { kind: "embedding-failed" }
-    | { kind: "below-threshold"; threshold: number }
-    | { kind: "indexing"; remaining: number }
-    | { kind: "none" };
-
-export function emptyStateText(reason: EmptyReason | undefined): string {
-    switch (reason?.kind) {
-        case "unwritten":
-            return "Write a few lines and similar notes will appear here.";
-        case "excluded-cloud":
-            return `This note is excluded from the index, so it isn't sent to ${reason.provider}.`;
-        case "embedding-failed":
-            return "Couldn't analyze this note. Check the model in Settings, then reopen the note.";
-        case "below-threshold":
-            return `No notes above the minimum similarity (${reason.threshold.toFixed(2)}).`;
-        case "indexing": {
-            const n = reason.remaining.toLocaleString("en-US");
-            const noun = reason.remaining === 1 ? "note" : "notes";
-            return `Indexing your vault: ${n} ${noun} left. Results fill in as notes are indexed.`;
-        }
-        default:
-            return "No similar notes found.";
-    }
 }
 
 export interface NoteBottomViewModel {
@@ -76,6 +50,8 @@ interface NoteBottomViewProps {
      * the modal is closed without opening a note (e.g. Esc).
      */
     onOpenSemanticSearch?: (onDismissed: () => void) => void;
+    /** Sidebar only: the saved expand-all mode; without it the mode lives in the view. */
+    savedExpandMode?: SavedExpandMode;
 }
 
 // Header Component
@@ -350,6 +326,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     bottomViewModelSubject$,
     viewType,
     onOpenSemanticSearch,
+    savedExpandMode,
 }) => {
     const [collapsed, setCollapsed] = useState(false);
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
@@ -358,7 +335,10 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
         "title" | "path" | "smart"
     >("title");
     const { isRowCollapsed, toggleRow, anyRowExpanded, toggleAllRows, noteSourceNote } =
-        useRowExpansion(similarNotes.map((note) => note.file.path));
+        useRowExpansion(
+            similarNotes.map((note) => note.file.path),
+            savedExpandMode
+        );
 
     useEffect(() => {
         const sub = bottomViewModelSubject$.subscribe((model: NoteBottomViewModel) => {

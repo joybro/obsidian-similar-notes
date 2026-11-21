@@ -9,6 +9,11 @@ import NoteBottomViewReact, {
     type SimilarNoteEntry,
     type ViewType,
 } from "../NoteBottomViewReact";
+import {
+    readExpandAll,
+    SIDEBAR_EXPAND_ALL_KEY,
+    withExpandAll,
+} from "../sidebarViewState";
 
 const file = (path: string): TFile =>
     ({
@@ -200,5 +205,97 @@ describe("Sidebar toolbar", () => {
         const onDismissed = open.mock.calls[0][0] as () => void;
         act(() => onDismissed());
         expect(document.activeElement).toBe(search);
+    });
+
+    describe("saved expand-all mode (sidebar view state)", () => {
+        /**
+         * Stands in for the sidebar view: it owns the mode, re-renders the
+         * component with it, and counts layout saves like
+         * workspace.requestSaveLayout().
+         */
+        const renderSaved = (initial: boolean) => {
+            const view = { expandAll: initial, saves: 0 };
+            const element = () => (
+                <NoteBottomViewReact
+                    workspace={workspace as Workspace}
+                    vaultName="v"
+                    leaf={leaf as unknown as MarkdownView}
+                    bottomViewModelSubject$={subject$}
+                    viewType="sidebar"
+                    onOpenSemanticSearch={vi.fn()}
+                    savedExpandMode={{
+                        expandAll: view.expandAll,
+                        onExpandAllChange: (expandAll) => {
+                            view.expandAll = expandAll;
+                            view.saves++;
+                            result.rerender(element());
+                        },
+                    }}
+                />
+            );
+            const result = render(element());
+            return view;
+        };
+
+        test("a saved expanded mode opens with every row expanded and is not saved again", () => {
+            const view = renderSaved(true);
+            expect(isExpanded("alpha")).toBe(true);
+            expect(isExpanded("gamma")).toBe(true);
+            expect(expandButton()).toHaveAttribute("aria-label", "Collapse all");
+            expect(view.saves).toBe(0);
+        });
+
+        test("no saved mode opens collapsed, as before", () => {
+            const view = renderSaved(false);
+            expect(isExpanded("alpha")).toBe(false);
+            expect(expandButton()).toHaveAttribute("aria-label", "Expand all");
+            expect(view.saves).toBe(0);
+        });
+
+        test("only Expand all / Collapse all save; note switches and row chevrons do not", () => {
+            const view = renderSaved(false);
+
+            fireEvent.click(expandButton()!);
+            expect(view).toEqual({ expandAll: true, saves: 1 });
+            expect(isExpanded("alpha")).toBe(true);
+
+            // A row's own chevron is an override, not saved
+            fireEvent.click(rowChevron("beta"));
+            expect(isExpanded("beta")).toBe(false);
+            expect(view.saves).toBe(1);
+
+            // Switching the active note keeps the saved mode without saving
+            leaf.file = noteB;
+            act(() => {
+                subject$.next(model(noteB, [entry("delta.md"), entry("beta.md")]));
+            });
+            expect(isExpanded("delta")).toBe(true);
+            expect(isExpanded("beta")).toBe(true);
+            expect(view.saves).toBe(1);
+
+            fireEvent.click(expandButton()!);
+            expect(view).toEqual({ expandAll: false, saves: 2 });
+            expect(isExpanded("delta")).toBe(false);
+            expect(isExpanded("beta")).toBe(false);
+        });
+    });
+});
+
+describe("sidebar view state helpers", () => {
+    test("read only a boolean; anything else means no saved mode", () => {
+        expect(readExpandAll({ [SIDEBAR_EXPAND_ALL_KEY]: true })).toBe(true);
+        expect(readExpandAll({ [SIDEBAR_EXPAND_ALL_KEY]: false })).toBe(false);
+        expect(readExpandAll({ [SIDEBAR_EXPAND_ALL_KEY]: "true" })).toBeUndefined();
+        expect(readExpandAll({ [SIDEBAR_EXPAND_ALL_KEY]: 1 })).toBeUndefined();
+        expect(readExpandAll({})).toBeUndefined();
+        expect(readExpandAll(null)).toBeUndefined();
+        expect(readExpandAll(undefined)).toBeUndefined();
+    });
+
+    test("write keeps the host's state and round-trips", () => {
+        const state = withExpandAll({ hostKey: "kept" }, true);
+        expect(state).toEqual({ hostKey: "kept", sidebarExpandAll: true });
+        expect(readExpandAll(state)).toBe(true);
+        expect(readExpandAll(withExpandAll(state, false))).toBe(false);
     });
 });

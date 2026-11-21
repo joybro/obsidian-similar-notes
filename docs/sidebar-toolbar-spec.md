@@ -32,8 +32,8 @@ under a note gets no toolbar.
 ### Expand mode
 
 - One mode for all rows: collapsed (the default, as before) or expanded.
-- The mode lasts for the rest of the session in that sidebar: switching the
-  active note and results refreshing after indexing keep it.
+- The mode stays when you switch the active note, when results refresh after
+  indexing, and when Obsidian restarts (see Saved state).
 - A row's own chevron still works and overrides the mode for that row. The
   override is keyed by the result note's path, so when the same source note's
   results refresh and reorder, the note you opened stays open.
@@ -41,10 +41,21 @@ under a note gets no toolbar.
   mode again.
 - Expand all / Collapse all drop all overrides and set the mode.
 
-### Not in this change
+### Saved state
 
-The mode is not saved across restarts: no workspace state, settings or
-`data.json` keys are written.
+- The sidebar view adds one optional key to its Obsidian workspace view state:
+  `sidebarExpandAll: boolean` (`true` = expanded mode). Obsidian keeps view
+  state in the vault's workspace layout, so the mode survives a restart, like
+  the collapse state of the host's own panels.
+- Missing or non-boolean values mean collapsed, so layouts saved by older
+  versions open as before. Older versions ignore the key.
+- `getState()` keeps the host's state and adds the key. `setState()` reads only
+  a boolean and re-renders with it.
+- The layout is saved (`workspace.requestSaveLayout()`) only when you press
+  Expand all / Collapse all and the mode changes; reading or restoring state
+  never saves.
+- Per-row overrides are not saved. Plugin settings, `data.json` and the index
+  are unchanged.
 
 ## 지도 변경분
 
