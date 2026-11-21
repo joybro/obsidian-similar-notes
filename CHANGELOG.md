@@ -2,16 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
-### Fixed
-
--   **The note that is already open now shows similar notes right away when Obsidian starts or the plugin is updated or turned on**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
-
-### Changed
-
--   **Title search gives a small boost to titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title shares character pairs with what you typed now gets a small ranking boost among the search candidates, so it can rank above a note whose title only means something similar when their scores are close. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.
-
 ## [1.8.0] - 2026-11-19
 
 ### Added
@@ -20,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **The note that is already open now shows similar notes right away when Obsidian starts or the plugin is updated or turned on**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
 -   **Quick renames no longer leave the old note in the search index**: when a rename is still waiting in the indexing queue, renaming the note again, editing it or deleting it now cleans up the original path too. Consecutive renames that have not started indexing reuse the existing body embeddings and update only the final title. Renaming again while retrying a failed title update also removes the intermediate path. A pending edit timer can no longer overwrite a newer rename.
 -   **The status bar's Indexed count no longer includes excluded notes**: the total in "Indexed: X/Y notes" now leaves out notes your exclusion rules match, so it reaches Y once indexing finishes and matches the Indexed line in settings.
 -   **Token usage "Today" follows your local day**: the usage counter for OpenAI and Gemini now starts a new day at your local midnight instead of midnight UTC.
@@ -37,6 +28,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+-   **Title search gives a small boost to titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title shares character pairs with what you typed now gets a small ranking boost among the search candidates, so it can rank above a note whose title only means something similar when their scores are close. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.
 -   **Requires Obsidian 1.11.0 or later**: the settings tab has used setting groups, which arrived in Obsidian 1.11, since plugin version 1.0.0, so on an older Obsidian it could not open. The plugin now declares this, and Obsidian versions older than 1.11.0 are offered 1.7.0 instead of 1.8.0.
 -   **An empty Similar notes panel now says why**: instead of always "No similar notes found.", the panel tells you when the note has no text yet, when it's excluded and not sent to OpenAI or Gemini, when the model couldn't analyze it, when results are hidden by your minimum similarity, or when your vault is still being indexed (with the number of notes left).
 -   **README and settings text now match what the plugin does**: the README says mobile installs start with a cloud API (key needed), that Ollama on mobile needs a server the phone can reach, and that settings including API keys live in plain text in the plugin's `data.json` inside the vault. The mobile warning for built-in models now recommends OpenAI or Gemini and mentions the one-time model download from Hugging Face.
