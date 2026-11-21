@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
--   **The note open when Obsidian starts now shows similar notes right away**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
+-   **The note that is already open now shows similar notes right away when Obsidian starts or the plugin is updated or turned on**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
 
 ### Changed
 
