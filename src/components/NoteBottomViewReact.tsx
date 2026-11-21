@@ -439,7 +439,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     return (
         <>
             <div className="nav-header" />
-            <div className="similar-notes-pane">
+            <div className={showLinkButton ? "similar-notes-pane has-link-button" : "similar-notes-pane"}>
                 <SimilarNotesHeader
                     collapsed={collapsed}
                     onToggleCollapse={toggleCollapse}

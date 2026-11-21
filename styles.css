@@ -470,10 +470,11 @@ select option:disabled {
     font-size: var(--font-ui-smaller);
 }
 
-/* On mobile every result row is at least 44px tall (the touch minimum) and
-   the Link button is exactly that tall, so rows with and without the button
-   share one height and the button's tap area stays inside its own row. */
-.is-mobile .similar-notes-pane .search-result-file-title {
+/* With the Link button turned on, every mobile result row is at least 44px
+   tall (the touch minimum) and the button is exactly that tall, so rows with
+   and without the button share one height and the button's tap area stays
+   inside its own row. Rows keep Obsidian's height when the setting is off. */
+.is-mobile .similar-notes-pane.has-link-button .search-result-file-title {
     min-height: 44px;
     padding-top: 0;
     padding-bottom: 0;

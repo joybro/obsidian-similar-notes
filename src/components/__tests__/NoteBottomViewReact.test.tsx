@@ -266,8 +266,10 @@ describe("SimilarNotesViewReact", () => {
         act(() => bottomViewModelSubject$.next({ ...bottomViewModelSubject$.value, showLinkButton: true }));
         expect(await linkButton()).toHaveAttribute("title", "Add link at the end of this note");
         expect(screen.getAllByRole("button", { name: /Add link to/ })).toHaveLength(1);
+        expect(document.querySelector(".similar-notes-pane")).toHaveClass("has-link-button");
         act(() => bottomViewModelSubject$.next({ ...bottomViewModelSubject$.value, showLinkButton: false }));
         expect(screen.queryByRole("button", { name: /Add link to/ })).not.toBeInTheDocument();
+        expect(document.querySelector(".similar-notes-pane")).not.toHaveClass("has-link-button");
     });
 
     test.each(["sidebar", "bottom"] as const)("links from the %s editor without opening the result", async (viewType) => {
