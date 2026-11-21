@@ -41,10 +41,26 @@ link does nothing when the drop event is already `defaultPrevented`
 dragged `[[path]]` resolves to a file (`TFile`), so a dropped folder path
 or a stale path is left to Obsidian's default handling.
 
-## 4. Verification
+## 4. Notes already open at startup get results
+
+Services start in `onLayoutReady`. By then Obsidian has already restored the
+workspace and fired `file-open` and `active-leaf-change` for the restored
+notes, while the handlers still had nothing to call. Without a catch-up, the
+note open at startup showed no bottom panel and the sidebar said "No similar
+notes found." until the user switched notes, on desktop and mobile alike.
+
+When initialization finishes, the plugin therefore attaches a bottom view to
+every open markdown leaf that does not have one yet, and emits results for
+the active file, as if it had just been opened. Leaves that gained a view
+from an event during initialization keep it (no duplicate panel).
+
+## 5. Verification
 
 - `src/adapter/ollama/__tests__/OllamaClient.test.ts` covers the
   `requestUrl` calls and the error paths.
 - Sections 2 and 3 are checked by hand in a test vault: reload the plugin
   with the sidebar open and confirm it reopens in place; drag a result into
   a note and confirm one link is inserted.
+- Section 4: `src/application/__tests__/BaseViewManager.test.ts` covers the
+  catch-up attach. By hand: with a note open, reload Obsidian and confirm
+  the bottom panel and the sidebar show results without switching notes.
