@@ -30,6 +30,12 @@ export class PluginSettingTab {
     }
 }
 
+export class MarkdownView {
+    file: unknown = null;
+    leaf: unknown = null;
+    containerEl: HTMLElement = document.createElement("div");
+}
+
 export class TFile {
     path: string;
     basename: string;

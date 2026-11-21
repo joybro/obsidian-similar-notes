@@ -41,6 +41,17 @@ export class BaseViewManager<TView extends Component> implements ViewManager<TVi
         }
     }
 
+    /**
+     * Attach a view to every open markdown leaf that has none yet.
+     * Used once services are ready, because the events for notes restored
+     * at startup fired before anything could handle them.
+     */
+    async attachToOpenLeaves(): Promise<void> {
+        for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+            await this.onActiveLeafChange(leaf);
+        }
+    }
+
     async onLayoutChange(): Promise<void> {
         const activeLeaves = this.app.workspace.getLeavesOfType("markdown");
 

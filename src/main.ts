@@ -314,6 +314,11 @@ export default class MainPlugin extends Plugin {
         // Complete initialization
         // If needsReindex is true, trigger a reindex to migrate from JSON to IndexedDB
         await this.init(this.settingsService.get().modelId, true, needsReindex);
+
+        // Notes restored with the workspace fired file-open and
+        // active-leaf-change before these services existed, so nothing
+        // rendered for them (obsidian-host-integration-spec section 4).
+        logRejection(this.leafViewCoordinator.renderNotesOpenAtStartup(), "render notes at startup");
     }
 
     private registerCommands() {
