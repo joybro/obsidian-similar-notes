@@ -7,7 +7,12 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 -   **Link similar notes**: Enable **Show link button on results** in Display settings to add a Link button to unlinked results in the sidebar and bottom panel. The button appends a link to the current note.
+-   **Sidebar toolbar with Expand all and Semantic search**: the Similar notes sidebar has two buttons under its header. **Expand all** opens every result's preview and keeps them open as you move between notes and after you restart Obsidian, until you choose **Collapse all**; a single row's arrow still opens or closes just that row. **Semantic search…** opens the semantic search box, same as the command. The panel under a note is unchanged.
 -   **README tip: keep the similar notes list in view** (#4): a CSS snippet that pins the list at the bottom of the editor while you scroll through a long note.
+
+### Fixed
+
+-   **The note already open when Obsidian starts, or when the plugin is updated or turned on, now refreshes its similar notes without opening another note**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
 
 ### Changed
 

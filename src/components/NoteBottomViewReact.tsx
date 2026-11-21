@@ -5,7 +5,16 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Observable } from "rxjs";
 import { AddLinkButton, useAddNoteLink } from "./noteLinkAction";
 import { triggerHoverLink } from "./hoverLinkPreview";
+import {
+    type SavedExpandMode,
+    SidebarToolbar,
+    useRowExpansion,
+} from "./SidebarToolbar";
 import { logRejection } from "@/utils/logRejection";
+import { type EmptyReason, emptyStateText } from "./emptyStateText";
+import { SimilarNotesHeader } from "./SimilarNotesHeader";
+
+export { type EmptyReason, emptyStateText };
 
 export interface SimilarNoteEntry {
     file: TFile;
@@ -14,39 +23,6 @@ export interface SimilarNoteEntry {
     preview: string;
     sourceChunk?: string;
     isLinked: boolean;
-}
-
-/**
- * Why the results list is empty, so the panel can say something true
- * (docs/panel-empty-states-spec.md). Undefined means "not computed" and
- * reads like "none".
- */
-export type EmptyReason =
-    | { kind: "unwritten" }
-    | { kind: "excluded-cloud"; provider: "OpenAI" | "Gemini" }
-    | { kind: "embedding-failed" }
-    | { kind: "below-threshold"; threshold: number }
-    | { kind: "indexing"; remaining: number }
-    | { kind: "none" };
-
-export function emptyStateText(reason: EmptyReason | undefined): string {
-    switch (reason?.kind) {
-        case "unwritten":
-            return "Write a few lines and similar notes will appear here.";
-        case "excluded-cloud":
-            return `This note is excluded from the index, so it isn't sent to ${reason.provider}.`;
-        case "embedding-failed":
-            return "Couldn't analyze this note. Check the model in Settings, then reopen the note.";
-        case "below-threshold":
-            return `No notes above the minimum similarity (${reason.threshold.toFixed(2)}).`;
-        case "indexing": {
-            const n = reason.remaining.toLocaleString("en-US");
-            const noun = reason.remaining === 1 ? "note" : "notes";
-            return `Indexing your vault: ${n} ${noun} left. Results fill in as notes are indexed.`;
-        }
-        default:
-            return "No similar notes found.";
-    }
 }
 
 export interface NoteBottomViewModel {
@@ -59,10 +35,6 @@ export interface NoteBottomViewModel {
     bottomResultCount: number;
 }
 
-interface SimilarNotesHeaderProps {
-    collapsed: boolean;
-    onToggleCollapse: () => void;
-}
 
 export type ViewType = "sidebar" | "bottom";
 
@@ -72,36 +44,15 @@ interface NoteBottomViewProps {
     leaf: MarkdownView;
     bottomViewModelSubject$: Observable<NoteBottomViewModel>;
     viewType: ViewType;
+    /**
+     * Sidebar only: open the semantic search modal. `onDismissed` runs when
+     * the modal is closed without opening a note (e.g. Esc).
+     */
+    onOpenSemanticSearch?: (onDismissed: () => void) => void;
+    /** Sidebar only: the saved expand-all mode; without it the mode lives in the view. */
+    savedExpandMode?: SavedExpandMode;
 }
 
-// Header Component
-const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
-    collapsed,
-    onToggleCollapse,
-}) => {
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-            onToggleCollapse();
-            e.preventDefault();
-        }
-    };
-
-    return (
-        <div
-            className="tree-item-self is-clickable"
-            onClick={onToggleCollapse}
-            onKeyDown={handleKeyDown}
-        >
-            <div
-                className={`similar-notes-title tree-item-itself is-clickable ${
-                    collapsed ? "is-collapsed" : ""
-                }`}
-            >
-                <div className="tree-item-inner">Similar notes</div>
-            </div>
-        </div>
-    );
-};
 
 const SearchResultPreview = ({
     preview,
@@ -140,6 +91,8 @@ const SearchResult = ({
     onAddLink,
     noteDisplayMode,
     allSimilarNotes,
+    isCollapsed,
+    onToggleCollapse,
 }: {
     note: SimilarNoteEntry;
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
@@ -149,8 +102,9 @@ const SearchResult = ({
     onAddLink?: (file: TFile) => void;
     noteDisplayMode: "title" | "path" | "smart";
     allSimilarNotes: SimilarNoteEntry[];
+    isCollapsed: boolean;
+    onToggleCollapse: (path: string) => void;
 }) => {
-    const [isCollapsed, setIsCollapsed] = useState(true);
     // Separate state to control whether the component is rendered in the DOM
     const [shouldRender, setShouldRender] = useState(false);
     // Additional state for animation when expanding
@@ -191,7 +145,7 @@ const SearchResult = ({
 
     const toggleCollapse = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setIsCollapsed((prev) => !prev);
+        onToggleCollapse(note.file.path);
     };
 
     const handleDragStart = (e: React.DragEvent) => {
@@ -291,6 +245,8 @@ const SearchResultsContainer = ({
     onContextMenu,
     onAddLink,
     noteDisplayMode,
+    isRowCollapsed,
+    onToggleRow,
 }: {
     similarNotes: SimilarNoteEntry[];
     emptyReason?: EmptyReason;
@@ -300,6 +256,8 @@ const SearchResultsContainer = ({
     /** Present only when the Link button setting is on. */
     onAddLink?: (file: TFile) => void;
     noteDisplayMode: "title" | "path" | "smart";
+    isRowCollapsed: (path: string) => boolean;
+    onToggleRow: (path: string) => void;
 }) => {
     if (similarNotes.length === 0) {
         return (
@@ -332,6 +290,8 @@ const SearchResultsContainer = ({
                         onAddLink={onAddLink}
                         noteDisplayMode={noteDisplayMode}
                         allSimilarNotes={similarNotes}
+                        isCollapsed={isRowCollapsed(note.file.path)}
+                        onToggleCollapse={onToggleRow}
                     />
                 ))}
             </div>
@@ -346,6 +306,8 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     leaf,
     bottomViewModelSubject$,
     viewType,
+    onOpenSemanticSearch,
+    savedExpandMode,
 }) => {
     const [collapsed, setCollapsed] = useState(false);
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
@@ -355,6 +317,11 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     const [noteDisplayMode, setNoteDisplayMode] = useState<
         "title" | "path" | "smart"
     >("title");
+    const { isRowCollapsed, toggleRow, anyRowExpanded, toggleAllRows, noteSourceNote } =
+        useRowExpansion(
+            similarNotes.map((note) => note.file.path),
+            savedExpandMode
+        );
 
     useEffect(() => {
         const sub = bottomViewModelSubject$.subscribe((model: NoteBottomViewModel) => {
@@ -367,12 +334,13 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 : model.bottomResultCount;
             setSourceFile(model.currentFile);
             setShowLinkButton(model.showLinkButton);
+            noteSourceNote(model.currentFile?.path ?? null);
             setSimilarNotes(model.similarNoteEntries.slice(0, limit));
             setEmptyReason(model.emptyReason);
             setNoteDisplayMode(model.noteDisplayMode);
         });
         return () => sub.unsubscribe();
-    }, [bottomViewModelSubject$, leaf.file, viewType]);
+    }, [bottomViewModelSubject$, leaf.file, viewType, noteSourceNote]);
 
     const openNote = (file: TFile, newTab = false) => {
         logRejection(workspace.openLinkText(file.path, "", newTab), "open note");
@@ -438,7 +406,16 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
 
     return (
         <>
-            <div className="nav-header" />
+            {viewType === "sidebar" ? (
+                <SidebarToolbar
+                    showExpandButton={similarNotes.length > 0 && !collapsed}
+                    anyRowExpanded={anyRowExpanded}
+                    onToggleAllRows={toggleAllRows}
+                    onOpenSemanticSearch={onOpenSemanticSearch}
+                />
+            ) : (
+                <div className="nav-header" />
+            )}
             <div className={showLinkButton ? "similar-notes-pane has-link-button" : "similar-notes-pane"}>
                 <SimilarNotesHeader
                     collapsed={collapsed}
@@ -453,6 +430,8 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                         onContextMenu={handleContextMenu}
                         onAddLink={showLinkButton ? handleAddLink : undefined}
                         noteDisplayMode={noteDisplayMode}
+                        isRowCollapsed={isRowCollapsed}
+                        onToggleRow={toggleRow}
                     />
                 )}
             </div>

@@ -8,8 +8,8 @@ export class LeafViewCoordinator {
     private noteBottomViewManager: NoteBottomViewManager;
 
     constructor(
-        app: App,
-        similarNoteCoordinator: SimilarNoteCoordinator,
+        private app: App,
+        private similarNoteCoordinator: SimilarNoteCoordinator,
         settingsService: SettingsService
     ) {
         // Extract only showAtBottom-related data from SettingsService
@@ -33,6 +33,15 @@ export class LeafViewCoordinator {
 
     async onActiveLeafChange(leaf: WorkspaceLeaf | null): Promise<void> {
         await this.noteBottomViewManager.onActiveLeafChange(leaf);
+    }
+
+    /**
+     * Render the notes that were already open when services started: attach
+     * missing bottom views and emit results for the active file.
+     */
+    async renderNotesOpenAtStartup(): Promise<void> {
+        await this.noteBottomViewManager.attachToOpenLeaves();
+        await this.similarNoteCoordinator.onFileOpen(this.app.workspace.getActiveFile());
     }
 
     async onLayoutChange(): Promise<void> {

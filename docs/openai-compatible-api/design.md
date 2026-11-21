@@ -140,6 +140,12 @@ interface UsageStats {
 }
 ```
 
+### Day Boundary
+
+- **Date keys are local dates.** Every `daily` key and `total.firstUseDate` is the `YYYY-MM-DD` of the request time in the user's local time zone (`localDateKey` in `src/utils/localDate.ts`), not a UTC date. "Today" in the settings usage line therefore starts at local midnight; a user in UTC+9 no longer sees "Today" reset at 09:00.
+- **30-day cleanup uses the same clock.** On each tracked request, entries whose key is earlier than the local date 30 days before now are removed. Keys are compared as strings, which orders `YYYY-MM-DD` correctly.
+- **Existing rows are not migrated.** Entries written before this change keep their UTC date keys and are read as if they were local dates. Only the day the update is installed can be affected: requests on either side of UTC midnight may land in the same or neighboring rows. Totals are unaffected, and old rows age out through the 30-day cleanup.
+
 ### Cost Calculation
 
 Price is **user-provided** (optional):
