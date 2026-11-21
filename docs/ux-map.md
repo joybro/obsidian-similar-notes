@@ -27,6 +27,8 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
 
 - T1: (open a note) → note-footer → hover-preview (Cmd+hover) → open result (click / Cmd-click new tab) or drag into editor (link) → note-footer of the opened note
 - T8: command "Show in sidebar" or ribbon → sidebar → same actions as note-footer → note-footer of the opened note
+- T8 (read previews): sidebar → Expand all → sidebar (ideal-expanded, kept across note switches)
+- T2 from the sidebar: sidebar → Semantic search button → search-modal → Esc → sidebar (focus back on the button)
 - T2: Cmd+Shift+O → search-modal → type (required: ≥ min length) → pick result → (opened note)
 - T3: type the trigger `;;` + words in the editor → link-suggest → pick → link inserted in the editor
 - T4: install / Load & Apply in settings (load-model-modal) → status-bar (downloading → indexing → idle)
@@ -52,10 +54,13 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - → hover-preview (overlay): Cmd+hover a result
   - → note-footer (replace): open a result
 
-- screen: sidebar | states: empty, ideal, ideal-linked
-  - 무엇을 보여주나: same list as note-footer for the active note, in a right-sidebar leaf (sidebar result count setting)
-  - 행동: same as note-footer
+- screen: sidebar | states: empty, ideal, ideal-linked, ideal-expanded
+  - 무엇을 보여주나: same list as note-footer for the active note, in a right-sidebar leaf (sidebar result count setting), under a toolbar row with two buttons (`docs/sidebar-toolbar-spec.md`)
+  - 행동: same as note-footer; Expand all / Collapse all (hidden in empty); Semantic search…
+  - ideal: rows collapsed (default mode); per-row chevrons open single rows
+  - ideal-expanded: after Expand all every row shows its preview; the mode stays when the active note changes or results refresh, until Collapse all. Per-row toggles hold while the same note's results refresh and reset on note switch
   - → hover-preview (overlay): Cmd+hover a result
+  - → search-modal (modal): Semantic search button (Enter or Space too)
   - → sidebar (back): close the leaf
 
 - screen: hover-preview | states: ideal
@@ -67,6 +72,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - 행동: type, move selection, open, create a note from the query
   - 오류에서: Notice, the modal stays open; edit the query or close
   - → search-modal (back): Esc
+  - → sidebar (back): Esc when opened from the sidebar button; focus returns to that button
 
 - screen: link-suggest | states: loading, ideal, empty-no-results
   - 무엇을 보여주나: popup under the cursor with notes similar to the words typed after the trigger
@@ -125,6 +131,8 @@ obsidian vault=PluginSandbox eval code="document.querySelectorAll('.search-resul
 | note-footer error-embedding | provider OpenAI with an invalid key | manual (key entry) |
 | note-footer ideal-collapsed, hover-preview | click the header; CDP `Input.dispatchMouseEvent` with Cmd (`CLAUDE.md` § UI verification) | auto (CDP) |
 | sidebar * | command `similar-notes:show-similar-notes` then as note-footer | auto |
+| sidebar ideal-expanded | sidebar ideal, then click `.similar-notes-sidebar-toolbar [aria-label="Expand all"]` via eval | auto |
+| sidebar → search-modal → sidebar | click `[aria-label="Semantic search…"]` via eval, then CDP Escape; read `document.activeElement` | auto (CDP) |
 | search-modal * | command `similar-notes:semantic-search`, then CDP `Input.insertText` | auto (CDP) |
 | link-suggest * | focus editor, CDP `Input.insertText` `;;coffee` | auto (CDP) |
 | status-bar loading-downloading | first install of a builtin model not cached yet | manual (network, one-time) |
