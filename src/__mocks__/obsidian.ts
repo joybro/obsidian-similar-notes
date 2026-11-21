@@ -61,10 +61,14 @@ export interface App {
 export class Modal {
     app: App;
     containerEl: HTMLElement;
+    modalEl: HTMLElement;
+    contentEl: HTMLElement;
 
     constructor(app: App) {
         this.app = app;
         this.containerEl = document.createElement("div");
+        this.modalEl = document.createElement("div");
+        this.contentEl = document.createElement("div");
     }
 
     open(): void {
@@ -225,3 +229,12 @@ if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
 }
 
 // Add any other Obsidian types/interfaces as needed for tests
+
+// Icons and tooltips: record what was asked so tests can read it back.
+export function setIcon(el: HTMLElement, iconId: string): void {
+    el.setAttribute("data-icon", iconId);
+}
+
+export function setTooltip(el: HTMLElement, tooltip: string): void {
+    el.setAttribute("aria-label", tooltip);
+}

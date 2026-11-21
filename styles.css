@@ -12,6 +12,16 @@
     margin-bottom: 12px;
 }
 
+/* Sidebar toolbar: Obsidian's nav-buttons-container lays out the buttons;
+   on phones and tablets each button gets at least a 44px tap target. */
+body.is-mobile .similar-notes-sidebar-toolbar .nav-action-button {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .similar-notes-pane .tree-item-self {
     font-size: max(var(--font-ui-small), var(--font-smaller));
     align-items: center;

@@ -11,13 +11,16 @@ import NoteBottomViewReact, {
 export class SimilarNotesSidebarView extends ItemView {
     private root: Root | null = null;
     private bottomViewModelSubject$: Observable<NoteBottomViewModel>;
+    private openSemanticSearch: (onDismissed: () => void) => void;
 
     constructor(
         leaf: WorkspaceLeaf,
-        bottomViewModelSubject$: Observable<NoteBottomViewModel>
+        bottomViewModelSubject$: Observable<NoteBottomViewModel>,
+        openSemanticSearch: (onDismissed: () => void) => void
     ) {
         super(leaf);
         this.bottomViewModelSubject$ = bottomViewModelSubject$;
+        this.openSemanticSearch = openSemanticSearch;
     }
 
     getViewType(): string {
@@ -49,6 +52,7 @@ export class SimilarNotesSidebarView extends ItemView {
                 leaf={mockLeaf}
                 bottomViewModelSubject$={this.bottomViewModelSubject$}
                 viewType="sidebar"
+                onOpenSemanticSearch={this.openSemanticSearch}
             />
         );
     }
