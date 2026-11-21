@@ -49,6 +49,8 @@ export class TFile {
     }
 }
 
+export class MarkdownView {}
+
 export interface App {
     workspace: {
         getLeaf: () => {

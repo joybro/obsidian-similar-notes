@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+-   **Link similar notes**: Enable **Show link button on results** in Display settings to add a Link button to unlinked results in the sidebar and bottom panel. The button appends a link to the current note.
 -   **README tip: keep the similar notes list in view** (#4): a CSS snippet that pins the list at the bottom of the editor while you scroll through a long note.
 
 ### Fixed

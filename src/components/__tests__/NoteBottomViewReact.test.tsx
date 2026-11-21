@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { BehaviorSubject } from "rxjs";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -29,6 +29,7 @@ interface SimilarNote {
     title: string;
     preview: string;
     similarity: number;
+    isLinked?: boolean;
 }
 
 describe("SimilarNotesViewReact", () => {
@@ -43,6 +44,7 @@ describe("SimilarNotesViewReact", () => {
         currentFile: TFile;
         similarNoteEntries: SimilarNote[];
         noteDisplayMode: "title" | "path" | "smart";
+        showLinkButton: boolean;
     }>;
     let currentFile: TFile;
 
@@ -75,6 +77,7 @@ describe("SimilarNotesViewReact", () => {
                 },
             ],
             noteDisplayMode: "title",
+            showLinkButton: false,
         });
         mockLeaf.file = currentFile;
     });
@@ -226,5 +229,99 @@ describe("SimilarNotesViewReact", () => {
                 targetEl: expect.any(HTMLElement),
             })
         );
+    });
+
+    const renderLinkAction = (viewType: "sidebar" | "bottom") => {
+        bottomViewModelSubject$.next({ ...bottomViewModelSubject$.value, showLinkButton: true });
+        return render(
+            <NoteBottomViewReact
+                workspace={mockWorkspace as Workspace}
+                leaf={mockLeaf}
+                bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
+                viewType={viewType}
+            />
+        );
+    };
+    const linkButton = () => screen.findByRole("button", { name: "Add link to Similar Note 1 at the end of this note" });
+
+    test.each(["sidebar", "bottom"] as const)("shows link buttons only when enabled in the %s", async (viewType) => {
+        bottomViewModelSubject$.next({
+            ...bottomViewModelSubject$.value,
+            similarNoteEntries: [
+                bottomViewModelSubject$.value.similarNoteEntries[0],
+                { ...bottomViewModelSubject$.value.similarNoteEntries[1], isLinked: true },
+            ],
+        });
+        render(
+            <NoteBottomViewReact
+                workspace={mockWorkspace as Workspace}
+                leaf={mockLeaf}
+                bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
+                viewType={viewType}
+            />
+        );
+        expect(screen.queryByRole("button", { name: /Add link to/ })).not.toBeInTheDocument();
+        act(() => bottomViewModelSubject$.next({ ...bottomViewModelSubject$.value, showLinkButton: true }));
+        expect(await linkButton()).toHaveAttribute("title", "Add link at the end of this note");
+        expect(screen.getAllByRole("button", { name: /Add link to/ })).toHaveLength(1);
+        act(() => bottomViewModelSubject$.next({ ...bottomViewModelSubject$.value, showLinkButton: false }));
+        expect(screen.queryByRole("button", { name: /Add link to/ })).not.toBeInTheDocument();
+    });
+
+    test.each(["sidebar", "bottom"] as const)("links from the %s editor without opening the result", async (viewType) => {
+        const editor = {
+            lastLine: () => 1,
+            getLine: () => "Unsaved text",
+            replaceRange: vi.fn(),
+        };
+        const generateMarkdownLink = vi.fn(() => "[Target](folder/Target.md)");
+        const activeView = { file: currentFile, getMode: () => "source", editor };
+        Object.assign(mockLeaf, { app: { fileManager: { generateMarkdownLink } }, ...activeView });
+        mockWorkspace.getActiveViewOfType = vi.fn().mockReturnValue(activeView);
+        renderLinkAction(viewType);
+
+        fireEvent.click(await linkButton());
+        expect(generateMarkdownLink).toHaveBeenCalledWith(bottomViewModelSubject$.value.similarNoteEntries[0].file, currentFile.path);
+        expect(editor.replaceRange).toHaveBeenCalledWith("\n[Target](folder/Target.md)\n", { line: 1, ch: 12 });
+        expect(mockOpenLinkText).not.toHaveBeenCalled();
+        expect(screen.getByLabelText("Already linked")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Add link to Similar Note 1 at the end of this note" })).not.toBeInTheDocument();
+    });
+
+    test("appends atomically in reading mode and prevents duplicate clicks while saving", async () => {
+        let finish: (() => void) | undefined;
+        const process = vi.fn((_file, update: (content: string) => string) => {
+            expect(update("Existing\n")).toBe("Existing\n[[similar1]]\n");
+            expect(update("Existing")).toBe("Existing\n[[similar1]]\n");
+            expect(update("")).toBe("[[similar1]]\n");
+            return new Promise<void>((resolve) => { finish = resolve; });
+        });
+        Object.assign(mockLeaf, {
+            app: {
+                fileManager: { generateMarkdownLink: () => "[[similar1]]" },
+                vault: { process },
+            },
+            getMode: () => "preview",
+        });
+        renderLinkAction("bottom");
+        const button = await linkButton();
+        fireEvent.click(button);
+        fireEvent.click(button);
+        expect(process).toHaveBeenCalledTimes(1);
+        expect(process).toHaveBeenCalledWith(currentFile, expect.any(Function));
+        await act(async () => { finish?.(); });
+        expect(screen.getByLabelText("Already linked")).toBeInTheDocument();
+    });
+
+    test("does not add a link to a different note when the displayed results are stale", async () => {
+        const generateMarkdownLink = vi.fn();
+        Object.assign(mockLeaf, { app: { fileManager: { generateMarkdownLink } } });
+        renderLinkAction("bottom");
+        const button = await linkButton();
+        mockLeaf.file = createMockTFile("other.md");
+        fireEvent.click(button);
+        expect(generateMarkdownLink).not.toHaveBeenCalled();
     });
 });
