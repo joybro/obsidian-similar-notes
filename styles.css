@@ -470,9 +470,22 @@ select option:disabled {
     font-size: var(--font-ui-smaller);
 }
 
+/* On mobile the tap target grows to 44px through an invisible ::after
+   layer, so rows with a Link button keep the same height as rows
+   without one. */
 .is-mobile .similar-notes-add-link {
-    min-width: 44px;
-    min-height: 44px;
+    position: relative;
+    min-height: 0;
+}
+
+.is-mobile .similar-notes-add-link::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: 44px;
+    transform: translate(-50%, -50%);
 }
 
 /* Mobile-only caution shown in the Built-in model settings: on-device models can
