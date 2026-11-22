@@ -63,7 +63,7 @@ export function resolveWikilink(
  * no markdown editor to insert into.
  */
 export function insertLinkForNote(app: App, notePath: string): boolean {
-    const view = getTargetMarkdownView(app);
+    const view = getTargetMarkdownView(app.workspace);
     if (!view?.editor) return false;
 
     const sourcePath = view.file?.path ?? "";
