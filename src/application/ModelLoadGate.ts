@@ -13,7 +13,7 @@ export interface WaitingPanel {
  * clears by itself.
  */
 // A model already on disk also reports progress from 0 to 100 while it is
-// read (measured on desktop: about 0.3 s). Only a load still below 100 after
+// read (measured on desktop: about 0.6 s). Only a load still below 100 after
 // this long is called a download.
 export const DOWNLOAD_GRACE_MS = 2000;
 
