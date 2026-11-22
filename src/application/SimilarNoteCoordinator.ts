@@ -202,6 +202,8 @@ export class SimilarNoteCoordinator {
             this.noteBottomViewModel$.next({
                 currentFile: null,
                 similarNoteEntries: [],
+                // No search ran, so "No similar notes found." would not be true.
+                emptyReason: { kind: "no-note" },
                 noteDisplayMode: settings.noteDisplayMode,
                 sidebarResultCount: settings.sidebarResultCount,
                 bottomResultCount: settings.bottomResultCount,

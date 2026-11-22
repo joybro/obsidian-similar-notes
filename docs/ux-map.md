@@ -54,9 +54,10 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - → hover-preview (overlay): Cmd+hover a result
   - → note-footer (replace): open a result
 
-- screen: sidebar | states: empty, ideal, ideal-linked, ideal-expanded
+- screen: sidebar | states: empty, empty-no-note, ideal, ideal-linked, ideal-expanded
   - 무엇을 보여주나: same list as note-footer for the active note, in a right-sidebar leaf (sidebar result count setting), under a toolbar row with two buttons (`docs/sidebar-toolbar-spec.md`)
   - 행동: same as note-footer; Expand all / Collapse all (hidden in empty); Semantic search…
+  - empty-no-note: no note to follow (no markdown editor open, or the main-area tab used last is a canvas, PDF or image): "Open a note and similar notes will appear here."; the previous results are dropped
   - ideal: rows collapsed (default mode); per-row chevrons open single rows
   - ideal-expanded: after Expand all every row shows its preview; the mode stays when the active note changes, results refresh or Obsidian restarts (saved in the view state), until Collapse all. Per-row toggles hold while the same note's results refresh and reset on note switch
   - → hover-preview (overlay): Cmd+hover a result
@@ -131,6 +132,7 @@ obsidian vault=PluginSandbox eval code="document.querySelectorAll('.search-resul
 | note-footer error-embedding | provider OpenAI with an invalid key | manual (key entry) |
 | note-footer ideal-collapsed, hover-preview | click the header; CDP `Input.dispatchMouseEvent` with Cmd (`CLAUDE.md` § UI verification) | auto (CDP) |
 | sidebar * | command `similar-notes:show-similar-notes` then as note-footer | auto |
+| sidebar empty-no-note | sidebar open, then close every note tab (or open a PDF or canvas in the main area) | auto |
 | sidebar ideal-expanded | sidebar ideal, then click `.similar-notes-sidebar-toolbar [aria-label="Expand all"]` via eval | auto |
 | sidebar → search-modal → sidebar | click `[aria-label="Semantic search…"]` via eval, then CDP Escape; read `document.activeElement` | auto (CDP) |
 | search-modal * | command `similar-notes:semantic-search`, then CDP `Input.insertText` | auto (CDP) |

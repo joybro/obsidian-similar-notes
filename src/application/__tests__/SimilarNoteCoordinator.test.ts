@@ -118,6 +118,7 @@ describe("SimilarNoteCoordinator", () => {
             const seen: Array<{
                 currentFile: unknown;
                 count: number;
+                reason: unknown;
             }> = [];
             const sub = coord
                 .getNoteBottomViewModelObservable()
@@ -125,6 +126,7 @@ describe("SimilarNoteCoordinator", () => {
                     seen.push({
                         currentFile: m.currentFile,
                         count: m.similarNoteEntries.length,
+                        reason: m.emptyReason?.kind,
                     });
                 });
 
@@ -140,6 +142,7 @@ describe("SimilarNoteCoordinator", () => {
             expect(seen).toHaveLength(1);
             expect(seen[0].currentFile).toBeNull();
             expect(seen[0].count).toBe(0);
+            expect(seen[0].reason).toBe("no-note");
         });
 
         test("onFileOpen(non-markdown file) also clears the sidebar instead of keeping prior results", async () => {

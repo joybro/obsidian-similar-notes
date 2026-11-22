@@ -4,6 +4,7 @@
  * reads like "none".
  */
 export type EmptyReason =
+    | { kind: "no-note" }
     | { kind: "unwritten" }
     | { kind: "excluded-cloud"; provider: "OpenAI" | "Gemini" }
     | { kind: "embedding-failed" }
@@ -13,6 +14,8 @@ export type EmptyReason =
 
 export function emptyStateText(reason: EmptyReason | undefined): string {
     switch (reason?.kind) {
+        case "no-note":
+            return "Open a note and similar notes will appear here.";
         case "unwritten":
             return "Write a few lines and similar notes will appear here.";
         case "excluded-cloud":

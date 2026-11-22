@@ -35,6 +35,21 @@ under a note gets no toolbar.
 - The same rule decides which note the sidebar follows while it has focus:
   results keep refreshing for the note in the most recently used main-area
   editor instead of being dropped until you click back into the note.
+- "Most recently used" means the one tab used last in the main area, asked
+  from Obsidian each time (`workspace.getMostRecentLeaf()`); the plugin keeps
+  no memory of its own. So after you close that editor, the sidebar and the
+  link insert move to whichever main-area tab Obsidian now reports as most
+  recent.
+- If that tab is not a markdown editor (a canvas, a PDF, an image), there is
+  no target, even when an older markdown editor is still open in another
+  split. This is deliberate: a link should never land in a note you were not
+  just working in. Insert as link shows the notice; click into the note you
+  mean and it becomes the target again.
+- With no target the sidebar has no note to follow: it drops the previous
+  note's results and shows one grey line, "Open a note and similar notes will
+  appear here." (`no-note` in `docs/panel-empty-states-spec.md`); the
+  expand/collapse button is hidden as in any empty state. It fills again when
+  a note becomes the target.
 
 ### Expand mode
 
@@ -68,5 +83,6 @@ under a note gets no toolbar.
 
 - sidebar: new states `ideal-expanded` (mode expanded) and `ideal-collapsed`
   (default); the expand button is absent in `empty`.
+- sidebar: new state `empty-no-note` (no markdown editor is the target).
 - sidebar → search-modal (modal): Semantic search button.
 - search-modal → sidebar (back): Esc returns focus to the button.

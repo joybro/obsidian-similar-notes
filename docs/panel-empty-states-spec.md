@@ -20,6 +20,7 @@ while fixed guidance and self-resolving states stay grey.
 
 | Reason | When | Text |
 |---|---|---|
+| no-note | there is no note to show results for: no markdown editor is open, or the tab used last in the main area is not a note (canvas, PDF, image). No search runs. In practice only the sidebar shows this, since the footer panel lives under a note | Open a note and similar notes will appear here. |
 | unwritten | the note has no text after exclusion patterns (`SimilarNoteFinder` status `empty-content`) | Write a few lines and similar notes will appear here. |
 | excluded-cloud | excluded note with OpenAI or Gemini, ad-hoc embedding skipped (`ad-hoc-disallowed`, frontmatter-exclusion spec §2.1) | This note is excluded from the index, so it isn't sent to OpenAI. (provider name from the setting: OpenAI or Gemini) |
 | embedding-failed | the on-the-fly embedding threw (`embedding-failed`; a Notice is also shown) | Couldn't analyze this note. Check the model in Settings, then reopen the note. |
@@ -27,7 +28,8 @@ while fixed guidance and self-resolving states stay grey.
 | indexing | the search ran, returned nothing, and notes other than the open one are queued for indexing | Indexing your vault: 1,240 notes left. Results fill in as notes are indexed. (count = the status bar's "N to index" source, `NoteIndexingService.getNoteChangeCount$`; "1 note left" for one) |
 | none | anything else | No similar notes found. |
 
-Order: the first three are searches that never ran and win; `excluded-cloud`
+Order: `no-note` is decided before any note is looked at. Of the rest, the
+next three are searches that never ran and win; `excluded-cloud`
 beats `unwritten`, so an empty excluded note under a cloud provider already
 says it is excluded (writing in it would not bring results); `below-threshold`
 only when results exist; `indexing` only when there are zero results (if

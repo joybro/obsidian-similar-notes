@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { BehaviorSubject } from "rxjs";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -190,6 +190,41 @@ describe("SimilarNotesViewReact", () => {
         expect(el).toBeInTheDocument();
         // Only the confirmed failure is styled as an error
         expect(el.classList.contains("is-error")).toBe(emptyReason.kind === "embedding-failed");
+    });
+
+    test("sidebar with no note to follow drops the results and says to open a note", async () => {
+        render(
+            <NoteBottomViewReact
+                workspace={mockWorkspace as unknown as Workspace}
+                leaf={mockLeaf}
+                bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
+                viewType="sidebar"
+            />
+        );
+        await screen.findByText("Similar Note 1");
+
+        // The last note is closed (or a canvas/PDF tab becomes the most
+        // recent one): the followed view has no file and the coordinator
+        // emits an empty model.
+        (mockLeaf as { file: TFile | null }).file = null;
+        act(() => {
+            (bottomViewModelSubject$ as BehaviorSubject<unknown>).next({
+                currentFile: null,
+                similarNoteEntries: [],
+                emptyReason: { kind: "no-note" },
+                noteDisplayMode: "title",
+                sidebarResultCount: 10,
+                bottomResultCount: 5,
+            });
+        });
+
+        expect(
+            await screen.findByText("Open a note and similar notes will appear here.")
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Similar Note 1")).not.toBeInTheDocument();
+        expect(screen.queryByText("No similar notes found.")).not.toBeInTheDocument();
+        expect(screen.queryByLabelText("Expand all")).not.toBeInTheDocument();
     });
 
     test("calls openFile when note is clicked", async () => {
