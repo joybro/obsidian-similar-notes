@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 -   **The note already open when Obsidian starts, or when the plugin is updated or turned on, now refreshes its similar notes without opening another note**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
+-   **The panel no longer says "No similar notes found." before it has looked**: for the first few seconds after Obsidian starts or the plugin is turned on or updated, it now says "Looking for similar notes…" until the first results arrive.
 -   **The sidebar no longer says "No similar notes found." when there is no note to compare**: with every note closed, or with a canvas, PDF or image as the tab you used last, it now says "Open a note and similar notes will appear here."
 
 ### Changed

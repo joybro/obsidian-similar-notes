@@ -88,6 +88,24 @@ describe("SimilarNoteCoordinator", () => {
     });
 
     describe("#39.1: sidebar should not show stale results when the active note is closed", () => {
+        test("before any file-open is handled the model says results are still being looked for", () => {
+            const coord = new SimilarNoteCoordinator(
+                vault,
+                noteRepository,
+                similarNoteFinder,
+                settingsService
+            );
+            let first: { currentFile: unknown; emptyReason?: { kind: string } } | undefined;
+            const sub = coord
+                .getNoteBottomViewModelObservable()
+                .subscribe((m) => {
+                    first ??= m;
+                });
+            sub.unsubscribe();
+            expect(first?.currentFile).toBeNull();
+            expect(first?.emptyReason?.kind).toBe("loading");
+        });
+
         test("onFileOpen(null) emits a model with currentFile=null and an empty result list", async () => {
             const coord = new SimilarNoteCoordinator(
                 vault,

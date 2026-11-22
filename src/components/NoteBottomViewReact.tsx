@@ -330,7 +330,11 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
 }) => {
     const [collapsed, setCollapsed] = useState(false);
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
-    const [emptyReason, setEmptyReason] = useState<EmptyReason | undefined>();
+    // Until the first result for this view's note arrives nothing has been
+    // searched, so the empty line says "looking", not "none found".
+    const [emptyReason, setEmptyReason] = useState<EmptyReason | undefined>({
+        kind: "loading",
+    });
     const [noteDisplayMode, setNoteDisplayMode] = useState<
         "title" | "path" | "smart"
     >("title");

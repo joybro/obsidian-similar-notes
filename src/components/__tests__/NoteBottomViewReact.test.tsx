@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { BehaviorSubject } from "rxjs";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -192,6 +192,37 @@ describe("SimilarNotesViewReact", () => {
         expect(el.classList.contains("is-error")).toBe(emptyReason.kind === "embedding-failed");
     });
 
+    test("before the first result for its note arrives the panel says it is looking", async () => {
+        // The latest model is for another note (or the coordinator's initial
+        // value at startup), so this view has nothing to show yet.
+        mockLeaf.file = createMockTFile("just-opened.md");
+        render(
+            <NoteBottomViewReact
+                workspace={mockWorkspace as unknown as Workspace}
+                leaf={mockLeaf}
+                bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
+                viewType="sidebar"
+            />
+        );
+
+        expect(screen.getByText("Looking for similar notes…")).toBeInTheDocument();
+        expect(screen.queryByText("No similar notes found.")).not.toBeInTheDocument();
+        expect(screen.queryByLabelText("Expand all")).not.toBeInTheDocument();
+
+        // The search for this note comes back empty: now "none found" is true.
+        (bottomViewModelSubject$ as BehaviorSubject<unknown>).next({
+            currentFile: mockLeaf.file,
+            similarNoteEntries: [],
+            emptyReason: { kind: "none" },
+            noteDisplayMode: "title",
+            sidebarResultCount: 10,
+            bottomResultCount: 5,
+        });
+        expect(await screen.findByText("No similar notes found.")).toBeInTheDocument();
+        expect(screen.queryByText("Looking for similar notes…")).not.toBeInTheDocument();
+    });
+
     test("sidebar with no note to follow drops the results and says to open a note", async () => {
         render(
             <NoteBottomViewReact
@@ -208,15 +239,13 @@ describe("SimilarNotesViewReact", () => {
         // recent one): the followed view has no file and the coordinator
         // emits an empty model.
         (mockLeaf as { file: TFile | null }).file = null;
-        act(() => {
-            (bottomViewModelSubject$ as BehaviorSubject<unknown>).next({
-                currentFile: null,
-                similarNoteEntries: [],
-                emptyReason: { kind: "no-note" },
-                noteDisplayMode: "title",
-                sidebarResultCount: 10,
-                bottomResultCount: 5,
-            });
+        (bottomViewModelSubject$ as BehaviorSubject<unknown>).next({
+            currentFile: null,
+            similarNoteEntries: [],
+            emptyReason: { kind: "no-note" },
+            noteDisplayMode: "title",
+            sidebarResultCount: 10,
+            bottomResultCount: 5,
         });
 
         expect(

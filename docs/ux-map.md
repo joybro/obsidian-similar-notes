@@ -40,10 +40,11 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
 
 - 오류에서: every surface stays usable; an embedding or provider failure shows an Obsidian Notice and the status bar error state, and the user leaves by fixing the provider in settings, then Retry errored notes or reopening the note.
 
-- screen: note-footer | states: empty, empty-unwritten, empty-below-threshold, empty-excluded-note, loading-indexing, partial-not-indexed, ideal, ideal-linked, ideal-collapsed, error-embedding
+- screen: note-footer | states: loading, empty, empty-unwritten, empty-below-threshold, empty-excluded-note, loading-indexing, partial-not-indexed, ideal, ideal-linked, ideal-collapsed, error-embedding
   - 무엇을 보여주나: under the open note, the top similar notes with score, optional source chunk, "linked" tag for notes already linked
   - 행동: open, open in new tab (Cmd-click), hover preview (Cmd+hover), drag into editor, right-click menu (Open link, Open in new tab, Copy Obsidian URL), collapse
   - Each empty state is one grey line in the same place; only the text differs (`docs/panel-empty-states-spec.md`).
+  - loading: nothing searched yet for this note (right after the plugin turns on, until the first result): "Looking for similar notes…"
   - empty: "No similar notes found." (the search ran, nothing came back, nothing is waiting to be indexed)
   - empty-unwritten: the note has no text (after exclusion patterns) and is not an excluded note under OpenAI or Gemini (that one shows empty-excluded-note): "Write a few lines and similar notes will appear here."
   - empty-below-threshold: results exist but all are under Minimum similarity: "No notes above the minimum similarity (0.50)."
@@ -54,7 +55,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - → hover-preview (overlay): Cmd+hover a result
   - → note-footer (replace): open a result
 
-- screen: sidebar | states: empty, empty-no-note, ideal, ideal-linked, ideal-expanded
+- screen: sidebar | states: loading, empty, empty-no-note, ideal, ideal-linked, ideal-expanded
   - 무엇을 보여주나: same list as note-footer for the active note, in a right-sidebar leaf (sidebar result count setting), under a toolbar row with two buttons (`docs/sidebar-toolbar-spec.md`)
   - 행동: same as note-footer; Expand all / Collapse all (hidden in empty); Semantic search…
   - empty-no-note: no note to follow (no markdown editor open, or the main-area tab used last is a canvas, PDF or image): "Open a note and similar notes will appear here."; the previous results are dropped
@@ -132,6 +133,7 @@ obsidian vault=PluginSandbox eval code="document.querySelectorAll('.search-resul
 | note-footer error-embedding | provider OpenAI with an invalid key | manual (key entry) |
 | note-footer ideal-collapsed, hover-preview | click the header; CDP `Input.dispatchMouseEvent` with Cmd (`CLAUDE.md` § UI verification) | auto (CDP) |
 | sidebar * | command `similar-notes:show-similar-notes` then as note-footer | auto |
+| sidebar loading | disable then enable the plugin with a note open; read the sidebar within the first 2 seconds | auto (timing-dependent) |
 | sidebar empty-no-note | sidebar open, then close every note tab (or open a PDF or canvas in the main area) | auto |
 | sidebar ideal-expanded | sidebar ideal, then click `.similar-notes-sidebar-toolbar [aria-label="Expand all"]` via eval | auto |
 | sidebar → search-modal → sidebar | click `[aria-label="Semantic search…"]` via eval, then CDP Escape; read `document.activeElement` | auto (CDP) |

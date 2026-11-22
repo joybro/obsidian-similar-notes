@@ -37,6 +37,8 @@ export class SimilarNoteCoordinator {
     private noteBottomViewModel$ = new BehaviorSubject<NoteBottomViewModel>({
         currentFile: null,
         similarNoteEntries: [],
+        // Before the first file-open is handled nothing has been searched.
+        emptyReason: { kind: "loading" },
         noteDisplayMode: "title", // Will be properly initialized in constructor
         sidebarResultCount: 10,   // Will be properly initialized in constructor
         bottomResultCount: 5,     // Will be properly initialized in constructor

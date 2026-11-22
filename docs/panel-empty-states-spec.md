@@ -20,6 +20,7 @@ while fixed guidance and self-resolving states stay grey.
 
 | Reason | When | Text |
 |---|---|---|
+| loading | nothing has been searched for this note yet: from the moment the plugin turns on (Obsidian start, plugin enabled or updated) until the first result for the open note arrives. Measured in a running Obsidian with the model already on disk: about 3 seconds in the sidebar | Looking for similar notes… |
 | no-note | there is no note to show results for: no markdown editor is open, or the tab used last in the main area is not a note (canvas, PDF, image). No search runs. In practice only the sidebar shows this, since the footer panel lives under a note | Open a note and similar notes will appear here. |
 | unwritten | the note has no text after exclusion patterns (`SimilarNoteFinder` status `empty-content`) | Write a few lines and similar notes will appear here. |
 | excluded-cloud | excluded note with OpenAI or Gemini, ad-hoc embedding skipped (`ad-hoc-disallowed`, frontmatter-exclusion spec §2.1) | This note is excluded from the index, so it isn't sent to OpenAI. (provider name from the setting: OpenAI or Gemini) |
@@ -28,7 +29,10 @@ while fixed guidance and self-resolving states stay grey.
 | indexing | the search ran, returned nothing, and notes other than the open one are queued for indexing | Indexing your vault: 1,240 notes left. Results fill in as notes are indexed. (count = the status bar's "N to index" source, `NoteIndexingService.getNoteChangeCount$`; "1 note left" for one) |
 | none | anything else | No similar notes found. |
 
-Order: `no-note` is decided before any note is looked at. Of the rest, the
+Order: `loading` is the panel's state before any result; the first result for
+its note replaces it and it does not come back while the panel stays open
+(on a note switch the sidebar keeps the previous results until the new ones
+arrive). `no-note` is decided before any note is looked at. Of the rest, the
 next three are searches that never ran and win; `excluded-cloud`
 beats `unwritten`, so an empty excluded note under a cloud provider already
 says it is excluded (writing in it would not bring results); `below-threshold`
@@ -71,6 +75,7 @@ notes are queued.
 - The OpenAI provider pointed at an OpenAI-compatible server still says
   "OpenAI" (the URL is not inspected, same as frontmatter-exclusion spec §2.1).
 - What the panel shows while the built-in model is still downloading was not
-  observed in a running Obsidian; by code, an embedding call
-  before the model is ready fails or waits, which maps to `embedding-failed`
-  or a late result.
+  observed in a running Obsidian; by code, the panel stays on the `loading`
+  line until the first search returns, and an embedding call before the
+  model is ready fails or waits, which maps to `embedding-failed` or a late
+  result. The status bar reports the download.
