@@ -6,29 +6,31 @@ function markdownView(path: string) {
     return Object.assign(new MarkdownView(), { file: { path } });
 }
 
-function makeApp(active: unknown, recentView: unknown) {
+function makeWorkspace(active: unknown, recentView: unknown) {
     return {
-        workspace: {
-            getActiveViewOfType: vi.fn(() => active),
-            getMostRecentLeaf: vi.fn(() => (recentView ? { view: recentView } : null)),
-        },
-    } as never;
+        getActiveViewOfType: vi.fn(() => active),
+        getMostRecentLeaf: vi.fn(() => (recentView ? { view: recentView } : null)),
+    };
+}
+
+function makeApp(active: unknown, recentView: unknown) {
+    return { workspace: makeWorkspace(active, recentView) } as never;
 }
 
 describe("getTargetMarkdownView", () => {
     it("returns the active markdown view", () => {
         const active = markdownView("a.md");
-        expect(getTargetMarkdownView(makeApp(active, markdownView("b.md")))).toBe(active);
+        expect(getTargetMarkdownView(makeWorkspace(active, markdownView("b.md")))).toBe(active);
     });
 
     it("falls back to the most recent main-area markdown view when a sidebar leaf is active", () => {
         const recent = markdownView("b.md");
-        expect(getTargetMarkdownView(makeApp(null, recent))).toBe(recent);
+        expect(getTargetMarkdownView(makeWorkspace(null, recent))).toBe(recent);
     });
 
     it("returns null when the most recent main-area leaf is not a markdown view", () => {
-        expect(getTargetMarkdownView(makeApp(null, { file: { path: "c.canvas" } }))).toBeNull();
-        expect(getTargetMarkdownView(makeApp(null, null))).toBeNull();
+        expect(getTargetMarkdownView(makeWorkspace(null, { file: { path: "c.canvas" } }))).toBeNull();
+        expect(getTargetMarkdownView(makeWorkspace(null, null))).toBeNull();
     });
 });
 

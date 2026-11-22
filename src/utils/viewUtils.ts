@@ -1,4 +1,4 @@
-import type { App, MarkdownView } from "obsidian";
+import type { App, MarkdownView, Workspace } from "obsidian";
 import { MarkdownView as MarkdownViewClass } from "obsidian";
 
 /**
@@ -9,10 +9,10 @@ import { MarkdownView as MarkdownViewClass } from "obsidian";
  * on pointerdown and focusin), while the note the user was writing in stays
  * open, with its cursor, in the main area.
  */
-export function getTargetMarkdownView(app: App): MarkdownView | null {
-    const active = app.workspace.getActiveViewOfType(MarkdownViewClass);
+export function getTargetMarkdownView(workspace: Workspace): MarkdownView | null {
+    const active = workspace.getActiveViewOfType(MarkdownViewClass);
     if (active) return active;
-    const recent = app.workspace.getMostRecentLeaf()?.view;
+    const recent = workspace.getMostRecentLeaf()?.view;
     return recent instanceof MarkdownViewClass ? recent : null;
 }
 
@@ -24,7 +24,7 @@ export function getTargetMarkdownView(app: App): MarkdownView | null {
 export function createActiveFileMockView(app: App): MarkdownView {
     return {
         get file() {
-            return getTargetMarkdownView(app)?.file || null;
+            return getTargetMarkdownView(app.workspace)?.file || null;
         },
         app: app,
     } as MarkdownView;
