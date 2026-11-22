@@ -1,7 +1,8 @@
-import type { App, TFile, Workspace } from "obsidian";
-import { MarkdownView, Notice } from "obsidian";
+import type { App, MarkdownView, TFile, Workspace } from "obsidian";
+import { Notice } from "obsidian";
 import { useRef } from "react";
 import { logRejection } from "@/utils/logRejection";
+import { getTargetMarkdownView } from "@/utils/viewUtils";
 
 /**
  * Append a link to `target` at the end of `source`.
@@ -18,7 +19,9 @@ export async function appendNoteLink(
     target: TFile
 ): Promise<void> {
     const link = app.fileManager.generateMarkdownLink(target, source.path);
-    const activeView = preferredView ?? workspace.getActiveViewOfType(MarkdownView);
+    // From the sidebar there is no preferred view, and the click has made the
+    // sidebar the active leaf: look for the note's editor in the main area.
+    const activeView = preferredView ?? getTargetMarkdownView(workspace);
 
     if (activeView?.file === source && activeView.getMode() === "source") {
         const editor = activeView.editor;
