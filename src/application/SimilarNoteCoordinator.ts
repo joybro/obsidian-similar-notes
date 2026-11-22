@@ -53,6 +53,9 @@ export class SimilarNoteCoordinator {
     // Throttle for re-searching while the panel shows the indexing line.
     private lastIndexingSearchAt = 0;
     private indexingSearchInFlight = false;
+    // Set while the model is downloading or loading (ModelLoadGate): no
+    // search runs and an empty panel shows this reason.
+    private waitingReason: EmptyReason | null = null;
 
     constructor(
         private readonly vault: Vault,
@@ -64,15 +67,7 @@ export class SimilarNoteCoordinator {
         // don't care about exclusion.
         private readonly isExcluded: (path: string) => boolean = () => false
     ) {
-        // Initialize with current settings
-        const settings = this.settingsService.get();
-        const currentModel = this.noteBottomViewModel$.value;
-        this.noteBottomViewModel$.next({
-            ...currentModel,
-            noteDisplayMode: settings.noteDisplayMode,
-            sidebarResultCount: settings.sidebarResultCount,
-            bottomResultCount: settings.bottomResultCount,
-        });
+        this.publishDisplaySettings();
 
         this.settingsService
             .getNewSettingsObservable()
@@ -97,16 +92,23 @@ export class SimilarNoteCoordinator {
                     }
                 }
 
-                // Update current model with new settings
-                const settings = this.settingsService.get();
-                const currentModel = this.noteBottomViewModel$.value;
-                this.noteBottomViewModel$.next({
-                    ...currentModel,
-                    noteDisplayMode: settings.noteDisplayMode,
-                    sidebarResultCount: settings.sidebarResultCount,
-                    bottomResultCount: settings.bottomResultCount,
-                });
+                this.publishDisplaySettings();
             });
+    }
+
+    // The three display settings every view model carries.
+    private displaySettings() {
+        const s = this.settingsService.get();
+        return {
+            noteDisplayMode: s.noteDisplayMode,
+            sidebarResultCount: s.sidebarResultCount,
+            bottomResultCount: s.bottomResultCount,
+        };
+    }
+
+    private publishDisplaySettings() {
+        const view = this.noteBottomViewModel$.value;
+        this.noteBottomViewModel$.next({ ...view, ...this.displaySettings() });
     }
 
     /**
@@ -200,20 +202,45 @@ export class SimilarNoteCoordinator {
         if (!file || file.extension !== "md") {
             // No active markdown file — clear the sidebar so it doesn't keep
             // showing similar notes for a file the user has navigated away from.
-            const settings = this.settingsService.get();
-            this.noteBottomViewModel$.next({
-                currentFile: null,
-                similarNoteEntries: [],
-                // No search ran, so "No similar notes found." would not be true.
-                emptyReason: { kind: "no-note" },
-                noteDisplayMode: settings.noteDisplayMode,
-                sidebarResultCount: settings.sidebarResultCount,
-                bottomResultCount: settings.bottomResultCount,
-            });
+            // No search ran, so "No similar notes found." would not be true.
+            this.noteBottomViewModel$.next(this.emptyView(null, { kind: "no-note" }));
             return;
         }
 
         await this.emitNoteBottomViewModel(file);
+    }
+
+    private emptyView(
+        file: TFile | null,
+        emptyReason: EmptyReason
+    ): NoteBottomViewModel {
+        return {
+            currentFile: file,
+            similarNoteEntries: [],
+            emptyReason,
+            ...this.displaySettings(),
+        };
+    }
+
+    /**
+     * Called by ModelLoadGate. A reason holds searches and shows on an empty
+     * waiting panel; null releases them and searches for the note opened
+     * meanwhile (results if the model works, the failure line if its load
+     * failed, which is then true).
+     */
+    setWaiting(reason: EmptyReason | null) {
+        const wasWaiting = this.waitingReason !== null;
+        this.waitingReason = reason;
+        const view = this.noteBottomViewModel$.value;
+        const kind = view.emptyReason?.kind;
+        if (kind !== "loading" && kind !== "downloading") {
+            return;
+        }
+        if (reason) {
+            this.noteBottomViewModel$.next({ ...view, emptyReason: reason });
+        } else if (wasWaiting && view.currentFile) {
+            logRejection(this.emitNoteBottomViewModel(view.currentFile), "search after model load");
+        }
     }
 
     async emitNoteBottomViewModelFromPath(path: string) {
@@ -307,6 +334,10 @@ export class SimilarNoteCoordinator {
         // Any search restarts the indexing re-search throttle: the panel
         // just looked, so the next look waits a full interval.
         this.lastIndexingSearchAt = Date.now();
+        if (this.waitingReason) {
+            this.noteBottomViewModel$.next(this.emptyView(file, this.waitingReason));
+            return;
+        }
         const { notes, status } = await this.getSimilarNotesWithStatus(file);
         if (
             options.onlyIfStillCurrent &&
@@ -329,9 +360,7 @@ export class SimilarNoteCoordinator {
                         threshold,
                         file.path
                     ),
-            noteDisplayMode: settings.noteDisplayMode,
-            sidebarResultCount: settings.sidebarResultCount,
-            bottomResultCount: settings.bottomResultCount,
+            ...this.displaySettings(),
         });
     }
 

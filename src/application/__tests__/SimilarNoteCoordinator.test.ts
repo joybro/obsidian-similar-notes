@@ -3,6 +3,8 @@ import type { SimilarNoteFinder } from "@/domain/service/SimilarNoteFinder";
 import type { TFile, Vault } from "obsidian";
 import { BehaviorSubject, Subject, firstValueFrom } from "rxjs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { emptyStateText } from "@/components/emptyStateText";
+import { ModelLoadGate } from "../ModelLoadGate";
 import { SimilarNoteCoordinator } from "../SimilarNoteCoordinator";
 import type {
     SettingsService,
@@ -823,6 +825,145 @@ describe("SimilarNoteCoordinator", () => {
         test("nothing found after indexing keeps the plain line", async () => {
             withStatus("ok", []);
             expect(await reasonAfterOpen(make())).toEqual({ kind: "none" });
+        });
+
+        describe("while the model is downloading or loading", () => {
+            const currentReason = async (coord: SimilarNoteCoordinator) =>
+                (await firstValueFrom(coord.getNoteBottomViewModelObservable()))
+                    .emptyReason;
+            const finderCalls = () =>
+                (
+                    similarNoteFinder.findSimilarNotesWithStatus as ReturnType<typeof vi.fn>
+                ).mock.calls.length;
+
+            test("control: without a model load in progress, a failing embedding shows the failure line", async () => {
+                withStatus("embedding-failed");
+                expect(await reasonAfterOpen(make())).toEqual({
+                    kind: "embedding-failed",
+                });
+            });
+
+            test("the panel open at startup follows the download percent", async () => {
+                const progress$ = new Subject<number>();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.watch(progress$);
+                gate.begin();
+                expect(await currentReason(coord)).toEqual({ kind: "loading" });
+                progress$.next(45.7);
+                expect(await currentReason(coord)).toEqual({
+                    kind: "downloading",
+                    percent: 45.7,
+                });
+                expect(emptyStateText(await currentReason(coord))).toBe(
+                    "Downloading the model: 45%. Similar notes will appear when it's ready."
+                );
+            });
+
+            test("a note opened during the download is not searched and shows the download line", async () => {
+                withStatus("embedding-failed");
+                const progress$ = new Subject<number>();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.watch(progress$);
+                gate.begin();
+                progress$.next(12);
+                expect(await reasonAfterOpen(coord, "other.md")).toEqual({
+                    kind: "downloading",
+                    percent: 12,
+                });
+                expect(finderCalls()).toBe(0);
+                progress$.next(80);
+                const view = await firstValueFrom(
+                    coord.getNoteBottomViewModelObservable()
+                );
+                expect(view.currentFile?.path).toBe("other.md");
+                expect(view.emptyReason).toEqual({
+                    kind: "downloading",
+                    percent: 80,
+                });
+            });
+
+            test("between the end of the download and the model being ready the line is the looking line", async () => {
+                const progress$ = new Subject<number>();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.watch(progress$);
+                gate.begin();
+                progress$.next(99);
+                progress$.next(100);
+                expect(await reasonAfterOpen(coord)).toEqual({ kind: "loading" });
+                expect(finderCalls()).toBe(0);
+            });
+
+            test("a note opened before any progress is reported waits on the looking line", async () => {
+                withStatus("embedding-failed");
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.begin();
+                expect(await reasonAfterOpen(coord)).toEqual({ kind: "loading" });
+                expect(finderCalls()).toBe(0);
+            });
+
+            test("when the model is ready the note opened meanwhile is searched", async () => {
+                withStatus("ok", [neighbor(0.9)]);
+                const progress$ = new Subject<number>();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.watch(progress$);
+                gate.begin();
+                progress$.next(30);
+                await coord.onFileOpen(makeFile("open.md"));
+                gate.end();
+                await vi.waitFor(async () => {
+                    const view = await firstValueFrom(
+                        coord.getNoteBottomViewModelObservable()
+                    );
+                    expect(view.similarNoteEntries).toHaveLength(1);
+                    expect(view.emptyReason).toBeUndefined();
+                });
+            });
+
+            test("when the load fails the note opened meanwhile gets the failure line", async () => {
+                withStatus("embedding-failed");
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.begin();
+                await coord.onFileOpen(makeFile("open.md"));
+                gate.end();
+                await vi.waitFor(async () => {
+                    expect(await currentReason(coord)).toEqual({
+                        kind: "embedding-failed",
+                    });
+                });
+            });
+
+            test("progress reported outside a model load does not touch the panel", async () => {
+                withStatus("ok", []);
+                const progress$ = new Subject<number>();
+                const coord = make();
+                new ModelLoadGate(coord).watch(progress$);
+                progress$.next(10);
+                expect(await currentReason(coord)).toEqual({ kind: "loading" });
+                expect(await reasonAfterOpen(coord)).toEqual({ kind: "none" });
+                expect(finderCalls()).toBe(1);
+            });
+
+            test("results already on screen stay when a later model load starts", async () => {
+                withStatus("ok", [neighbor(0.9)]);
+                const progress$ = new Subject<number>();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.watch(progress$);
+                await coord.onFileOpen(makeFile("open.md"));
+                gate.begin();
+                progress$.next(50);
+                const view = await firstValueFrom(
+                    coord.getNoteBottomViewModelObservable()
+                );
+                expect(view.similarNoteEntries).toHaveLength(1);
+                expect(view.emptyReason).toBeUndefined();
+            });
         });
     });
 });

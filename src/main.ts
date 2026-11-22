@@ -5,6 +5,8 @@ import { OramaNoteChunkRepository } from "./adapter/orama/OramaNoteChunkReposito
 import { LeafViewCoordinator } from "./application/LeafViewCoordinator";
 import { NoteIndexingService } from "./application/NoteIndexingService";
 import { SettingsService } from "./application/SettingsService";
+import { ModelLoadGate } from "./application/ModelLoadGate";
+import { migrateDataFile } from "./utils/migrateDataFile";
 import { SimilarNoteCoordinator } from "./application/SimilarNoteCoordinator";
 import type { Command } from "./commands";
 import {
@@ -58,6 +60,7 @@ export default class MainPlugin extends Plugin {
     // Set once the sidebar view type is registered (in initializeServices). The
     // ribbon icon is registered earlier in onload, so this guards early clicks.
     private sidebarViewRegistered = false;
+    private modelLoadGate: ModelLoadGate;
 
     async onload() {
         log.setDefaultLevel(log.levels.ERROR);
@@ -107,29 +110,6 @@ export default class MainPlugin extends Plugin {
         }
 
         return pluginDataDir;
-    }
-
-    private async migrateDataFiles(
-        oldPath: string,
-        newPath: string
-    ): Promise<void> {
-        try {
-            if (
-                (await this.app.vault.adapter.exists(oldPath)) &&
-                !(await this.app.vault.adapter.exists(newPath))
-            ) {
-                log.info(`Migrating file from ${oldPath} to ${newPath}`);
-                const data = await this.app.vault.adapter.read(oldPath);
-                await this.app.vault.adapter.write(newPath, data);
-                await this.app.vault.adapter.remove(oldPath);
-                log.info(`Successfully migrated file to plugin folder`);
-            }
-        } catch (error) {
-            log.error(
-                `Failed to migrate file from ${oldPath} to ${newPath}:`,
-                error
-            );
-        }
     }
 
     private registerEvents() {
@@ -256,6 +236,10 @@ export default class MainPlugin extends Plugin {
                 return () => sub.unsubscribe();
             })()
         );
+
+        this.modelLoadGate = new ModelLoadGate(this.similarNoteCoordinator);
+        const progressSub = this.modelLoadGate.watch(this.modelService.getDownloadProgress$());
+        this.register(() => progressSub.unsubscribe());
 
         this.statusBarView = new StatusBarView({
             plugin: this,
@@ -418,10 +402,26 @@ export default class MainPlugin extends Plugin {
         firstTime: boolean,
         newModel: boolean
     ): Promise<void> {
+        try {
+            await this.loadModelAndIndex(firstTime, newModel);
+        } finally {
+            // Search for a note opened meanwhile, also after a failure, so
+            // the panel never stays on the waiting line.
+            this.modelLoadGate.end();
+        }
+    }
+
+    private async loadModelAndIndex(
+        firstTime: boolean,
+        newModel: boolean
+    ): Promise<void> {
         this.noteIndexingService.stopLoop();
 
         try {
             if (firstTime || newModel) {
+                // Notes opened from here on wait for the model instead of
+                // failing against a provider that is not loaded yet.
+                this.modelLoadGate.begin();
                 // Get settings and switch provider
                 const settings = this.settingsService.get();
 
@@ -452,7 +452,7 @@ export default class MainPlugin extends Plugin {
 
         // Migrate existing database from old location to new location
         const oldDbPath = `${this.app.vault.configDir}/${dbFileName}`;
-        await this.migrateDataFiles(oldDbPath, dbPath);
+        await migrateDataFile(this.app.vault.adapter, oldDbPath, dbPath);
 
         if (firstTime) {
             await this.noteChunkRepository.init(
@@ -528,6 +528,7 @@ export default class MainPlugin extends Plugin {
         // Get current settings
         const settings = this.settingsService.get();
 
+        this.modelLoadGate.begin();
         try {
             // Reload the model with current settings
             await this.modelService.switchProvider(settings);
@@ -538,6 +539,7 @@ export default class MainPlugin extends Plugin {
             // Restart the indexing service whether the model load succeeded or failed
             // This ensures the service doesn't remain stopped
             this.noteIndexingService.startLoop();
+            this.modelLoadGate.end();
         }
     }
 }

@@ -21,6 +21,7 @@ while fixed guidance and self-resolving states stay grey.
 | Reason | When | Text |
 |---|---|---|
 | loading | nothing has been searched for this note yet: from the moment the plugin turns on (Obsidian start, plugin enabled or updated) until the first result for the open note arrives. Measured in a running Obsidian with the model already on disk: about 3 seconds in the sidebar | Looking for similar notes… |
+| downloading | the built-in model is being downloaded (first install, or a model picked in settings that is not on disk yet) and the provider reports progress below 100. No search runs. Shown for the note open at startup and for any note opened meanwhile | Downloading the model: 45%. Similar notes will appear when it's ready. (number = the status bar's source, the embedding service's download progress, rounded down the same way) |
 | no-note | there is no note to show results for: no markdown editor is open, or the tab used last in the main area is not a note (canvas, PDF, image). No search runs. In practice only the sidebar shows this, since the footer panel lives under a note | Open a note and similar notes will appear here. |
 | unwritten | the note has no text after exclusion patterns (`SimilarNoteFinder` status `empty-content`) | Write a few lines and similar notes will appear here. |
 | excluded-cloud | excluded note with OpenAI or Gemini, ad-hoc embedding skipped (`ad-hoc-disallowed`, frontmatter-exclusion spec §2.1) | This note is excluded from the index, so it isn't sent to OpenAI. (provider name from the setting: OpenAI or Gemini) |
@@ -28,6 +29,17 @@ while fixed guidance and self-resolving states stay grey.
 | below-threshold | the search returned results but none reach Minimum similarity | No notes above the minimum similarity (0.50). (setting value, two decimals) |
 | indexing | the search ran, returned nothing, and notes other than the open one are queued for indexing | Indexing your vault: 1,240 notes left. Results fill in as notes are indexed. (count = the status bar's "N to index" source, `NoteIndexingService.getNoteChangeCount$`; "1 note left" for one) |
 | none | anything else | No similar notes found. |
+
+Model load: from the moment a model load starts (plugin start, model change,
+GPU reload) until the model and the index are usable, the panel does not
+search. A search then would throw in the provider and show the red
+`embedding-failed` line and a Notice for something that clears by itself. A
+note opened in that window shows `downloading` while progress is below 100 and
+`loading` otherwise (before the first progress report, and for the seconds
+between the end of the download and the model being ready). When the load
+ends the note on screen is searched: results if it worked,
+`embedding-failed` if the load failed, which is then true. Results already on
+screen when a later load starts stay.
 
 Order: `loading` is the panel's state before any result; the first result for
 its note replaces it and it does not come back while the panel stays open
@@ -74,8 +86,7 @@ notes are queued.
 - The semantic-search modal keeps its own "No similar notes found".
 - The OpenAI provider pointed at an OpenAI-compatible server still says
   "OpenAI" (the URL is not inspected, same as frontmatter-exclusion spec §2.1).
-- What the panel shows while the built-in model is still downloading was not
-  observed in a running Obsidian; by code, the panel stays on the `loading`
-  line until the first search returns, and an embedding call before the
-  model is ready fails or waits, which maps to `embedding-failed` or a late
-  result. The status bar reports the download.
+- The `downloading` line was checked with unit tests only, not in a running
+  Obsidian with a model actually downloading (network, one-time). Whether a
+  model already on disk reports progress below 100 for a moment while loading
+  (the status bar would show a percent then too) was not measured.
