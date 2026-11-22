@@ -330,6 +330,9 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
 }) => {
     const [collapsed, setCollapsed] = useState(false);
     const [similarNotes, setSimilarNotes] = useState<SimilarNoteEntry[]>([]);
+    // Other split panes are not searched until selected. Do not promise a
+    // search there until a model addressed to this note actually arrives.
+    const [hasNoteModel, setHasNoteModel] = useState(false);
     // Until the first result for this view's note arrives nothing has been
     // searched, so the empty line says "looking", not "none found".
     const [emptyReason, setEmptyReason] = useState<EmptyReason | undefined>({
@@ -350,6 +353,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                 return;
             }
 
+            setHasNoteModel(true);
             const limit = viewType === "sidebar"
                 ? model.sidebarResultCount
                 : model.bottomResultCount;
@@ -428,7 +432,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                     collapsed={collapsed}
                     onToggleCollapse={toggleCollapse}
                 />
-                {!collapsed && (
+                {!collapsed && (viewType !== "bottom" || hasNoteModel) && (
                     <SearchResultsContainer
                         similarNotes={similarNotes}
                         emptyReason={emptyReason}

@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act } from "react";
 import type { MarkdownView, TFile, Workspace } from "obsidian";
 import { BehaviorSubject } from "rxjs";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -221,6 +222,48 @@ describe("SimilarNotesViewReact", () => {
         });
         expect(await screen.findByText("No similar notes found.")).toBeInTheDocument();
         expect(screen.queryByText("Looking for similar notes…")).not.toBeInTheDocument();
+    });
+
+    test("분할 창의 검색하지 않은 아래 패널은 상태를 꾸며 내지 않는다", () => {
+        const passiveFile = createMockTFile("passive.md");
+        const passiveLeaf = { file: passiveFile } as MarkdownView;
+        const view = render(
+            <NoteBottomViewReact
+                workspace={mockWorkspace as Workspace}
+                leaf={passiveLeaf}
+                bottomViewModelSubject$={bottomViewModelSubject$}
+                vaultName="test-vault"
+                viewType="bottom"
+            />
+        );
+
+        expect(screen.getByText("Similar notes")).toBeInTheDocument();
+        expect(view.container.querySelector(".search-empty-state")).toBeNull();
+        expect(screen.queryByText("Similar Note 1")).not.toBeInTheDocument();
+
+        act(() => {
+            (bottomViewModelSubject$ as BehaviorSubject<unknown>).next({
+                currentFile: passiveFile,
+                similarNoteEntries: [],
+                emptyReason: { kind: "loading" },
+                noteDisplayMode: "title",
+                sidebarResultCount: 10,
+                bottomResultCount: 5,
+            });
+        });
+        expect(screen.getByText("Looking for similar notes…")).toBeInTheDocument();
+
+        act(() => {
+            (bottomViewModelSubject$ as BehaviorSubject<unknown>).next({
+                currentFile: passiveFile,
+                similarNoteEntries: [],
+                emptyReason: { kind: "none" },
+                noteDisplayMode: "title",
+                sidebarResultCount: 10,
+                bottomResultCount: 5,
+            });
+        });
+        expect(screen.getByText("No similar notes found.")).toBeInTheDocument();
     });
 
     test("sidebar with no note to follow drops the results and says to open a note", async () => {

@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **분할 창의 검색하지 않은 노트는 검색 중으로 표시하지 않음**: 시작하거나 플러그인을 다시 켰을 때, 아직 선택하지 않은 노트의 아래 패널은 상태 줄을 비워 둡니다. 해당 노트를 선택해 상태나 결과를 받으면 표시합니다.
 -   **The note already open when Obsidian starts, or when the plugin is updated or turned on, now refreshes its similar notes without opening another note**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
 -   **The panel no longer says "No similar notes found." before it has looked**: for the first few seconds after Obsidian starts or the plugin is turned on or updated, it now says "Looking for similar notes…" until the first results arrive.
 -   **While the built-in model downloads, the panel says so**: on a first install it now shows "Downloading the model: 45%. Similar notes will appear when it's ready." instead of "Looking for similar notes…", and a note opened during the download waits on that line instead of showing "Couldn't analyze this note." in red.

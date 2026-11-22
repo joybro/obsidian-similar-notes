@@ -45,7 +45,13 @@ screen when a later load starts stay. At plugin start the note that is
 already open is put on the waiting line the same way (the views only take
 states addressed to their own note), before the model load begins.
 
-Order: `loading` is the panel's state before any result; the first result for
+분할 창에서 아직 자기 노트의 모델을 받지 않은 아래 패널은 제목만 두고
+상태 줄을 비운다. 활성 노트만 검색하므로 다른 창의 검색을 약속하지 않는다.
+자기 노트의 대기 상태나 결과를 받으면 그때부터 표시한다. 시작 시 열린 창,
+플러그인 재활성화 및 설정으로 다시 만든 패널에 같은 규칙을 적용한다.
+사이드바의 초기 `loading` 표시는 유지하며, 이미 받은 결과는 그대로 둔다.
+
+Order: `loading` is the sidebar's state before any result; the first result for
 its note replaces it and it does not come back while the panel stays open
 (on a note switch the sidebar keeps the previous results until the new ones
 arrive). `no-note` is decided before any note is looked at. Of the rest, the
@@ -98,4 +104,7 @@ notes are queued.
   the panel went through "Looking for similar notes…" to the search result.
   With the model on disk, three starts showed no `downloading` state (the
   read reported progress for about 0.6 s). Not observed: a first install
-  with an empty index, mobile, and a download that fails midway.
+  with an empty index and a download that fails midway.
+- 모바일 흉내에서는 아래 패널에 모델 내려받기 진행률 4%와 7%가 표시되는
+  것을 확인했다. 사이드바 패널과 실제 휴대전화는 확인하지 못했으며,
+  앱이 종료되어 검색 결과가 표시될 때까지 이어지는 동작도 확인하지 못했다.
