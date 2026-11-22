@@ -36,6 +36,8 @@ Update the `version` field in:
 - `package.json`
 - `manifest.json` (if exists, e.g., Obsidian plugins)
 
+**If `minAppVersion` changes in this release**, also add or update `versions.json` at the repository root on the default branch, in the same commit that moves `manifest.json`: a JSON object mapping each plugin version to its `minAppVersion` (for example `{"1.7.0": "1.8.9", "1.8.0": "1.11.0"}`). Obsidian reads it from the repository root to offer the newest compatible version to users on an older app; without it they get no fallback. Only releases that change `minAppVersion` need an entry. After pushing, check that `git show origin/<default branch>:versions.json` prints the file.
+
 ### 2. Analyze Changes Since Last Release
 
 Find the latest stable release tag (excludes beta/rc tags):
