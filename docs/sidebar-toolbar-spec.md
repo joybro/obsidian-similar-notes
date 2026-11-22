@@ -32,6 +32,9 @@ under a note gets no toolbar.
   (Alt+Enter) in that modal goes into the most recently used editor in the
   main area, at its cursor, just as when the modal is opened by the command
   from that editor. With no markdown editor there it shows the same notice.
+- The same rule decides which note the sidebar follows while it has focus:
+  results keep refreshing for the note in the most recently used main-area
+  editor instead of being dropped until you click back into the note.
 
 ### Expand mode
 
