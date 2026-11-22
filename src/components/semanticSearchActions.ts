@@ -56,12 +56,27 @@ export function resolveWikilink(
 }
 
 /**
- * Insert a wiki-link to the given note path at the active editor's cursor,
- * followed by a single space so successive inserts are space-separated.
- * Returns false (caller surfaces a Notice) when there is no active editor.
+ * The editor a link should go into: the active markdown view, or else the most
+ * recently used leaf in the main area when that is a markdown view. The fallback
+ * matters when the search modal was opened from a sidebar button: clicking it
+ * makes the sidebar leaf active, while the note the user was writing in stays
+ * open (with its cursor) in the main area.
+ */
+function targetMarkdownView(app: App): MarkdownView | null {
+    const active = app.workspace.getActiveViewOfType(MarkdownView);
+    if (active) return active;
+    const recent = app.workspace.getMostRecentLeaf()?.view;
+    return recent instanceof MarkdownView ? recent : null;
+}
+
+/**
+ * Insert a wiki-link to the given note path at the target editor's cursor
+ * (see targetMarkdownView), followed by a single space so successive inserts
+ * are space-separated. Returns false (caller surfaces a Notice) when there is
+ * no markdown editor to insert into.
  */
 export function insertLinkForNote(app: App, notePath: string): boolean {
-    const view = app.workspace.getActiveViewOfType(MarkdownView);
+    const view = targetMarkdownView(app);
     if (!view?.editor) return false;
 
     const sourcePath = view.file?.path ?? "";

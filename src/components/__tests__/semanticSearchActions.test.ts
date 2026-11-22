@@ -100,9 +100,12 @@ describe("createNoteFromQuery (spec item 2)", () => {
     });
 });
 
-function makeEditorApp(view: unknown) {
+function makeEditorApp(view: unknown, recentLeaf: unknown = null) {
     return {
-        workspace: { getActiveViewOfType: vi.fn(() => view) },
+        workspace: {
+            getActiveViewOfType: vi.fn(() => view),
+            getMostRecentLeaf: vi.fn(() => recentLeaf),
+        },
         vault: { getAbstractFileByPath: vi.fn((p: string) => new TFile(p)) },
         metadataCache: { fileToLinktext: vi.fn(() => "Target") },
     } as never;
@@ -121,6 +124,25 @@ describe("insertLinkForNote (spec item 3)", () => {
 
     it("returns false when there is no active markdown editor", () => {
         const app = makeEditorApp(null);
+        expect(insertLinkForNote(app, "Target.md")).toBe(false);
+    });
+
+    it("falls back to the most recent main-area editor when a sidebar view is active", () => {
+        // Clicking the sidebar's Semantic search button makes the sidebar leaf active,
+        // so getActiveViewOfType(MarkdownView) is null while the note editor still exists.
+        const replaceSelection = vi.fn();
+        const recent = Object.assign(new MarkdownView(), {
+            editor: { replaceSelection },
+            file: { path: "src.md" },
+        });
+        const app = makeEditorApp(null, { view: recent });
+
+        expect(insertLinkForNote(app, "Target.md")).toBe(true);
+        expect(replaceSelection).toHaveBeenCalledWith("[[Target]] ");
+    });
+
+    it("returns false when the most recent main-area leaf is not a markdown editor", () => {
+        const app = makeEditorApp(null, { view: { editor: { replaceSelection: vi.fn() } } });
         expect(insertLinkForNote(app, "Target.md")).toBe(false);
     });
 });

@@ -28,6 +28,10 @@ under a note gets no toolbar.
   (`body.is-mobile`) each has at least a 44px tap target.
 - Closing the search modal without opening a note (Esc, click outside) returns
   focus to the search button. Opening or creating a note leaves focus there.
+- Clicking the button makes the sidebar the active leaf, so "insert as link"
+  (Alt+Enter) in that modal goes into the most recently used editor in the
+  main area, at its cursor, just as when the modal is opened by the command
+  from that editor. With no markdown editor there it shows the same notice.
 
 ### Expand mode
 
