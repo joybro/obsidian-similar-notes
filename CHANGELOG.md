@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 -   **The note already open when Obsidian starts, or when the plugin is updated or turned on, now refreshes its similar notes without opening another note**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
 -   **The panel no longer says "No similar notes found." before it has looked**: for the first few seconds after Obsidian starts or the plugin is turned on or updated, it now says "Looking for similar notes…" until the first results arrive.
 -   **While the built-in model downloads, the panel says so**: on a first install it now shows "Downloading the model: 45%. Similar notes will appear when it's ready." instead of "Looking for similar notes…", and a note opened during the download waits on that line instead of showing "Couldn't analyze this note." in red.
+-   **The status bar no longer flashes a download percent at every start**: reading a model that is already on disk was shown as a download for a moment. A percent now appears only for a real download.
 -   **The sidebar no longer says "No similar notes found." when there is no note to compare**: with every note closed, or with a canvas, PDF or image as the tab you used last, it now says "Open a note and similar notes will appear here."
 
 ### Changed

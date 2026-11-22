@@ -942,6 +942,32 @@ describe("SimilarNoteCoordinator", () => {
                 expect(seen).not.toContain("downloading");
             });
 
+            test("the status bar's percent is below 100 only while the panel says downloading", () => {
+                const progress$ = new Subject<number>();
+                const gate = new ModelLoadGate(make());
+                gate.watch(progress$);
+                const shown: number[] = [];
+                gate.getShownDownloadProgress$().subscribe((p) => shown.push(p));
+                // A model read from disk: nothing below 100 is shown.
+                gate.begin();
+                for (const percent of [0, 50, 100]) {
+                    progress$.next(percent);
+                }
+                gate.end();
+                expect(shown.every((p) => p === 100)).toBe(true);
+                // A real download: the percent shows after the grace period.
+                shown.length = 0;
+                gate.begin();
+                progress$.next(10);
+                expect(shown.every((p) => p === 100)).toBe(true);
+                pastGrace();
+                expect(shown[shown.length - 1]).toBe(10);
+                progress$.next(42.5);
+                expect(shown[shown.length - 1]).toBe(42.5);
+                gate.end();
+                expect(shown[shown.length - 1]).toBe(100);
+            });
+
             test("when the model is ready the note opened meanwhile is searched", async () => {
                 withStatus("ok", [neighbor(0.9)]);
                 const progress$ = new Subject<number>();

@@ -1,5 +1,5 @@
 import type { EmptyReason } from "@/components/emptyStateText";
-import type { Observable, Subscription } from "rxjs";
+import { Subject, type Observable, type Subscription } from "rxjs";
 
 /** The part of the panel coordinator the gate drives. */
 export interface WaitingPanel {
@@ -25,6 +25,7 @@ export class ModelLoadGate {
     // True once progress has stayed below 100 for the grace period.
     private downloadShown = false;
     private graceTimer: number | null = null;
+    private readonly shownProgress$ = new Subject<number>();
 
     constructor(
         private readonly panel: WaitingPanel,
@@ -35,7 +36,7 @@ export class ModelLoadGate {
     begin(): void {
         this.reset();
         this.loading = true;
-        this.panel.setWaiting(this.reason());
+        this.publish();
     }
 
     /** The load finished or failed; the panel searches again. */
@@ -44,6 +45,7 @@ export class ModelLoadGate {
             return;
         }
         this.reset();
+        this.shownProgress$.next(100);
         this.panel.setWaiting(null);
     }
 
@@ -58,11 +60,28 @@ export class ModelLoadGate {
                 this.graceTimer = window.setTimeout(() => {
                     this.graceTimer = null;
                     this.downloadShown = true;
-                    this.panel.setWaiting(this.reason());
+                    this.publish();
                 }, this.graceMs);
             }
-            this.panel.setWaiting(this.reason());
+            this.publish();
         });
+    }
+
+    /**
+     * The download percent as shown to the user: below 100 only while the
+     * panel says "downloading", 100 otherwise. The status bar reads this, so
+     * it shows a percent exactly when the panel does, with the same number.
+     */
+    getShownDownloadProgress$(): Observable<number> {
+        return this.shownProgress$.asObservable();
+    }
+
+    private publish(): void {
+        const reason = this.reason();
+        this.shownProgress$.next(
+            reason.kind === "downloading" ? reason.percent : 100
+        );
+        this.panel.setWaiting(reason);
     }
 
     private reset(): void {

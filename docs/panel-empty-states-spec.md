@@ -38,7 +38,9 @@ note opened in that window shows `downloading` once progress has stayed below 10
 period and `loading` otherwise (before that, and for the seconds between the
 end of the download and the model being ready). When the load
 ends the note on screen is searched: results if it worked,
-`embedding-failed` if the load failed, which is then true. Results already on
+`embedding-failed` if the load failed, which is then true. The status bar takes its
+download percent from the same gate, so it shows a percent exactly when the
+panel says `downloading`, with the same number. Results already on
 screen when a later load starts stay. At plugin start the note that is
 already open is put on the waiting line the same way (the views only take
 states addressed to their own note), before the model load begins.
