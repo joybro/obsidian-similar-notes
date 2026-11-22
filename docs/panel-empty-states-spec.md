@@ -21,7 +21,7 @@ while fixed guidance and self-resolving states stay grey.
 | Reason | When | Text |
 |---|---|---|
 | loading | nothing has been searched for this note yet: from the moment the plugin turns on (Obsidian start, plugin enabled or updated) until the first result for the open note arrives. Measured in a running Obsidian with the model already on disk: about 3 seconds in the sidebar | Looking for similar notes… |
-| downloading | the built-in model is being downloaded (first install, or a model picked in settings that is not on disk yet) and the provider reports progress below 100. No search runs. Shown for the note open at startup and for any note opened meanwhile | Downloading the model: 45%. Similar notes will appear when it's ready. (number = the status bar's source, the embedding service's download progress, rounded down the same way) |
+| downloading | the built-in model is being downloaded (first install, or a model picked in settings that is not on disk yet) and the provider has reported progress below 100 for more than 2 seconds (`DOWNLOAD_GRACE_MS`; a model already on disk also reports 0 to 100 while it is read, about 0.3 s on desktop, and must not be called a download). No search runs. Shown for the note open at startup and for any note opened meanwhile | Downloading the model: 45%. Similar notes will appear when it's ready. (number = the status bar's source, the embedding service's download progress, rounded down the same way) |
 | no-note | there is no note to show results for: no markdown editor is open, or the tab used last in the main area is not a note (canvas, PDF, image). No search runs. In practice only the sidebar shows this, since the footer panel lives under a note | Open a note and similar notes will appear here. |
 | unwritten | the note has no text after exclusion patterns (`SimilarNoteFinder` status `empty-content`) | Write a few lines and similar notes will appear here. |
 | excluded-cloud | excluded note with OpenAI or Gemini, ad-hoc embedding skipped (`ad-hoc-disallowed`, frontmatter-exclusion spec §2.1) | This note is excluded from the index, so it isn't sent to OpenAI. (provider name from the setting: OpenAI or Gemini) |
@@ -34,9 +34,9 @@ Model load: from the moment a model load starts (plugin start, model change,
 GPU reload) until the model and the index are usable, the panel does not
 search. A search then would throw in the provider and show the red
 `embedding-failed` line and a Notice for something that clears by itself. A
-note opened in that window shows `downloading` while progress is below 100 and
-`loading` otherwise (before the first progress report, and for the seconds
-between the end of the download and the model being ready). When the load
+note opened in that window shows `downloading` once progress has stayed below 100 past the grace
+period and `loading` otherwise (before that, and for the seconds between the
+end of the download and the model being ready). When the load
 ends the note on screen is searched: results if it worked,
 `embedding-failed` if the load failed, which is then true. Results already on
 screen when a later load starts stay. At plugin start the note that is

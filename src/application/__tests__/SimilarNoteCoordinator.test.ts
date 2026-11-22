@@ -4,7 +4,7 @@ import type { TFile, Vault } from "obsidian";
 import { BehaviorSubject, Subject, firstValueFrom } from "rxjs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { emptyStateText } from "@/components/emptyStateText";
-import { ModelLoadGate } from "../ModelLoadGate";
+import { DOWNLOAD_GRACE_MS, ModelLoadGate } from "../ModelLoadGate";
 import { SimilarNoteCoordinator } from "../SimilarNoteCoordinator";
 import type {
     SettingsService,
@@ -828,6 +828,16 @@ describe("SimilarNoteCoordinator", () => {
         });
 
         describe("while the model is downloading or loading", () => {
+            beforeEach(() => {
+                vi.useFakeTimers();
+            });
+            afterEach(() => {
+                vi.useRealTimers();
+            });
+            // Past the grace period that keeps a model read from disk from
+            // being called a download.
+            const pastGrace = () => vi.advanceTimersByTime(DOWNLOAD_GRACE_MS);
+
             const currentReason = async (coord: SimilarNoteCoordinator) =>
                 (await firstValueFrom(coord.getNoteBottomViewModelObservable()))
                     .emptyReason;
@@ -851,6 +861,8 @@ describe("SimilarNoteCoordinator", () => {
                 gate.begin();
                 expect(await currentReason(coord)).toEqual({ kind: "loading" });
                 progress$.next(45.7);
+                expect(await currentReason(coord)).toEqual({ kind: "loading" });
+                pastGrace();
                 expect(await currentReason(coord)).toEqual({
                     kind: "downloading",
                     percent: 45.7,
@@ -868,6 +880,7 @@ describe("SimilarNoteCoordinator", () => {
                 gate.watch(progress$);
                 gate.begin();
                 progress$.next(12);
+                pastGrace();
                 expect(await reasonAfterOpen(coord, "other.md")).toEqual({
                     kind: "downloading",
                     percent: 12,
@@ -891,6 +904,7 @@ describe("SimilarNoteCoordinator", () => {
                 gate.watch(progress$);
                 gate.begin();
                 progress$.next(99);
+                pastGrace();
                 progress$.next(100);
                 expect(await reasonAfterOpen(coord)).toEqual({ kind: "loading" });
                 expect(finderCalls()).toBe(0);
@@ -903,6 +917,29 @@ describe("SimilarNoteCoordinator", () => {
                 gate.begin();
                 expect(await reasonAfterOpen(coord)).toEqual({ kind: "loading" });
                 expect(finderCalls()).toBe(0);
+            });
+
+            test("a model read from disk (0 to 100 within the grace period) never shows the download line", async () => {
+                const progress$ = new Subject<number>();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.watch(progress$);
+                gate.begin();
+                const seen: (string | undefined)[] = [];
+                coord
+                    .getNoteBottomViewModelObservable()
+                    .subscribe((view) => seen.push(view.emptyReason?.kind));
+                await coord.onFileOpen(makeFile("open.md"));
+                for (const percent of [0, 20, 60, 99, 100]) {
+                    progress$.next(percent);
+                    vi.advanceTimersByTime(60);
+                }
+                pastGrace();
+                gate.end();
+                expect(seen).not.toContain("downloading");
+                // The grace timer of a finished load does not fire into the next state.
+                pastGrace();
+                expect(seen).not.toContain("downloading");
             });
 
             test("when the model is ready the note opened meanwhile is searched", async () => {
