@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
-import { MarkdownView, TFile } from "obsidian";
+import { TFile } from "obsidian";
 import { logRejection } from "@/utils/logRejection";
+import { getTargetMarkdownView } from "@/utils/viewUtils";
 
 // Characters illegal in OS file names plus Obsidian link-sensitive characters.
 const ILLEGAL_FILENAME_CHARS = /[\\/:*?"<>|#^[\]]/g;
@@ -56,12 +57,13 @@ export function resolveWikilink(
 }
 
 /**
- * Insert a wiki-link to the given note path at the active editor's cursor,
- * followed by a single space so successive inserts are space-separated.
- * Returns false (caller surfaces a Notice) when there is no active editor.
+ * Insert a wiki-link to the given note path at the target editor's cursor
+ * (see getTargetMarkdownView), followed by a single space so successive inserts
+ * are space-separated. Returns false (caller surfaces a Notice) when there is
+ * no markdown editor to insert into.
  */
 export function insertLinkForNote(app: App, notePath: string): boolean {
-    const view = app.workspace.getActiveViewOfType(MarkdownView);
+    const view = getTargetMarkdownView(app);
     if (!view?.editor) return false;
 
     const sourcePath = view.file?.path ?? "";
