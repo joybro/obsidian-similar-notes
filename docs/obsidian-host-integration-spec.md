@@ -49,9 +49,12 @@ notes, while the handlers still had nothing to call. Without a catch-up, the
 note open at startup showed no bottom panel and the sidebar said "No similar
 notes found." until the user switched notes, on desktop and mobile alike.
 
-When initialization finishes, the plugin therefore attaches a bottom view to
-every open markdown leaf that does not have one yet, and emits results for
-the active file, as if it had just been opened. Leaves that gained a view
+As soon as the services exist, before the model is loaded, the plugin
+therefore attaches a bottom view to every open markdown leaf that does not
+have one yet and handles the active file as if it had just been opened. The
+model is not usable yet, so the panel waits on the "looking" or "downloading"
+line (panel-empty-states spec, "Model load") and the search for the active
+file runs when the model and the index are ready. Leaves that gained a view
 from an event during initialization keep it (no duplicate panel).
 
 ## 5. Verification

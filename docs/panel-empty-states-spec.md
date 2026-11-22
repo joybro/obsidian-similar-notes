@@ -39,7 +39,9 @@ note opened in that window shows `downloading` while progress is below 100 and
 between the end of the download and the model being ready). When the load
 ends the note on screen is searched: results if it worked,
 `embedding-failed` if the load failed, which is then true. Results already on
-screen when a later load starts stay.
+screen when a later load starts stay. At plugin start the note that is
+already open is put on the waiting line the same way (the views only take
+states addressed to their own note), before the model load begins.
 
 Order: `loading` is the panel's state before any result; the first result for
 its note replaces it and it does not come back while the panel stays open
