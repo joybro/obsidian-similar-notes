@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **업데이트 뒤 제목 색인 중 진행 팝업이 연달아 뜨지 않음**: 기존 노트의 제목만 채우는 동안은 상태줄에 대기 수를 표시하고, 100개마다 뜨던 팝업은 생략합니다. 일반 색인의 진행 알림은 유지합니다.
+
 -   **Quick renames no longer leave the old note in the search index**: when a rename is still waiting in the indexing queue, renaming the note again, editing it or deleting it now cleans up the original path too. Consecutive renames that have not started indexing reuse the existing body embeddings and update only the final title. Renaming again while retrying a failed title update also removes the intermediate path. A pending edit timer can no longer overwrite a newer rename.
 -   **The status bar's Indexed count no longer includes excluded notes**: the total in "Indexed: X/Y notes" now leaves out notes your exclusion rules match, so it reaches Y once indexing finishes and matches the Indexed line in settings.
 -   **Token usage "Today" follows your local day**: the usage counter for OpenAI and Gemini now starts a new day at your local midnight instead of midnight UTC.

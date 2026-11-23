@@ -115,6 +115,12 @@ change queue with reason `title-backfill`, which embeds only the title. The
 status bar counts them like other queued notes. Full reindex also produces
 them.
 
+제목 백필은 상태줄의 대기 수에는 포함하지만, 100개 단위 진행 팝업의
+계산에서는 제외한다. 백필과 일반 변경이 섞이면 팝업은 백필을 제외한
+대기 수만 사용한다. 일반 색인의 기존 임계값과 오류 알림은 유지한다.
+백필 수천 건이 빨리 끝날 때 진행 팝업이 연달아 쌓이는 것을 막기 위한
+규칙이며, 별도 설정이나 저장 형식 변경은 없다.
+
 The list comes from the Orama worker, which records while loading chunks from
 IndexedDB which paths have body rows and which have a title row
 (`getPathsWithoutTitleChunk`, a snapshot of load time). Processing a

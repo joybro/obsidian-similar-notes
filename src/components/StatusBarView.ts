@@ -12,6 +12,7 @@ export interface StatusBarViewConfig {
     plugin: Plugin;
     app: App;
     noteChangeCount$: Observable<number>;
+    getNotifiableChangeCount: () => number;
     downloadProgress$: Observable<number>;
     modelError$: Observable<string | null>;
     indexedNotesMTimeStore: IndexedNoteMTimeStore;
@@ -80,16 +81,17 @@ export class StatusBarView {
             this.config.noteChangeCount$.subscribe((count) => {
                 this.noteChangeCount = count;
 
+                const noticeCount = this.config.getNotifiableChangeCount();
                 // Show notice when crossing 100-note thresholds
-                if (count > 10) {
+                if (noticeCount > 10) {
                     const currentThreshold =
-                        Math.floor((count - 1) / 100) * 100 + 100;
+                        Math.floor((noticeCount - 1) / 100) * 100 + 100;
                     if (
                         this.lastNotifiedThreshold !== null &&
                         currentThreshold < this.lastNotifiedThreshold
                     ) {
                         new Notice(
-                            `Similar Notes: ${count} notes remaining to index`
+                            `Similar Notes: ${noticeCount} notes remaining to index`
                         );
                     }
                     this.lastNotifiedThreshold = currentThreshold;

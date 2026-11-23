@@ -388,6 +388,10 @@ export class NoteChangeQueue {
         return this.queue.length;
     }
 
+    getNotifiableChangeCount(): number {
+        return this.queue.filter((change) => change.reason !== "title-backfill").length;
+    }
+
     /** Number of queued changes for one path (part of getFileChangeCount). */
     getQueuedCountFor(path: string): number {
         return this.queue.filter((change) => change.path === path).length;

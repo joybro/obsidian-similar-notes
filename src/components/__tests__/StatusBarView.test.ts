@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BehaviorSubject } from "rxjs";
 
 // Shared sink so tests can inspect the titles rendered into the status-bar menu.
-const { capturedTitles } = vi.hoisted(() => ({
+const { capturedTitles, capturedNotices } = vi.hoisted(() => ({
     capturedTitles: [] as string[],
+    capturedNotices: [] as string[],
 }));
 
 // StatusBarView pulls Menu/Notice/setIcon/setTooltip from obsidian. Provide just
@@ -36,7 +37,9 @@ vi.mock("obsidian", () => ({
             return this;
         }
     },
-    Notice: class {},
+    Notice: class {
+        constructor(message: string) { capturedNotices.push(message); }
+    },
     setIcon: vi.fn(),
     setTooltip: vi.fn(),
 }));
@@ -66,6 +69,7 @@ function createConfig() {
         plugin: { addStatusBarItem: () => statusBarItem },
         app: { vault: { getMarkdownFiles: () => [] } },
         noteChangeCount$,
+        getNotifiableChangeCount: () => noteChangeCount$.value,
         downloadProgress$,
         modelError$,
         indexedNotesMTimeStore: {
@@ -268,5 +272,65 @@ describe("StatusBarView indexed count leaves out excluded notes", () => {
         });
 
         view.dispose();
+    });
+});
+
+
+describe("제목 백필과 일반 색인의 진행 알림", () => {
+    async function drain(titleCount: number, bodyCount: number) {
+        const { NoteChangeQueue } = await import("@/infrastructure/noteChangeQueue");
+        const { NoteIndexingLoop } = await import("@/application/NoteIndexingLoop");
+        const queue = new NoteChangeQueue(
+            {} as never, {} as never, {} as never, {} as never, {} as never
+        );
+        queue.enqueue([
+            ...Array.from({ length: titleCount }, (_, i) => ({
+                path: `title-${i}.md`, reason: "title-backfill" as const,
+            })),
+            ...Array.from({ length: bodyCount }, (_, i) => ({
+                path: `body-${i}.md`, reason: "modified" as const,
+            })),
+        ]);
+        const { config, noteChangeCount$, statusBarItem } = createConfig();
+        config.getNotifiableChangeCount = () => queue.getNotifiableChangeCount();
+        noteChangeCount$.next(queue.getFileChangeCount());
+        capturedNotices.length = 0;
+        const view = new StatusBarView(config);
+        const processed: string[] = [];
+        const loop = new NoteIndexingLoop(queue, async (change) => {
+            processed.push(change.path);
+        }, () => true, (count) => noteChangeCount$.next(count));
+        try {
+            expect(statusBarItem.createSpan).toHaveBeenCalledWith({
+                text: ` ${titleCount + bodyCount} to index`,
+            });
+            loop.start();
+            await vi.waitFor(() => expect(noteChangeCount$.value).toBe(0));
+            expect(processed).toHaveLength(titleCount + bodyCount);
+            return [...capturedNotices];
+        } finally {
+            loop.stop();
+            view.dispose();
+        }
+    }
+
+    it("제목만 3200건이면 상태 표시를 유지하고 팝업은 띄우지 않는다", async () => {
+        expect(await drain(3200, 0)).toEqual([]);
+    });
+
+    it("본문 350건은 기존 100개 단위 알림을 유지한다", async () => {
+        expect(await drain(0, 350)).toEqual([
+            "Similar Notes: 300 notes remaining to index",
+            "Similar Notes: 200 notes remaining to index",
+            "Similar Notes: 100 notes remaining to index",
+        ]);
+    });
+
+    it("백필 3200건과 본문 350건이 섞여도 본문 수만 알린다", async () => {
+        expect(await drain(3200, 350)).toEqual([
+            "Similar Notes: 300 notes remaining to index",
+            "Similar Notes: 200 notes remaining to index",
+            "Similar Notes: 100 notes remaining to index",
+        ]);
     });
 });

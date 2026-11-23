@@ -245,6 +245,7 @@ export default class MainPlugin extends Plugin {
             plugin: this,
             app: this.app,
             noteChangeCount$: this.noteIndexingService.getNoteChangeCount$(),
+            getNotifiableChangeCount: () => this.noteChangeQueue.getNotifiableChangeCount(),
             // Filtered by the gate: reading a model from disk also reports
             // progress and must not show as a download.
             downloadProgress$: this.modelLoadGate.getShownDownloadProgress$(),
