@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
--   **분할 창의 검색하지 않은 노트는 검색 중으로 표시하지 않음**: 시작하거나 플러그인을 다시 켰을 때, 아직 선택하지 않은 노트의 아래 패널은 상태 줄을 비워 둡니다. 해당 노트를 선택해 상태나 결과를 받으면 표시합니다.
+-   **Notes in a split pane that you haven't selected no longer say they are looking for similar notes**: when Obsidian starts or the plugin is turned back on, the bottom panel of a note you haven't selected yet leaves its status line empty. It shows a status or results once you select that note.
 -   **The note already open when Obsidian starts, or when the plugin is updated or turned on, now refreshes its similar notes without opening another note**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
 -   **The panel no longer says "No similar notes found." before it has looked**: for the first few seconds after Obsidian starts or the plugin is turned on or updated, it now says "Looking for similar notes…" until the first results arrive.
 -   **While the built-in model downloads, the panel says so**: on a first install it now shows "Downloading the model: 45%. Similar notes will appear when it's ready." instead of "Looking for similar notes…", and a note opened during the download waits on that line instead of showing "Couldn't analyze this note." in red. If the model fails to load, the panel shows "Couldn't analyze this note. Check the model in Settings, then reopen the note." instead of staying on "Looking for similar notes…".
@@ -30,7 +30,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
--   **업데이트 뒤 제목 색인 중 진행 팝업이 연달아 뜨지 않음**: 기존 노트의 제목만 채우는 동안은 상태줄에 대기 수를 표시하고, 100개마다 뜨던 팝업은 생략합니다. 일반 색인의 진행 알림은 유지합니다.
+-   **Indexing note titles after an update no longer shows a progress pop-up again and again**: while only the titles of existing notes are being filled in, the status bar shows how many are left and the pop-up that appeared every 100 notes is skipped. Progress notices for regular indexing are unchanged.
 
 -   **Quick renames no longer leave the old note in the search index**: when a rename is still waiting in the indexing queue, renaming the note again, editing it or deleting it now cleans up the original path too. Consecutive renames that have not started indexing reuse the existing body embeddings and update only the final title. Renaming again while retrying a failed title update also removes the intermediate path. A pending edit timer can no longer overwrite a newer rename.
 -   **The status bar's Indexed count no longer includes excluded notes**: the total in "Indexed: X/Y notes" now leaves out notes your exclusion rules match, so it reaches Y once indexing finishes and matches the Indexed line in settings.
