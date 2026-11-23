@@ -280,6 +280,16 @@ export class SimilarNotesSettingTab extends PluginSettingTab {
                             });
                     });
             },
+            (setting: Setting) => {
+                setting
+                    .setName("Show link button on results")
+                    .setDesc("Show a Link button on each unlinked result. Clicking it adds a link to that note at the end of the current note.")
+                    .addToggle((toggle) => {
+                        toggle.setValue(settings.showLinkButton).onChange((value) => {
+                            logRejection(this.settingsService.update({ showLinkButton: value }), "save setting");
+                        });
+                    });
+            },
             // Sidebar result count
             (setting: Setting) => {
                 setting

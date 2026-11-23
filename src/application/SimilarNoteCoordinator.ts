@@ -31,6 +31,7 @@ export class SimilarNoteCoordinator {
     private noteBottomViewModel$ = new BehaviorSubject<NoteBottomViewModel>({
         currentFile: null,
         similarNoteEntries: [],
+        showLinkButton: false,
         // Before the first file-open is handled nothing has been searched.
         emptyReason: { kind: "loading" },
         noteDisplayMode: "title", // Will be properly initialized in constructor
@@ -94,10 +95,11 @@ export class SimilarNoteCoordinator {
             });
     }
 
-    // The three display settings every view model carries.
+    // The display settings every view model carries.
     private displaySettings() {
         const s = this.settingsService.get();
         return {
+            showLinkButton: s.showLinkButton,
             noteDisplayMode: s.noteDisplayMode,
             sidebarResultCount: s.sidebarResultCount,
             bottomResultCount: s.bottomResultCount,

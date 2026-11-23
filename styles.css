@@ -467,6 +467,36 @@ select option:disabled {
     white-space: nowrap;
 }
 
+.similar-notes-result-actions {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.similar-notes-add-link {
+    margin-right: var(--size-4-2);
+    padding: 2px 6px;
+    height: auto;
+    font-size: var(--font-ui-smaller);
+}
+
+/* With the Link button turned on, every mobile result row is at least 44px
+   tall (the touch minimum) and the button is exactly that tall, so rows with
+   and without the button share one height and the button's tap area stays
+   inside its own row. Rows keep Obsidian's height when the setting is off. */
+.is-mobile .similar-notes-pane.has-link-button .search-result-file-title {
+    min-height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.is-mobile .similar-notes-add-link {
+    min-width: 44px;
+    min-height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
 /* Mobile-only caution shown in the Built-in model settings: on-device models can
    exhaust a phone's memory and crash Obsidian. Accent it so it reads as a warning,
    not a neutral settings row. */

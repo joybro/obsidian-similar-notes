@@ -3,6 +3,7 @@ import type { HoverParent, MarkdownView, TFile, Workspace } from "obsidian";
 import { Menu } from "obsidian";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Observable } from "rxjs";
+import { AddLinkButton, useAddNoteLink } from "./noteLinkAction";
 import { triggerHoverLink } from "./hoverLinkPreview";
 import {
     type SavedExpandMode,
@@ -11,6 +12,7 @@ import {
 } from "./SidebarToolbar";
 import { logRejection } from "@/utils/logRejection";
 import { type EmptyReason, emptyStateText, isFailureReason } from "./emptyStateText";
+import { SimilarNotesHeader } from "./SimilarNotesHeader";
 
 export { type EmptyReason, emptyStateText };
 
@@ -26,16 +28,13 @@ export interface SimilarNoteEntry {
 export interface NoteBottomViewModel {
     currentFile: TFile | null;
     similarNoteEntries: SimilarNoteEntry[];
+    showLinkButton: boolean;
     emptyReason?: EmptyReason;
     noteDisplayMode: "title" | "path" | "smart";
     sidebarResultCount: number;
     bottomResultCount: number;
 }
 
-interface SimilarNotesHeaderProps {
-    collapsed: boolean;
-    onToggleCollapse: () => void;
-}
 
 export type ViewType = "sidebar" | "bottom";
 
@@ -54,34 +53,6 @@ interface NoteBottomViewProps {
     savedExpandMode?: SavedExpandMode;
 }
 
-// Header Component
-const SimilarNotesHeader: React.FC<SimilarNotesHeaderProps> = ({
-    collapsed,
-    onToggleCollapse,
-}) => {
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-            onToggleCollapse();
-            e.preventDefault();
-        }
-    };
-
-    return (
-        <div
-            className="tree-item-self is-clickable"
-            onClick={onToggleCollapse}
-            onKeyDown={handleKeyDown}
-        >
-            <div
-                className={`similar-notes-title tree-item-itself is-clickable ${
-                    collapsed ? "is-collapsed" : ""
-                }`}
-            >
-                <div className="tree-item-inner">Similar notes</div>
-            </div>
-        </div>
-    );
-};
 
 const SearchResultPreview = ({
     preview,
@@ -117,6 +88,7 @@ const SearchResult = ({
     onNoteClick,
     onNoteHover,
     onContextMenu,
+    onAddLink,
     noteDisplayMode,
     allSimilarNotes,
     isCollapsed,
@@ -126,6 +98,8 @@ const SearchResult = ({
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
     onNoteHover: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
+    /** Present only when the Link button setting is on. */
+    onAddLink?: (file: TFile) => void;
     noteDisplayMode: "title" | "path" | "smart";
     allSimilarNotes: SimilarNoteEntry[];
     isCollapsed: boolean;
@@ -243,7 +217,10 @@ const SearchResult = ({
                         allSimilarNotes.map((entry) => entry.file)
                     )}
                 </div>
-                <div className="tree-item-flair-outer">
+                <div className={`tree-item-flair-outer${onAddLink && !note.isLinked ? " similar-notes-result-actions" : ""}`}>
+                    {onAddLink && !note.isLinked && (
+                        <AddLinkButton title={note.title} onClick={() => onAddLink(note.file)} />
+                    )}
                     <div className="tree-item-flair">
                         {note.similarity.toFixed(2)}
                     </div>
@@ -266,6 +243,7 @@ const SearchResultsContainer = ({
     onNoteClick,
     onNoteHover,
     onContextMenu,
+    onAddLink,
     noteDisplayMode,
     isRowCollapsed,
     onToggleRow,
@@ -275,6 +253,8 @@ const SearchResultsContainer = ({
     onNoteClick: (e: React.MouseEvent, file: TFile) => void;
     onNoteHover: (e: React.MouseEvent, file: TFile) => void;
     onContextMenu: (e: React.MouseEvent, file: TFile) => void;
+    /** Present only when the Link button setting is on. */
+    onAddLink?: (file: TFile) => void;
     noteDisplayMode: "title" | "path" | "smart";
     isRowCollapsed: (path: string) => boolean;
     onToggleRow: (path: string) => void;
@@ -307,6 +287,7 @@ const SearchResultsContainer = ({
                         onNoteClick={onNoteClick}
                         onNoteHover={onNoteHover}
                         onContextMenu={onContextMenu}
+                        onAddLink={onAddLink}
                         noteDisplayMode={noteDisplayMode}
                         allSimilarNotes={similarNotes}
                         isCollapsed={isRowCollapsed(note.file.path)}
@@ -338,6 +319,8 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
     const [emptyReason, setEmptyReason] = useState<EmptyReason | undefined>({
         kind: "loading",
     });
+    const [sourceFile, setSourceFile] = useState<TFile | null>(null);
+    const [showLinkButton, setShowLinkButton] = useState(false);
     const [noteDisplayMode, setNoteDisplayMode] = useState<
         "title" | "path" | "smart"
     >("title");
@@ -357,6 +340,8 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
             const limit = viewType === "sidebar"
                 ? model.sidebarResultCount
                 : model.bottomResultCount;
+            setSourceFile(model.currentFile);
+            setShowLinkButton(model.showLinkButton);
             noteSourceNote(model.currentFile?.path ?? null);
             setSimilarNotes(model.similarNoteEntries.slice(0, limit));
             setEmptyReason(model.emptyReason);
@@ -373,6 +358,18 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
         e.preventDefault();
         openNote(file, e.ctrlKey || e.metaKey);
     };
+
+    const handleAddLink = useAddNoteLink({
+        leaf,
+        workspace,
+        viewType,
+        sourceFile,
+        markLinked: (target) => setSimilarNotes((notes) =>
+            notes.map((note) =>
+                note.file.path === target.path ? { ...note, isLinked: true } : note
+            )
+        ),
+    });
 
     // Page Preview only reads/writes `.hoverPopover` on the parent, so a plain
     // stable object is a sufficient HoverParent for this React component.
@@ -427,7 +424,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
             ) : (
                 <div className="nav-header" />
             )}
-            <div className="similar-notes-pane">
+            <div className={showLinkButton ? "similar-notes-pane has-link-button" : "similar-notes-pane"}>
                 <SimilarNotesHeader
                     collapsed={collapsed}
                     onToggleCollapse={toggleCollapse}
@@ -439,6 +436,7 @@ const NoteBottomViewReact: React.FC<NoteBottomViewProps> = ({
                         onNoteClick={handleNoteClick}
                         onNoteHover={handleNoteHover}
                         onContextMenu={handleContextMenu}
+                        onAddLink={showLinkButton ? handleAddLink : undefined}
                         noteDisplayMode={noteDisplayMode}
                         isRowCollapsed={isRowCollapsed}
                         onToggleRow={toggleRow}

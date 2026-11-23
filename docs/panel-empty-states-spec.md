@@ -102,6 +102,13 @@ pause. The count shown is still the status bar's total. When only the open
 note is left queued while the indexing line shows, the coordinator searches
 once more and falls back to the plain line.
 
+## 결과 링크 단추 설정과 상태 전환
+
+`showLinkButton`은 다른 표시 설정과 함께 모든 모델에 전달한다. 검색 전,
+모델 준비 대기, 노트 없음, 결과 도착과 설정 재발행 모두 같은 현재 값을 쓴다.
+아래 패널은 자기 노트 모델을 받기 전에는 결과 영역을 숨기는 규칙을 유지한다.
+결과가 없을 때 새 링크 단추를 만들지는 않으며, 결과가 도착하면 현재 설정으로 표시한다.
+
 ## Caching
 
 `SimilarNoteCoordinator` does not cache a failed embedding (reopening retries,

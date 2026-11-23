@@ -28,6 +28,7 @@ function makeSettings(
         modelId: "test-model",
         includeFrontmatter: false,
         showSourceChunk: false,
+        showLinkButton: false,
         useGPU: false,
         excludeFolderPatterns: [],
         excludeRegexPatterns: [],
@@ -87,6 +88,35 @@ describe("SimilarNoteCoordinator", () => {
             get: vi.fn(() => settings),
             getNewSettingsObservable: vi.fn(() => settingsChange$),
         } as unknown as SettingsService;
+    });
+
+    test("updates the link button setting in the current view without a new search", async () => {
+        const coord = new SimilarNoteCoordinator(vault, noteRepository, similarNoteFinder, settingsService);
+        await coord.onFileOpen(makeFile("open.md"));
+        expect((await firstValueFrom(coord.getNoteBottomViewModelObservable())).showLinkButton).toBe(false);
+        vi.mocked(similarNoteFinder.findSimilarNotes).mockClear();
+        settings.showLinkButton = true;
+        settingsChange$.next({ showLinkButton: true });
+        expect((await firstValueFrom(coord.getNoteBottomViewModelObservable())).showLinkButton).toBe(true);
+        expect(similarNoteFinder.findSimilarNotes).not.toHaveBeenCalled();
+        await coord.onFileOpen(null);
+        expect((await firstValueFrom(coord.getNoteBottomViewModelObservable())).showLinkButton).toBe(true);
+    });
+
+    test("carries link button settings through loading and download states", async () => {
+        settings.showLinkButton = true;
+        const coord = new SimilarNoteCoordinator(vault, noteRepository, similarNoteFinder, settingsService);
+        const view = () => firstValueFrom(coord.getNoteBottomViewModelObservable());
+        expect(await view()).toMatchObject({ showLinkButton: true, emptyReason: { kind: "loading" } });
+        coord.setWaiting({ kind: "downloading", percent: 40 });
+        await coord.onFileOpen(makeFile("open.md"));
+        expect(await view()).toMatchObject({ showLinkButton: true, emptyReason: { kind: "downloading", percent: 40 } });
+        expect(similarNoteFinder.findSimilarNotes).not.toHaveBeenCalled();
+        settings.showLinkButton = false;
+        settingsChange$.next({ showLinkButton: false });
+        expect(await view()).toMatchObject({ showLinkButton: false, emptyReason: { kind: "downloading", percent: 40 } });
+        await coord.onFileOpen(null);
+        expect(await view()).toMatchObject({ showLinkButton: false, emptyReason: { kind: "no-note" } });
     });
 
     describe("#39.1: sidebar should not show stale results when the active note is closed", () => {

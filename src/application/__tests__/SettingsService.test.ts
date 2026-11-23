@@ -8,6 +8,17 @@ import { SettingsService } from "../SettingsService";
 import { shouldExcludeFile } from "@/utils/folderExclusion";
 
 describe("SettingsService defaults (spec item 4)", () => {
+    it.each([undefined, { noteDisplayMode: "title" }])("defaults the link button off and persists changes for %o", async (data) => {
+        const plugin = {
+            loadData: vi.fn().mockResolvedValue(data),
+            saveData: vi.fn().mockResolvedValue(undefined),
+        };
+        const svc = new SettingsService(plugin as never);
+        await svc.load();
+        expect(svc.get().showLinkButton).toBe(false);
+        await svc.update({ showLinkButton: true });
+        expect(plugin.saveData).toHaveBeenCalledWith(expect.objectContaining({ showLinkButton: true }));
+    });
     it("defaults semanticLinkTrigger to ';;' when there is no saved data", async () => {
         const plugin = {
             loadData: vi.fn().mockResolvedValue(undefined),
