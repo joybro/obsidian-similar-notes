@@ -40,7 +40,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
 
 - 오류에서: every surface stays usable; an embedding or provider failure shows an Obsidian Notice and the status bar error state, and the user leaves by fixing the provider in settings, then Retry errored notes or reopening the note.
 
-- screen: note-footer | states: loading, loading-downloading, empty, empty-unwritten, empty-below-threshold, empty-excluded-note, loading-indexing, partial-not-indexed, ideal, ideal-linked, ideal-collapsed, error-embedding
+- screen: note-footer | states: loading, loading-downloading, empty, empty-unwritten, empty-below-threshold, empty-excluded-note, loading-indexing, partial-not-indexed, error-model-download, error-model-load, ideal, ideal-linked, ideal-collapsed, error-embedding
   - 무엇을 보여주나: under the open note, the top similar notes with score, optional source chunk, "linked" tag for notes already linked
   - 행동: open, open in new tab (Cmd-click), hover preview (Cmd+hover), drag into editor, right-click menu (Open link, Open in new tab, Copy Obsidian URL), collapse
   - Each empty state is one grey line in the same place; only the text differs (`docs/panel-empty-states-spec.md`).
@@ -53,10 +53,12 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - loading-indexing: the search found nothing while notes are queued for indexing: "Indexing your vault: N notes left. Results fill in as notes are indexed." N follows the status bar's "N to index"; while it shows, the panel searches again at most every 10 s as N drops (results replace the line), and once more when the queue empties; a "No similar notes found." panel switches to this line when notes become queued
   - partial-not-indexed: the open note has no indexed chunks yet; results come from an on-the-fly embedding
   - error-embedding: on-the-fly embedding failed; Notice plus "Couldn't analyze this note. Check the model in Settings, then reopen the note."
+  - error-model-download: the built-in model could not be downloaded (network error); red, held for every note until the next model load: "Couldn't download the model. Check your connection, then reopen the note."; opening a note starts the failed load again (→ loading-downloading)
+  - error-model-load: any other failed model load (wrong model name, cloud or Ollama provider failure); red, held for every note: "Couldn't load the model. Check the model in Settings."; changing the model in settings fills the panel without reopening the note
   - → hover-preview (overlay): Cmd+hover a result
   - → note-footer (replace): open a result
 
-- screen: sidebar | states: loading, loading-downloading, empty, empty-no-note, ideal, ideal-linked, ideal-expanded
+- screen: sidebar | states: loading, loading-downloading, empty, empty-no-note, ideal, ideal-linked, ideal-expanded, error-model-download, error-model-load
   - 무엇을 보여주나: same list as note-footer for the active note, in a right-sidebar leaf (sidebar result count setting), under a toolbar row with two buttons (`docs/sidebar-toolbar-spec.md`)
   - 행동: same as note-footer; Expand all / Collapse all (hidden in empty); Semantic search…
   - empty-no-note: no note to follow (no markdown editor open, or the main-area tab used last is a canvas, PDF or image): "Open a note and similar notes will appear here."; the previous results are dropped
