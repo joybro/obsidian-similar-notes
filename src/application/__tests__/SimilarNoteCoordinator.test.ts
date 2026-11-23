@@ -1152,6 +1152,11 @@ describe("SimilarNoteCoordinator", () => {
             });
 
             const offline = () => new TypeError("Failed to fetch");
+            // iOS/iPadOS (WebKit) words the same fetch failure "Load failed";
+            // it reaches the plugin from the model worker as a plain Error
+            // that keeps the message and name.
+            const webkitOffline = () =>
+                Object.assign(new Error("Load failed"), { name: "TypeError" });
             const missingModel = () =>
                 new Error('Unauthorized access to file: "https://huggingface.co/no-such/model/resolve/main/config.json".');
 
@@ -1197,6 +1202,22 @@ describe("SimilarNoteCoordinator", () => {
                     );
                     expect(retry).not.toHaveBeenCalled();
                 }
+            });
+
+            test("a WebKit download failure gets the connection line and reopening a note retries", async () => {
+                searchThrows();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                const retry = vi.fn(async () => gate.begin());
+                gate.begin();
+                await coord.onFileOpen(makeFile("open.md"));
+                gate.fail(webkitOffline(), "builtin", retry);
+                expect(await reasonAfterOpen(coord, "other.md")).toEqual({
+                    kind: "model-download-failed",
+                });
+                gate.noteOpened();
+                expect(retry).toHaveBeenCalledTimes(1);
+                expect(finderCalls()).toBe(0);
             });
 
             test("reopening a note after a download failure starts the load again and shows its result", async () => {
