@@ -93,4 +93,9 @@ export class ErroredNoteStore {
     getCurrentErroredCount(): number {
         return this.erroredCount$.getValue();
     }
+
+    /** Close the database connection (plugin unload). */
+    close(): void {
+        this.storage.close();
+    }
 }

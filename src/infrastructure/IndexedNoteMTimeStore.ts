@@ -152,4 +152,9 @@ export class IndexedNoteMTimeStore {
             "restore() is deprecated. Data is loaded automatically in init()."
         );
     }
+
+    /** Close the database connection (plugin unload). */
+    close(): void {
+        this.storage.close();
+    }
 }

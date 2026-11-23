@@ -42,6 +42,14 @@ export class IndexedDBErroredStorage {
 
             request.onsuccess = () => {
                 this.db = request.result;
+                // Close when another connection needs the database (a deleteDatabase,
+                // a version upgrade by a newer plugin instance): an instance that was
+                // turned off but is still referenced would otherwise block it, and
+                // every later open would queue behind it forever.
+                this.db.onversionchange = () => {
+                    this.db?.close();
+                    this.db = null;
+                };
                 log.info("IndexedDB for errored notes initialized successfully");
                 resolve();
             };

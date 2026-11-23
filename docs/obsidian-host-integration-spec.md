@@ -33,6 +33,16 @@ to detach their leaves.
 Obsidian does not await `onunload`; service teardown runs as one async
 step after it returns, and a failure there is logged, not thrown.
 
+Because the restored sidebar keeps the old view, the instance that was
+turned off can stay referenced, and with it its IndexedDB connections.
+Teardown closes the main-thread connections (mtimes, errored notes; the
+chunk database lives in the index worker, which is terminated), and every
+connection closes itself on `versionchange`. A connection left open blocks
+a `deleteDatabase` or a version upgrade, and the next instance's open
+queues behind that request forever: the plugin then loads with no status
+bar and no results (seen with the sidebar open: turn off, delete the index
+databases, turn on).
+
 ## 3. The editor drop handler defers to earlier handlers
 
 The `editor-drop` handler that turns a dragged Similar notes result into a

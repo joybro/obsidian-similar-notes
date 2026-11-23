@@ -381,6 +381,10 @@ export default class MainPlugin extends Plugin {
         }
 
         this.noteChangeQueue.cleanup();
+        // An open connection would block deleting or upgrading the database
+        // while this instance is still referenced (a sidebar view keeps it).
+        this.indexedNotesMTimeStore?.close();
+        this.erroredNoteStore?.close();
 
         // Dispose of model service - do this last as it's the most memory intensive
         if (this.modelService) {

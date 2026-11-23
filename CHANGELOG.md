@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 -   **The status bar no longer flashes a download percent at every start**: reading a model that is already on disk was shown as a download for a moment. A percent now appears only for a real download. A model already on disk is not called a download however long reading it takes.
 -   **The sidebar no longer says "No similar notes found." when there is no note to compare**: with every note closed, or with a canvas, PDF or image as the tab you used last, it now says "Open a note and similar notes will appear here."
 
+-   **The plugin no longer hangs on load after it was turned off with the sidebar open**: the instance that was turned off kept its index database connections open, so deleting the index or a later database upgrade waited forever and the plugin loaded with no status bar. It now closes them when it is turned off and whenever another connection needs the database.
+
 ### Changed
 
 -   **Title search gives a small boost to titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title shares character pairs with what you typed now gets a small ranking boost among the search candidates, so it can rank above a note whose title only means something similar when their scores are close. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.
