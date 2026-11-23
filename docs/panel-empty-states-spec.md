@@ -14,7 +14,8 @@ is still working.
 ## Behavior
 
 Same place, same `search-empty-state` line; only the text changes. No new
-controls. The line is grey except `embedding-failed`, which adds `is-error`
+controls. The line is grey except the three failure lines (`embedding-failed`,
+`model-download-failed`, `model-load-failed`), which add `is-error`
 (`var(--text-error)`): a confirmed failure that won't clear by itself reads red,
 while fixed guidance and self-resolving states stay grey.
 
@@ -26,6 +27,8 @@ while fixed guidance and self-resolving states stay grey.
 | unwritten | the note has no text after exclusion patterns (`SimilarNoteFinder` status `empty-content`) | Write a few lines and similar notes will appear here. |
 | excluded-cloud | excluded note with OpenAI or Gemini, ad-hoc embedding skipped (`ad-hoc-disallowed`, frontmatter-exclusion spec §2.1) | This note is excluded from the index, so it isn't sent to OpenAI. (provider name from the setting: OpenAI or Gemini) |
 | embedding-failed | the on-the-fly embedding threw (`embedding-failed`; a Notice is also shown) | Couldn't analyze this note. Check the model in Settings, then reopen the note. |
+| model-download-failed | the built-in model failed to load and the error is a network error (`NETWORK_ERROR_PATTERNS`: the message contains `network` or `fetch`, as a fetch that cannot reach the server says `Failed to fetch` in Chromium; the HTTP errors transformers.js throws for a missing or private model, such as `Unauthorized access to file`, do not match). `ModelLoadGate.fail` classifies; only the built-in provider's errors can be download failures. Held for every note until the next load; opening a note while it is held starts a new load (the same load that failed: plugin start, model change or GPU reload) | Couldn't download the model. Check your connection, then reopen the note. |
+| model-load-failed | any other failed model load (a model name that does not exist, a cloud or Ollama provider that fails to load, a broken file). Held for every note until the next load; changing the model in Settings starts that load, so no reopen is asked for | Couldn't load the model. Check the model in Settings. |
 | below-threshold | the search returned results but none reach Minimum similarity | No notes above the minimum similarity (0.50). (setting value, two decimals) |
 | indexing | the search ran, returned nothing, and notes other than the open one are queued for indexing | Indexing your vault: 1,240 notes left. Results fill in as notes are indexed. (count = the status bar's "N to index" source, `NoteIndexingService.getNoteChangeCount$`; "1 note left" for one) |
 | none | anything else | No similar notes found. |
@@ -39,8 +42,13 @@ period and `loading` otherwise (before that, and for the seconds between the
 end of the download and the model being ready). When the load
 ends the note on screen is searched and shows results if it worked. If the
 load failed, the index is not opened and a search would throw, so no search
-runs: the note on screen and every note opened later show `embedding-failed`
-(true then) until the next model load starts. The status bar takes its
+runs: the note on screen and every note opened later show the failure line for
+the load, `model-download-failed` or `model-load-failed`, until the next model
+load starts. The note-level `embedding-failed` line is not used for a load: a
+failed load is every note's problem, and its text (check the model, reopen the
+note) is wrong for a dropped connection and for a reopen that changes nothing.
+After a download failure, opening a note starts the failed load again, so the
+line's "reopen the note" is true. The status bar takes its
 download percent from the same gate, so it shows a percent exactly when the
 panel says `downloading`, with the same number. Results already on
 screen when a later load starts stay. At plugin start the note that is

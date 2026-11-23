@@ -157,6 +157,14 @@ describe("SimilarNotesViewReact", () => {
             "Couldn't analyze this note. Check the model in Settings, then reopen the note.",
         ],
         [
+            { kind: "model-download-failed" },
+            "Couldn't download the model. Check your connection, then reopen the note.",
+        ],
+        [
+            { kind: "model-load-failed" },
+            "Couldn't load the model. Check the model in Settings.",
+        ],
+        [
             { kind: "below-threshold", threshold: 0.5 },
             "No notes above the minimum similarity (0.50).",
         ],
@@ -189,8 +197,12 @@ describe("SimilarNotesViewReact", () => {
         );
         const el = await screen.findByText(text);
         expect(el).toBeInTheDocument();
-        // Only the confirmed failure is styled as an error
-        expect(el.classList.contains("is-error")).toBe(emptyReason.kind === "embedding-failed");
+        // Only the confirmed failures are styled as an error
+        expect(el.classList.contains("is-error")).toBe(
+            ["embedding-failed", "model-download-failed", "model-load-failed"].includes(
+                emptyReason.kind
+            )
+        );
     });
 
     test("before the first result for its note arrives the panel says it is looking", async () => {

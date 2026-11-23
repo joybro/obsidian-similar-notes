@@ -117,6 +117,7 @@ export default class MainPlugin extends Plugin {
         this.registerEvent(
             this.app.workspace.on("file-open", async (file) => {
                 // Use optional chaining as the coordinator may not be initialized yet
+                this.modelLoadGate?.noteOpened();
                 await this.similarNoteCoordinator?.onFileOpen(file);
             })
         );
@@ -422,25 +423,17 @@ export default class MainPlugin extends Plugin {
         newModel: boolean
     ): Promise<void> {
         this.noteIndexingService.stopLoop();
+        const settings = this.settingsService.get();
 
         try {
             if (firstTime || newModel) {
                 // Notes opened from here on wait for the model instead of
                 // failing against a provider that is not loaded yet.
                 this.modelLoadGate.begin();
-                // Get settings and switch provider
-                const settings = this.settingsService.get();
-
                 // Switch to appropriate provider based on settings
                 await this.modelService.switchProvider(settings);
-                log.info(
-                    "Model service initialized successfully with provider:",
-                    settings.modelProvider,
-                    "and model:",
-                    settings.modelProvider === "builtin"
-                        ? settings.modelId
-                        : settings.ollamaModel
-                );
+                const model = settings.modelProvider === "builtin" ? settings.modelId : settings.ollamaModel;
+                log.info("Model service initialized with provider:", settings.modelProvider, "and model:", model);
 
                 logRejection(this.noteChunkingService.init(), "init chunking service");
             }
@@ -448,7 +441,8 @@ export default class MainPlugin extends Plugin {
             log.error("Failed to initialize model service:", error);
             // The index is not opened, so the panel shows the failure line
             // instead of searching; init's end() below is then a no-op.
-            return this.modelLoadGate.end({ failed: true });
+            const retry = () => this.init(settings.modelId, firstTime, newModel);
+            return this.modelLoadGate.fail(error, settings.modelProvider, retry);
         }
 
         const vectorSize = this.modelService.getVectorSize();
@@ -543,7 +537,7 @@ export default class MainPlugin extends Plugin {
         } catch (error) {
             log.error("Failed to reload model:", error);
             // Error state is handled by modelError$ observable in StatusBarView
-            this.modelLoadGate.end({ failed: true });
+            this.modelLoadGate.fail(error, settings.modelProvider, () => this.reloadModel());
         } finally {
             // Restart the indexing service whether the model load succeeded or failed
             // This ensures the service doesn't remain stopped

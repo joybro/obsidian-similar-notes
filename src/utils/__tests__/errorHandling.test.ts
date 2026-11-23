@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
     extractUserFriendlyMessage,
+    isNetworkError,
     TRANSFORMERS_ERROR_PATTERNS,
 } from "../errorHandling";
 
@@ -50,5 +51,31 @@ describe("extractUserFriendlyMessage", () => {
                 "Network error - check your internet connection"
             );
         });
+    });
+});
+
+describe("isNetworkError", () => {
+    test("a fetch that cannot reach the server is a network error", () => {
+        expect(isNetworkError(new TypeError("Failed to fetch"))).toBe(true);
+        expect(isNetworkError(new Error("net::ERR_INTERNET_DISCONNECTED network"))).toBe(true);
+    });
+
+    test("an HTTP error from the model host is not a network error", () => {
+        // The texts @huggingface/transformers throws for a missing or private
+        // model (utils/hub.js ERROR_MAPPING); the URL must not match either.
+        expect(
+            isNetworkError(
+                new Error(
+                    'Unauthorized access to file: "https://huggingface.co/no-such/model/resolve/main/config.json".'
+                )
+            )
+        ).toBe(false);
+        expect(
+            isNetworkError(
+                new Error(
+                    'Could not locate file: "https://huggingface.co/a/b/resolve/main/onnx/model.onnx".'
+                )
+            )
+        ).toBe(false);
     });
 });

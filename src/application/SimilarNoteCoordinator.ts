@@ -229,13 +229,13 @@ export class SimilarNoteCoordinator {
      * search runs, since the index was not opened and a search would throw.
      */
     setWaiting(reason: EmptyReason | null) {
-        const heldFailure = this.waitingReason?.kind === "embedding-failed";
+        const held = this.waitingReason?.kind;
         const wasWaiting = this.waitingReason !== null;
         this.waitingReason = reason;
         const view = this.noteBottomViewModel$.value;
         const kind = view.emptyReason?.kind;
         // Only a line the gate put there is replaced; a search result stays.
-        const gateFailure = kind === "embedding-failed" && heldFailure;
+        const gateFailure = kind !== undefined && kind === held;
         if (kind !== "loading" && kind !== "downloading" && !gateFailure) {
             return;
         }

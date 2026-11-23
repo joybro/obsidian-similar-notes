@@ -35,6 +35,14 @@ export const NETWORK_ERROR_PATTERNS: ErrorPattern[] = [
     }
 ];
 
+/** Whether an error reads as a network failure (NETWORK_ERROR_PATTERNS). */
+export function isNetworkError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return NETWORK_ERROR_PATTERNS.some((pattern) =>
+        pattern.patterns.some((text) => message.includes(text))
+    );
+}
+
 export const OLLAMA_ERROR_PATTERNS: ErrorPattern[] = [
     {
         patterns: ["Cannot connect"],

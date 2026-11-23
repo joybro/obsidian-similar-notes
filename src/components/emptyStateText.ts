@@ -10,9 +10,20 @@ export type EmptyReason =
     | { kind: "unwritten" }
     | { kind: "excluded-cloud"; provider: "OpenAI" | "Gemini" }
     | { kind: "embedding-failed" }
+    | { kind: "model-download-failed" }
+    | { kind: "model-load-failed" }
     | { kind: "below-threshold"; threshold: number }
     | { kind: "indexing"; remaining: number }
     | { kind: "none" };
+
+/** Failure lines read red: a confirmed failure that won't clear by itself. */
+export function isFailureReason(reason: EmptyReason | null | undefined): boolean {
+    return (
+        reason?.kind === "embedding-failed" ||
+        reason?.kind === "model-download-failed" ||
+        reason?.kind === "model-load-failed"
+    );
+}
 
 export function emptyStateText(reason: EmptyReason | undefined): string {
     switch (reason?.kind) {
@@ -29,6 +40,10 @@ export function emptyStateText(reason: EmptyReason | undefined): string {
             return `This note is excluded from the index, so it isn't sent to ${reason.provider}.`;
         case "embedding-failed":
             return "Couldn't analyze this note. Check the model in Settings, then reopen the note.";
+        case "model-download-failed":
+            return "Couldn't download the model. Check your connection, then reopen the note.";
+        case "model-load-failed":
+            return "Couldn't load the model. Check the model in Settings.";
         case "below-threshold":
             return `No notes above the minimum similarity (${reason.threshold.toFixed(2)}).`;
         case "indexing": {

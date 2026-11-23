@@ -10,7 +10,7 @@ import {
     useRowExpansion,
 } from "./SidebarToolbar";
 import { logRejection } from "@/utils/logRejection";
-import { type EmptyReason, emptyStateText } from "./emptyStateText";
+import { type EmptyReason, emptyStateText, isFailureReason } from "./emptyStateText";
 
 export { type EmptyReason, emptyStateText };
 
@@ -286,7 +286,7 @@ const SearchResultsContainer = ({
                     className={
                         // A confirmed failure that won't clear by itself reads red;
                         // fixed guidance and self-resolving states stay grey.
-                        emptyReason?.kind === "embedding-failed"
+                        isFailureReason(emptyReason)
                             ? "search-empty-state is-error"
                             : "search-empty-state"
                     }

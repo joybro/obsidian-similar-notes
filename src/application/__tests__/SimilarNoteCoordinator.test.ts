@@ -1002,10 +1002,10 @@ describe("SimilarNoteCoordinator", () => {
                 const gate = new ModelLoadGate(coord);
                 gate.begin();
                 await coord.onFileOpen(makeFile("open.md"));
-                gate.end({ failed: true });
+                gate.end({ failed: "load" });
                 await vi.waitFor(async () => {
                     expect(await currentReason(coord)).toEqual({
-                        kind: "embedding-failed",
+                        kind: "model-load-failed",
                     });
                 });
                 expect(finderCalls()).toBe(0);
@@ -1017,11 +1017,89 @@ describe("SimilarNoteCoordinator", () => {
                 const gate = new ModelLoadGate(coord);
                 gate.begin();
                 await coord.onFileOpen(makeFile("open.md"));
-                gate.end({ failed: true });
+                gate.end({ failed: "load" });
                 expect(await reasonAfterOpen(coord, "other.md")).toEqual({
-                    kind: "embedding-failed",
+                    kind: "model-load-failed",
                 });
                 expect(finderCalls()).toBe(0);
+            });
+
+            const offline = () => new TypeError("Failed to fetch");
+            const missingModel = () =>
+                new Error('Unauthorized access to file: "https://huggingface.co/no-such/model/resolve/main/config.json".');
+
+            test("a built-in model that fails to download shows the connection line for every note", async () => {
+                searchThrows();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.begin();
+                await coord.onFileOpen(makeFile("open.md"));
+                gate.fail(offline(), "builtin", vi.fn());
+                await vi.waitFor(async () => {
+                    expect(await currentReason(coord)).toEqual({
+                        kind: "model-download-failed",
+                    });
+                });
+                expect(emptyStateText(await currentReason(coord))).toBe(
+                    "Couldn't download the model. Check your connection, then reopen the note."
+                );
+                expect(await reasonAfterOpen(coord, "other.md")).toEqual({
+                    kind: "model-download-failed",
+                });
+                expect(finderCalls()).toBe(0);
+            });
+
+            test("any other failed load shows the settings line and opening a note does not retry", async () => {
+                for (const [error, provider] of [
+                    [missingModel(), "builtin"],
+                    // A cloud or Ollama provider is not downloaded.
+                    [offline(), "ollama"],
+                ] as const) {
+                    searchThrows();
+                    const coord = make();
+                    const gate = new ModelLoadGate(coord);
+                    const retry = vi.fn(async () => gate.begin());
+                    gate.begin();
+                    gate.fail(error, provider, retry);
+                    gate.noteOpened();
+                    expect(await reasonAfterOpen(coord, "other.md")).toEqual({
+                        kind: "model-load-failed",
+                    });
+                    expect(emptyStateText({ kind: "model-load-failed" })).toBe(
+                        "Couldn't load the model. Check the model in Settings."
+                    );
+                    expect(retry).not.toHaveBeenCalled();
+                }
+            });
+
+            test("reopening a note after a download failure starts the load again and shows its result", async () => {
+                searchThrows();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                // The plugin's retry begins a new load synchronously.
+                const retry = vi.fn(async () => gate.begin());
+                gate.begin();
+                await coord.onFileOpen(makeFile("open.md"));
+                gate.fail(offline(), "builtin", retry);
+                // What the plugin does on file-open: gate first, then the panel.
+                gate.noteOpened();
+                expect(await reasonAfterOpen(coord, "open.md")).toEqual({ kind: "loading" });
+                expect(retry).toHaveBeenCalledTimes(1);
+                expect(finderCalls()).toBe(0);
+                // Another open while the retry is loading does not start a second load.
+                gate.noteOpened();
+                await reasonAfterOpen(coord, "other.md");
+                expect(retry).toHaveBeenCalledTimes(1);
+                withStatus("ok", [neighbor(0.9)]);
+                gate.end();
+                await vi.waitFor(async () => {
+                    const view = await firstValueFrom(
+                        coord.getNoteBottomViewModelObservable()
+                    );
+                    expect(view.currentFile?.path).toBe("other.md");
+                    expect(view.similarNoteEntries).toHaveLength(1);
+                    expect(view.emptyReason).toBeUndefined();
+                });
             });
 
             test("the next load after a failed one searches the note on screen again", async () => {
@@ -1030,10 +1108,10 @@ describe("SimilarNoteCoordinator", () => {
                 const gate = new ModelLoadGate(coord);
                 gate.begin();
                 await coord.onFileOpen(makeFile("open.md"));
-                gate.end({ failed: true });
+                gate.end({ failed: "load" });
                 await vi.waitFor(async () => {
                     expect(await currentReason(coord)).toEqual({
-                        kind: "embedding-failed",
+                        kind: "model-load-failed",
                     });
                 });
                 // The user corrects the model in Settings.
