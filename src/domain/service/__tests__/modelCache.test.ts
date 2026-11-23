@@ -27,6 +27,13 @@ describe("isModelCached", () => {
         expect(await isModelCached("sentence-transformers/all-MiniLM-L6-v2", caches)).toBe(false);
     });
 
+    it("does not count weights of another precision", async () => {
+        // The worker loads fp32 (onnx/model.onnx). Another plugin sharing the
+        // app's cache may have fetched only the quantized file.
+        const caches = storage([`${base}/config.json`, `${base}/onnx/model_quantized.onnx`]);
+        expect(await isModelCached("sentence-transformers/all-MiniLM-L6-v2", caches)).toBe(false);
+    });
+
     it("does not count another model's weights", async () => {
         const caches = storage([`${base}/onnx/model.onnx`]);
         expect(await isModelCached("sentence-transformers/all-MiniLM-L12-v2", caches)).toBe(false);
