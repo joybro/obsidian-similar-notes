@@ -37,8 +37,10 @@ search. A search then would throw in the provider and show the red
 note opened in that window shows `downloading` once progress has stayed below 100 past the grace
 period and `loading` otherwise (before that, and for the seconds between the
 end of the download and the model being ready). When the load
-ends the note on screen is searched: results if it worked,
-`embedding-failed` if the load failed, which is then true. The status bar takes its
+ends the note on screen is searched and shows results if it worked. If the
+load failed, the index is not opened and a search would throw, so no search
+runs: the note on screen and every note opened later show `embedding-failed`
+(true then) until the next model load starts. The status bar takes its
 download percent from the same gate, so it shows a percent exactly when the
 panel says `downloading`, with the same number. Results already on
 screen when a later load starts stay. At plugin start the note that is
@@ -105,6 +107,12 @@ notes are queued.
   With the model on disk, three starts showed no `downloading` state (the
   read reported progress for about 0.6 s). Not observed: a first install
   with an empty index and a download that fails midway.
+- A first install on a fresh vault with an empty index was observed in a
+  running desktop Obsidian: the download line with a percent, then the
+  indexing line, then results on the open note and on the next note opened.
+  A model load that fails (a model id with no repository) showed the Notice;
+  before the failure line above was added, the panel stayed on "Looking for
+  similar notes…" because the search after the failed load threw.
 - 모바일 흉내에서는 아래 패널에 모델 내려받기 진행률 4%와 7%가 표시되는
   것을 확인했다. 사이드바 패널과 실제 휴대전화는 확인하지 못했으며,
   앱이 종료되어 검색 결과가 표시될 때까지 이어지는 동작도 확인하지 못했다.

@@ -987,17 +987,66 @@ describe("SimilarNoteCoordinator", () => {
                 });
             });
 
+            // After a failed load the plugin does not open the index, so a
+            // search throws (the index worker is not initialized) instead of
+            // returning "embedding-failed". The finder below throws the way
+            // the running app does.
+            const searchThrows = () =>
+                (
+                    similarNoteFinder.findSimilarNotesWithStatus as ReturnType<typeof vi.fn>
+                ).mockRejectedValue(new Error("OramaWorker not initialized"));
+
             test("when the load fails the note opened meanwhile gets the failure line", async () => {
-                withStatus("embedding-failed");
+                searchThrows();
                 const coord = make();
                 const gate = new ModelLoadGate(coord);
                 gate.begin();
                 await coord.onFileOpen(makeFile("open.md"));
-                gate.end();
+                gate.end({ failed: true });
                 await vi.waitFor(async () => {
                     expect(await currentReason(coord)).toEqual({
                         kind: "embedding-failed",
                     });
+                });
+                expect(finderCalls()).toBe(0);
+            });
+
+            test("a note opened after a failed load gets the failure line without a search", async () => {
+                searchThrows();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.begin();
+                await coord.onFileOpen(makeFile("open.md"));
+                gate.end({ failed: true });
+                expect(await reasonAfterOpen(coord, "other.md")).toEqual({
+                    kind: "embedding-failed",
+                });
+                expect(finderCalls()).toBe(0);
+            });
+
+            test("the next load after a failed one searches the note on screen again", async () => {
+                searchThrows();
+                const coord = make();
+                const gate = new ModelLoadGate(coord);
+                gate.begin();
+                await coord.onFileOpen(makeFile("open.md"));
+                gate.end({ failed: true });
+                await vi.waitFor(async () => {
+                    expect(await currentReason(coord)).toEqual({
+                        kind: "embedding-failed",
+                    });
+                });
+                // The user corrects the model in Settings.
+                withStatus("ok", [neighbor(0.9)]);
+                gate.begin();
+                expect(await currentReason(coord)).toEqual({ kind: "loading" });
+                gate.end();
+                await vi.waitFor(async () => {
+                    const view = await firstValueFrom(
+                        coord.getNoteBottomViewModelObservable()
+                    );
+                    expect(view.similarNoteEntries).toHaveLength(1);
+                    expect(view.emptyReason).toBeUndefined();
                 });
             });
 

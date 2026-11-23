@@ -225,15 +225,18 @@ export class SimilarNoteCoordinator {
     /**
      * Called by ModelLoadGate. A reason holds searches and shows on an empty
      * waiting panel; null releases them and searches for the note opened
-     * meanwhile (results if the model works, the failure line if its load
-     * failed, which is then true).
+     * meanwhile. After a failed load the reason is the failure line: no
+     * search runs, since the index was not opened and a search would throw.
      */
     setWaiting(reason: EmptyReason | null) {
+        const heldFailure = this.waitingReason?.kind === "embedding-failed";
         const wasWaiting = this.waitingReason !== null;
         this.waitingReason = reason;
         const view = this.noteBottomViewModel$.value;
         const kind = view.emptyReason?.kind;
-        if (kind !== "loading" && kind !== "downloading") {
+        // Only a line the gate put there is replaced; a search result stays.
+        const gateFailure = kind === "embedding-failed" && heldFailure;
+        if (kind !== "loading" && kind !== "downloading" && !gateFailure) {
             return;
         }
         if (reason) {

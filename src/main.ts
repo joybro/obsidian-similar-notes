@@ -411,8 +411,8 @@ export default class MainPlugin extends Plugin {
         try {
             await this.loadModelAndIndex(firstTime, newModel);
         } finally {
-            // Search for a note opened meanwhile, also after a failure, so
-            // the panel never stays on the waiting line.
+            // Search for a note opened meanwhile, so the panel never stays
+            // on the waiting line (a failed load already ended the gate).
             this.modelLoadGate.end();
         }
     }
@@ -446,7 +446,9 @@ export default class MainPlugin extends Plugin {
             }
         } catch (error) {
             log.error("Failed to initialize model service:", error);
-            return;
+            // The index is not opened, so the panel shows the failure line
+            // instead of searching; init's end() below is then a no-op.
+            return this.modelLoadGate.end({ failed: true });
         }
 
         const vectorSize = this.modelService.getVectorSize();
@@ -541,6 +543,7 @@ export default class MainPlugin extends Plugin {
         } catch (error) {
             log.error("Failed to reload model:", error);
             // Error state is handled by modelError$ observable in StatusBarView
+            this.modelLoadGate.end({ failed: true });
         } finally {
             // Restart the indexing service whether the model load succeeded or failed
             // This ensures the service doesn't remain stopped

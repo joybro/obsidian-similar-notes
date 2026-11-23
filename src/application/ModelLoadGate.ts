@@ -39,14 +39,18 @@ export class ModelLoadGate {
         this.publish();
     }
 
-    /** The load finished or failed; the panel searches again. */
-    end(): void {
+    /**
+     * The load finished; the panel searches again. After a failed load the
+     * index is not opened, so a search would throw: the panel holds on the
+     * failure line instead, for every note, until the next load begins.
+     */
+    end(options: { failed?: boolean } = {}): void {
         if (!this.loading) {
             return;
         }
         this.reset();
         this.shownProgress$.next(100);
-        this.panel.setWaiting(null);
+        this.panel.setWaiting(options.failed ? { kind: "embedding-failed" } : null);
     }
 
     /** Follow the download progress (the status bar's source). */
