@@ -21,7 +21,7 @@ while fixed guidance and self-resolving states stay grey.
 | Reason | When | Text |
 |---|---|---|
 | loading | nothing has been searched for this note yet: from the moment the plugin turns on (Obsidian start, plugin enabled or updated) until the first result for the open note arrives. Measured in a running Obsidian with the model already on disk: about 3 seconds in the sidebar | Looking for similar notes… |
-| downloading | the built-in model is being downloaded (first install, or a model picked in settings that is not on disk yet) and the provider has reported progress below 100 for more than 2 seconds (`DOWNLOAD_GRACE_MS`; a model already on disk also reports 0 to 100 while it is read, about 0.6 s on desktop, and must not be called a download). No search runs. Shown for the note open at startup and for any note opened meanwhile | Downloading the model: 45%. Similar notes will appear when it's ready. (number = the status bar's source, the embedding service's download progress, rounded down the same way) |
+| downloading | the built-in model is being downloaded (first install, or a model picked in settings that is not on disk yet) and the provider has reported progress below 100 for more than 2 seconds (`DOWNLOAD_GRACE_MS`; a model already on disk also reports 0 to 100 while it is read, about 0.6 s on desktop, and must not be called a download). A model whose ONNX weights are already in the browser cache reports no progress at all, however long the read takes: the worker checks the cache before loading (`isModelCached`), since transformers.js sends the same progress events for a cache read as for a download. No search runs. Shown for the note open at startup and for any note opened meanwhile | Downloading the model: 45%. Similar notes will appear when it's ready. (number = the status bar's source, the embedding service's download progress, rounded down the same way) |
 | no-note | there is no note to show results for: no markdown editor is open, or the tab used last in the main area is not a note (canvas, PDF, image). No search runs. In practice only the sidebar shows this, since the footer panel lives under a note | Open a note and similar notes will appear here. |
 | unwritten | the note has no text after exclusion patterns (`SimilarNoteFinder` status `empty-content`) | Write a few lines and similar notes will appear here. |
 | excluded-cloud | excluded note with OpenAI or Gemini, ad-hoc embedding skipped (`ad-hoc-disallowed`, frontmatter-exclusion spec §2.1) | This note is excluded from the index, so it isn't sent to OpenAI. (provider name from the setting: OpenAI or Gemini) |
@@ -105,7 +105,10 @@ notes are queued.
   status bar's number, no Notice and no red line; when the download ended
   the panel went through "Looking for similar notes…" to the search result.
   With the model on disk, three starts showed no `downloading` state (the
-  read reported progress for about 0.6 s). Not observed: a first install
+  read reported progress for about 0.6 s). A cached read slowed to 5.3 s
+  in a controlled run (no model request on the network) showed the
+  `downloading` line and the status bar's percent from 1.9 s to 5.1 s before
+  the cache check above was added. Not observed: a first install
   with an empty index and a download that fails midway.
 - A first install on a fresh vault with an empty index was observed in a
   running desktop Obsidian: the download line with a percent, then the

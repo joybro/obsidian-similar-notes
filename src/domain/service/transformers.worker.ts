@@ -8,6 +8,7 @@ import * as comlink from "comlink";
 import log from "loglevel";
 import { embedInBatches } from "../../utils/batching";
 import { normalizeWasmError } from "../../utils/wasmError";
+import { isModelCached } from "./modelCache";
 
 /**
  * Max chunks fed to one on-device forward pass. A single `[N, seqLen]` pass costs
@@ -139,6 +140,10 @@ class TransformersWorker {
             wasm.numThreads = 1;
         }
 
+        // A model already in the cache is read, not downloaded: pass on no
+        // progress, so the panel and status bar do not call a slow read a
+        // download (panel-empty-states spec, `downloading`).
+        const fromCache = await isModelCached(modelId);
         this.extractor = await transformers.pipeline(
             "feature-extraction",
             modelId,
@@ -147,7 +152,7 @@ class TransformersWorker {
                 dtype: "fp32",
                 device: useGPU ? "webgpu" : "wasm", // Use WebGPU if enabled, otherwise fall back to WASM
                 progress_callback: (progress: ProgressInfo) => {
-                    if (progress.status === "progress") {
+                    if (progress.status === "progress" && !fromCache) {
                         if (progress.file.includes("onnx")) {
                             progress_callback(progress.progress);
                         }
