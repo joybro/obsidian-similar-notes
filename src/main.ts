@@ -32,7 +32,7 @@ import { SimilarNoteFinder } from "./domain/service/SimilarNoteFinder";
 import { TextSearchService } from "./domain/service/TextSearchService";
 import { ErroredNoteStore } from "./infrastructure/ErroredNoteStore";
 import { IndexedNoteMTimeStore } from "./infrastructure/IndexedNoteMTimeStore";
-import { LangchainNoteChunkingService } from "./infrastructure/LangchainNoteChunkingService";
+import { MarkdownNoteChunkingService } from "./infrastructure/MarkdownNoteChunkingService";
 import { VaultNoteRepository } from "./infrastructure/VaultNoteRepository";
 import { needsReindexForUpgrade } from "./lifecycle/versionUpgrade";
 import { NoteChangeQueue } from "./infrastructure/noteChangeQueue";
@@ -158,7 +158,7 @@ export default class MainPlugin extends Plugin {
         await this.erroredNoteStore.init(vaultId);
 
         // Initialize dependent services
-        this.noteChunkingService = new LangchainNoteChunkingService(
+        this.noteChunkingService = new MarkdownNoteChunkingService(
             this.modelService
         );
 

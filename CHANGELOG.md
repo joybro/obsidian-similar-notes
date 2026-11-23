@@ -23,6 +23,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+-   **Smaller plugin download**: the plugin no longer bundles the LangChain library, which it used only to split notes into chunks. `main.js` is about 380 KB smaller. Notes are split exactly as before, so your existing index stays valid.
+
 -   **Title search gives a small boost to titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title shares character pairs with what you typed now gets a small ranking boost among the search candidates, so it can rank above a note whose title only means something similar when their scores are close. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.
 
 ## [1.8.0] - 2026-11-19

@@ -24,7 +24,7 @@ per-note indexing status, and silently swallowed errors.**
   misleading "Excluded" number. Errored notes need to be counted separately
   from not-yet-processed ones.
 - **#46-B:** Users saw "file too big" errors and assumed large files aren't
-  split. They *are* split (`LangchainNoteChunkingService`, `chunkSize =
+  split. They *are* split (`MarkdownNoteChunkingService`, `chunkSize =
   maxTokens`). The real cause is per-chunk embedding failures (e.g. the Ollama
   v0.12.5+ payload bug) that fail the whole note — which then surfaced as a
   bogus "Excluded" count with no visible reason.

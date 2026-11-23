@@ -2,8 +2,8 @@ import type { Note } from "@/domain/model/Note";
 import { NoteChunk } from "@/domain/model/NoteChunk";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import type { NoteChunkingService } from "@/domain/service/NoteChunkingService";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import log from "loglevel";
+import { MarkdownTextSplitter } from "./markdownTextSplitter";
 
 // Chunk size targeted for semantic-search granularity. getMaxTokens() is an
 // embedding-input *ceiling* (model context / transport safety), not a good chunk
@@ -15,26 +15,22 @@ import log from "loglevel";
 // size. See docs/semantic-chunk-size-spec.md and docs/adr/0002-*.
 export const SEMANTIC_CHUNK_TOKENS = 512;
 
-export class LangchainNoteChunkingService implements NoteChunkingService {
-    private splitter: RecursiveCharacterTextSplitter | null = null;
+export class MarkdownNoteChunkingService implements NoteChunkingService {
+    private splitter: MarkdownTextSplitter | null = null;
 
     constructor(private readonly embeddingService: EmbeddingService) {}
 
     async init() {
-        this.splitter = RecursiveCharacterTextSplitter.fromLanguage(
-            "markdown",
-            {
-                // min(): never exceed what the model/transport can embed, but
-                // never chunk coarser than the semantic target either.
-                chunkSize: Math.min(
-                    SEMANTIC_CHUNK_TOKENS,
-                    this.embeddingService.getMaxTokens()
-                ),
-                chunkOverlap: 100,
-                lengthFunction: (text) =>
-                    this.embeddingService.countTokens(text),
-            }
-        );
+        this.splitter = new MarkdownTextSplitter({
+            // min(): never exceed what the model/transport can embed, but
+            // never chunk coarser than the semantic target either.
+            chunkSize: Math.min(
+                SEMANTIC_CHUNK_TOKENS,
+                this.embeddingService.getMaxTokens()
+            ),
+            chunkOverlap: 100,
+            lengthFunction: (text) => this.embeddingService.countTokens(text),
+        });
     }
 
     async split(note: Note): Promise<NoteChunk[]> {

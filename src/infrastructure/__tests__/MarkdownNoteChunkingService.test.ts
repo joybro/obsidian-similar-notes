@@ -2,9 +2,9 @@ import { describe, expect, test } from "vitest";
 import { Note } from "@/domain/model/Note";
 import type { EmbeddingService } from "@/domain/service/EmbeddingService";
 import {
-    LangchainNoteChunkingService,
+    MarkdownNoteChunkingService,
     SEMANTIC_CHUNK_TOKENS,
-} from "../LangchainNoteChunkingService";
+} from "../MarkdownNoteChunkingService";
 
 // A fake embedding service exposing only what the chunker uses. countTokens is
 // 1-token-per-char so chunk "token" sizes equal character counts, making the
@@ -29,18 +29,18 @@ function longNote(paragraphs = 40): Note {
 }
 
 async function chunkTokenSizes(
-    service: LangchainNoteChunkingService,
+    service: MarkdownNoteChunkingService,
     note: Note
 ): Promise<number[]> {
     const chunks = await service.split(note);
     return chunks.map((c) => c.content.length); // countTokens == length here
 }
 
-describe("LangchainNoteChunkingService: semantic chunk-size cap (semantic-chunk-size-spec)", () => {
+describe("MarkdownNoteChunkingService: semantic chunk-size cap (semantic-chunk-size-spec)", () => {
     test("caps chunk size at SEMANTIC_CHUNK_TOKENS when the model ceiling is larger", async () => {
         // bge-m3-like: getMaxTokens 2048. Old behavior chunked at 2048, diluting
         // long multi-topic notes. New behavior must cap at the semantic target.
-        const service = new LangchainNoteChunkingService(
+        const service = new MarkdownNoteChunkingService(
             fakeEmbeddingService(2048)
         );
         await service.init();
@@ -55,7 +55,7 @@ describe("LangchainNoteChunkingService: semantic chunk-size cap (semantic-chunk-
 
     test("model ceiling still binds when it is smaller than the semantic target", async () => {
         // all-minilm-like: getMaxTokens 256 < 512. min() keeps the smaller size.
-        const service = new LangchainNoteChunkingService(
+        const service = new MarkdownNoteChunkingService(
             fakeEmbeddingService(256)
         );
         await service.init();
@@ -68,11 +68,11 @@ describe("LangchainNoteChunkingService: semantic chunk-size cap (semantic-chunk-
     test("a smaller ceiling produces strictly finer chunks (more, smaller pieces)", async () => {
         const note = longNote();
 
-        const big = new LangchainNoteChunkingService(
+        const big = new MarkdownNoteChunkingService(
             fakeEmbeddingService(2048)
         );
         await big.init();
-        const small = new LangchainNoteChunkingService(
+        const small = new MarkdownNoteChunkingService(
             fakeEmbeddingService(256)
         );
         await small.init();
@@ -85,7 +85,7 @@ describe("LangchainNoteChunkingService: semantic chunk-size cap (semantic-chunk-
     });
 
     test("a short note stays a single chunk (cap does not over-split)", async () => {
-        const service = new LangchainNoteChunkingService(
+        const service = new MarkdownNoteChunkingService(
             fakeEmbeddingService(2048)
         );
         await service.init();

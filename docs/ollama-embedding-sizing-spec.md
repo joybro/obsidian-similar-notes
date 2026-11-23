@@ -162,4 +162,4 @@ Larger context = more headroom = less truncation. For token-dense notes:
 | Real context length | `OllamaClient.getModelInfo` (`/api/show`) |
 | Truncate backstop + endpoint | `OllamaClient.generateEmbedding(s)` (`/api/embed`) |
 | Batching | `batchTextsByPayload`, `BATCH_PAYLOAD_BUDGET_BYTES`, `OllamaEmbeddingProvider.embedTexts` |
-| Chunking (consumes `maxTokens`) | `LangchainNoteChunkingService` |
+| Chunking (consumes `maxTokens`) | `MarkdownNoteChunkingService` |

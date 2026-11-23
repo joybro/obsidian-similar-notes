@@ -18,7 +18,7 @@ in one call. It is used in two unrelated roles:
    not reject it (`EmbeddingService.truncate`, `TextSearchService.checkTokenLimit`,
    Ollama's transport/context guards). Here the *maximum* is exactly what we want.
 2. **Chunk size** — how finely a note is split before embedding
-   (`LangchainNoteChunkingService.init` used `chunkSize: getMaxTokens()`). Here
+   (`MarkdownNoteChunkingService.init` used `chunkSize: getMaxTokens()`). Here
    the maximum is the *wrong* value: chunk size should be tuned for retrieval
    granularity, not for how much the model can physically swallow.
 
@@ -72,7 +72,7 @@ another.
 
 ## The fix: a fixed semantic target, with the model max as a ceiling
 
-`LangchainNoteChunkingService` sizes chunks at:
+`MarkdownNoteChunkingService` sizes chunks at:
 
 ```
 chunkSize = min( SEMANTIC_CHUNK_TOKENS,  getMaxTokens() )
@@ -115,8 +115,8 @@ take effect (existing vectors keep their old granularity until re-embedded).
 
 | Concern | Location |
 | --- | --- |
-| Semantic target constant | `SEMANTIC_CHUNK_TOKENS` (`LangchainNoteChunkingService`) |
-| Chunk size = `min(target, ceiling)` | `LangchainNoteChunkingService.init` |
+| Semantic target constant | `SEMANTIC_CHUNK_TOKENS` (`MarkdownNoteChunkingService`) |
+| Chunk size = `min(target, ceiling)` | `MarkdownNoteChunkingService.init` |
 | Model/transport ceiling (unchanged role) | `EmbeddingProvider.getMaxTokens` per provider |
 | Ollama overflow/transport rationale | `docs/ollama-embedding-sizing-spec.md` |
 | Decision record | `docs/adr/0002-semantic-chunk-size-cap.md` |

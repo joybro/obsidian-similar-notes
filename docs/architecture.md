@@ -32,7 +32,7 @@ src/
 
 ## Core Domain Flow
 
-1. **Note Processing**: When a note is opened/modified, it's chunked into smaller pieces using LangChain's text splitters
+1. **Note Processing**: When a note is opened/modified, it's chunked into smaller pieces by a recursive markdown splitter (`docs/markdown-splitter-spec.md`)
 2. **Embedding Generation**: Chunks are processed through a Transformers.js model (runs in Web Worker for performance)
 3. **Vector Storage**: Embeddings are stored in Orama vector database for fast similarity search
 4. **Similar Note Finding**: When requested, performs vector search to find semantically similar notes
@@ -67,7 +67,7 @@ src/
 
 4. **Ollama chunk sizing & batching**: Ollama rejects inputs longer than the model context, and a chunk's true token count can't be known cheaply before sending. The embedding-input ceiling is the smaller of a transport-payload ceiling and a context-window ceiling, with `truncate: true` as a hard backstop, and chunks are embedded in payload-bounded batches. The rationale (why the 0.5 safety factor, which ceiling binds per model) is non-obvious — see `docs/ollama-embedding-sizing-spec.md`.
 
-5. **Semantic chunk size**: Chunk size is sized for retrieval granularity, not for the model's maximum input. It is capped at a fixed `SEMANTIC_CHUNK_TOKENS` (512) with the model's `getMaxTokens()` only as the upper bound (`LangchainNoteChunkingService`). Reusing the model ceiling as the chunk size made large-context models (bge-m3, OpenAI) produce coarse chunks that diluted topical signal and missed genuine matches — see `docs/semantic-chunk-size-spec.md` and `docs/adr/0002-semantic-chunk-size-cap.md`.
+5. **Semantic chunk size**: Chunk size is sized for retrieval granularity, not for the model's maximum input. It is capped at a fixed `SEMANTIC_CHUNK_TOKENS` (512) with the model's `getMaxTokens()` only as the upper bound (`MarkdownNoteChunkingService`). Reusing the model ceiling as the chunk size made large-context models (bge-m3, OpenAI) produce coarse chunks that diluted topical signal and missed genuine matches — see `docs/semantic-chunk-size-spec.md` and `docs/adr/0002-semantic-chunk-size-cap.md`.
 
 6. **Built-in embedding per-pass batch cap**: The built-in (Transformers.js / onnxruntime-web) embedder caps chunks per forward pass at `MAX_EMBED_BATCH_SIZE` (32) and runs sub-batches sequentially (`transformers.worker.ts`, `splitIntoBatches`/`embedInBatches` in `src/utils/batching.ts`). Embedding a large note's chunks in one pass overran the wasm32 ~4GB address space and aborted with a bare number (and then cascaded). Note: this is *not* a threading issue — the beta.4 single-thread pin was a no-op. See `docs/builtin-embedding-batch-cap-spec.md`.
 
