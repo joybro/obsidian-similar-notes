@@ -60,6 +60,17 @@ describe("isNetworkError", () => {
         expect(isNetworkError(new Error("net::ERR_INTERNET_DISCONNECTED network"))).toBe(true);
     });
 
+    test("a fetch that cannot reach the server on iOS/iPadOS (WebKit) is a network error", () => {
+        // WebKit rejects a failed fetch with TypeError "Load failed", which
+        // contains neither "network" nor "fetch".
+        expect(isNetworkError(new TypeError("Load failed"))).toBe(true);
+        // The worker's error crosses into the plugin as a plain Error that
+        // keeps the message and name.
+        expect(
+            isNetworkError(Object.assign(new Error("Load failed"), { name: "TypeError" }))
+        ).toBe(true);
+    });
+
     test("an HTTP error from the model host is not a network error", () => {
         // The texts @huggingface/transformers throws for a missing or private
         // model (utils/hub.js ERROR_MAPPING); the URL must not match either.

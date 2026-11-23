@@ -30,7 +30,9 @@ export const GPU_ERROR_PATTERNS: ErrorPattern[] = [
 
 export const NETWORK_ERROR_PATTERNS: ErrorPattern[] = [
     {
-        patterns: ["network", "fetch"],
+        // "Failed to fetch" is how Chromium (desktop, Android) rejects a fetch
+        // that cannot reach the server; WebKit (iOS, iPadOS) says "Load failed".
+        patterns: ["network", "fetch", "Load failed"],
         message: "Network error - check your internet connection"
     }
 ];
