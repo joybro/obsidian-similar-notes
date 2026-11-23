@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+-   **Similar notes fill in when indexing finishes, even if a few already show**: on a large vault's first index, the panel could find one or two similar notes partway through and then stay at that short list until you reopened the note. When indexing finishes it now searches once more, and reopening the note no longer brings back the short list.
 -   **Notes in a split pane that you haven't selected no longer say they are looking for similar notes**: when Obsidian starts or the plugin is turned back on, the bottom panel of a note you haven't selected yet leaves its status line empty. It shows a status or results once you select that note.
 -   **The note already open when Obsidian starts, or when the plugin is updated or turned on, now refreshes its similar notes without opening another note**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
 -   **The panel no longer says "No similar notes found." before it has looked**: for the first few seconds after Obsidian starts or the plugin is turned on or updated, it now says "Looking for similar notes…" until the first results arrive.

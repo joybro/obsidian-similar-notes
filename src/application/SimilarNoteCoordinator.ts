@@ -10,24 +10,18 @@ import type {
     SimilarNoteSearchStatus,
 } from "@/domain/service/SimilarNoteFinder";
 import { applyExclusionPatterns } from "@/utils/indexableText";
-import log from "loglevel";
 import type { TFile, Vault } from "obsidian";
 import { BehaviorSubject, type Observable } from "rxjs";
 import type { SettingsService } from "./SettingsService";
 import { logRejection } from "@/utils/logRejection";
-
-interface SimilarNoteCacheEntry {
-    mtime: number;
-    notes: SimilarNoteEntry[];
-    status: SimilarNoteSearchStatus;
-}
+import { SimilarNoteCache, toSimilarNoteEntries } from "./similarNoteResults";
 
 interface SimilarNotesWithStatus {
     notes: SimilarNoteEntry[];
     status: SimilarNoteSearchStatus;
+    partial: boolean;
 }
 
-const MAX_CACHE_SIZE = 20;
 // While the panel shows "Indexing your vault", search again at most this
 // often as the queue drains. Each search may embed the open note on the fly
 // (it is not indexed yet), so keep it low: about 6 per minute.
@@ -43,7 +37,7 @@ export class SimilarNoteCoordinator {
         sidebarResultCount: 10,   // Will be properly initialized in constructor
         bottomResultCount: 5,     // Will be properly initialized in constructor
     });
-    private cache = new Map<string, SimilarNoteCacheEntry>(); // file path -> entry
+    private cache = new SimilarNoteCache(); // file path -> results
     // Notes still waiting to be indexed (the status bar's "N to index").
     private pendingIndexCount = 0;
     // How many of those queued changes are for a given path. The open note's
@@ -56,6 +50,10 @@ export class SimilarNoteCoordinator {
     // Set while the model is downloading or loading (ModelLoadGate): no
     // search runs and an empty panel shows this reason.
     private waitingReason: EmptyReason | null = null;
+    // Path of the open note when the results it shows were found while
+    // other notes were still queued. When the queue reaches zero the panel
+    // searches once more (panel-empty-states spec, "Indexing").
+    private partialShownFor: string | null = null;
 
     constructor(
         private readonly vault: Vault,
@@ -132,6 +130,7 @@ export class SimilarNoteCoordinator {
         }
         return pendingIndexCount$.subscribe((count) => {
             this.pendingIndexCount = count;
+            this.cache.dropCompletedPartial((p) => this.pendingOtherThan(p));
             const view = this.noteBottomViewModel$.value;
             const reason = view.emptyReason?.kind;
             if (!view.currentFile) {
@@ -141,6 +140,15 @@ export class SimilarNoteCoordinator {
             // ("none") or positive ("indexing"), so it carries the previous
             // state.
             const others = this.pendingOtherThan(view.currentFile.path);
+            if (others === 0 && this.partialShownFor === view.currentFile.path) {
+                // Results already show, but they were found on an
+                // incomplete index: look once more now that it is complete.
+                this.partialShownFor = null;
+                void this.emitNoteBottomViewModel(view.currentFile, {
+                    onlyIfStillCurrent: true,
+                });
+                return;
+            }
             if (reason === "none" && others > 0) {
                 // The empty result was cached as final; drop it so the
                 // searches below actually look again.
@@ -302,6 +310,7 @@ export class SimilarNoteCoordinator {
                 mtime: verifiedMtime ?? cached.mtime,
                 notes: updatedNotes,
                 status: cached.status,
+                partial: cached.partial,
             });
 
             const latestView = this.noteBottomViewModel$.value;
@@ -338,16 +347,19 @@ export class SimilarNoteCoordinator {
         // just looked, so the next look waits a full interval.
         this.lastIndexingSearchAt = Date.now();
         if (this.waitingReason) {
+            this.partialShownFor = null;
             this.noteBottomViewModel$.next(this.emptyView(file, this.waitingReason));
             return;
         }
-        const { notes, status } = await this.getSimilarNotesWithStatus(file);
+        const { notes, status, partial } =
+            await this.getSimilarNotesWithStatus(file);
         if (
             options.onlyIfStillCurrent &&
             this.noteBottomViewModel$.value.currentFile?.path !== file.path
         ) {
             return;
         }
+        this.partialShownFor = partial ? file.path : null;
         const settings = this.settingsService.get();
         const threshold = settings.minSimilarityThreshold;
         const filtered = notes.filter((entry) => entry.similarity >= threshold);
@@ -365,6 +377,15 @@ export class SimilarNoteCoordinator {
                     ),
             ...this.displaySettings(),
         });
+        if (this.partialShownFor === file.path && this.pendingOtherThan(file.path) === 0) {
+            // The queue emptied while this search ran: no count change is
+            // left to trigger the last search, so run it now.
+            this.partialShownFor = null;
+            this.cache.delete(file.path);
+            await this.emitNoteBottomViewModel(file, {
+                onlyIfStillCurrent: true,
+            });
+        }
     }
 
     /**
@@ -433,6 +454,7 @@ export class SimilarNoteCoordinator {
             return {
                 notes: this.withoutExcludedTargets(cacheEntry.notes),
                 status: cacheEntry.status,
+                partial: cacheEntry.partial,
             };
         }
 
@@ -455,6 +477,9 @@ export class SimilarNoteCoordinator {
             rawNote.links
         );
         const maxResultCount = Math.max(settings.sidebarResultCount, settings.bottomResultCount);
+        // Judged before the search: a queue that empties while it runs
+        // still leaves a list found on the incomplete index.
+        const partial = this.pendingOtherThan(file.path) > 0;
         const { notes: similarNotes, status } =
             await this.similarNoteFinder.findSimilarNotesWithStatus(
                 note,
@@ -462,31 +487,11 @@ export class SimilarNoteCoordinator {
                 { allowAdHocEmbedding }
             );
 
-        const showSourceChunk = settings.showSourceChunk;
-
-        const similarNoteEntries = similarNotes
-            .map((similarNote) => ({
-                file: this.vault.getFileByPath(similarNote.path),
-                title: similarNote.title,
-                similarity: similarNote.similarity,
-                preview: similarNote.similarChunk,
-                sourceChunk: showSourceChunk
-                    ? similarNote.sourceChunk
-                    : undefined,
-                isLinked: similarNote.isLinked,
-                path: similarNote.path,
-            }))
-            .filter((viewModel) => {
-                if (viewModel.file === null) {
-                    log.error(
-                        `Stale data detected: similar note not found in vault (path: ${viewModel.path}). ` +
-                        `This may indicate the file was renamed/moved but the index was not updated.`
-                    );
-                    return false;
-                }
-                return true;
-            })
-            .map(({ path: _path, ...rest }) => rest) as SimilarNoteEntry[];
+        const similarNoteEntries = toSimilarNoteEntries(
+            this.vault,
+            similarNotes,
+            settings.showSourceChunk
+        );
 
         // Don't cache a failed embedding (reopening the note should retry, as
         // the panel tells the user) or an empty search while notes are still
@@ -505,16 +510,14 @@ export class SimilarNoteCoordinator {
                 mtime: file.stat.mtime,
                 notes: similarNoteEntries,
                 status,
+                partial,
             });
-            if (this.cache.size > MAX_CACHE_SIZE) {
-                const oldestKey = this.cache.keys().next().value as string | undefined;
-                if (oldestKey !== undefined) this.cache.delete(oldestKey);
-            }
         }
 
         return {
             notes: this.withoutExcludedTargets(similarNoteEntries),
             status,
+            partial,
         };
     }
 

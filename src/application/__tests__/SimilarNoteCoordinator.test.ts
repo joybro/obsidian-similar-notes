@@ -822,6 +822,103 @@ describe("SimilarNoteCoordinator", () => {
             expect(await reasonAfterOpen(coord)).toBeUndefined();
         });
 
+        describe("NGX4: results found while other notes were queued are searched once more at zero", () => {
+            const five = [0.9, 0.85, 0.8, 0.75, 0.7].map((s, i) => ({
+                ...neighbor(s),
+                path: `n${i}.md`,
+                title: `n${i}`,
+            }));
+            const shownCount = async (coord: SimilarNoteCoordinator) =>
+                (await firstValueFrom(coord.getNoteBottomViewModelObservable()))
+                    .similarNoteEntries.length;
+
+            test("a partial list fills in when the queue reaches zero", async () => {
+                const pending$ = new BehaviorSubject(29);
+                const coord = make();
+                coord.watchPendingIndexCount(pending$);
+                withStatus("ok", [neighbor(0.9)]);
+                expect(await reasonAfterOpen(coord)).toBeUndefined();
+                expect(await shownCount(coord)).toBe(1);
+
+                withStatus("ok", five);
+                pending$.next(3);
+                // Still indexing: the shown results are left alone.
+                expect(await shownCount(coord)).toBe(1);
+                pending$.next(0);
+                await vi.waitFor(async () => {
+                    expect(await shownCount(coord)).toBe(5);
+                });
+            });
+
+            test("the partial list is not kept for a later reopen", async () => {
+                const pending$ = new BehaviorSubject(29);
+                const coord = make();
+                coord.watchPendingIndexCount(pending$);
+                withStatus("ok", [neighbor(0.9)]);
+                await coord.onFileOpen(makeFile("open.md"));
+                // The user moves to another note before indexing ends.
+                await coord.onFileOpen(makeFile("elsewhere.md"));
+                withStatus("ok", five);
+                pending$.next(0);
+                const shownForOpen: number[] = [];
+                const sub = coord
+                    .getNoteBottomViewModelObservable()
+                    .subscribe((v) => {
+                        if (v.currentFile?.path === "open.md") {
+                            shownForOpen.push(v.similarNoteEntries.length);
+                        }
+                    });
+                await coord.onFileOpen(makeFile("open.md"));
+                sub.unsubscribe();
+                // Never flashes the old one-row list first.
+                expect(shownForOpen).toEqual([5]);
+            });
+
+            test("a search still running when the queue empties searches once more", async () => {
+                const finder =
+                    similarNoteFinder.findSimilarNotesWithStatus as ReturnType<typeof vi.fn>;
+                const pending$ = new BehaviorSubject(29);
+                const coord = make();
+                coord.watchPendingIndexCount(pending$);
+                let release: () => void = () => {};
+                finder.mockImplementationOnce(
+                    () =>
+                        new Promise((resolve) => {
+                            release = () =>
+                                resolve({ notes: [neighbor(0.9)], status: "ok" });
+                        })
+                );
+                const opening = coord.onFileOpen(makeFile("open.md"));
+                await vi.waitFor(() => expect(finder).toHaveBeenCalled());
+                pending$.next(0);
+                withStatus("ok", five);
+                release();
+                await opening;
+                await vi.waitFor(async () => {
+                    expect(await shownCount(coord)).toBe(5);
+                });
+            });
+
+            test("results found with nothing else queued are not searched again", async () => {
+                const finder =
+                    similarNoteFinder.findSimilarNotesWithStatus as ReturnType<typeof vi.fn>;
+                const pending$ = new BehaviorSubject(0);
+                const queued = new Map<string, number>();
+                const coord = make();
+                coord.watchPendingIndexCount(pending$, (p) => queued.get(p) ?? 0);
+                withStatus("ok", [neighbor(0.9)]);
+                await coord.onFileOpen(makeFile("open.md"));
+                const calls = finder.mock.calls.length;
+                // Editing the open note queues only itself.
+                queued.set("open.md", 1);
+                pending$.next(1);
+                queued.delete("open.md");
+                pending$.next(0);
+                await Promise.resolve();
+                expect(finder.mock.calls.length).toBe(calls);
+            });
+        });
+
         test("nothing found after indexing keeps the plain line", async () => {
             withStatus("ok", []);
             expect(await reasonAfterOpen(make())).toEqual({ kind: "none" });

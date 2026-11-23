@@ -79,7 +79,14 @@ the panel), so results fill in before the queue empties. The open
 note is usually not indexed yet, so each of these searches embeds it on the
 fly; 10 seconds keeps that to about six calls a minute on a long first index.
 Once results show, the panel leaves the indexing state and these searches
-stop. When the queue reaches zero it searches once more.
+stop. When the queue reaches zero it searches once more. This last search also
+runs when the panel already shows results that were found while other notes
+were still queued (a re-search here may return only a row or two of what the
+finished index holds); results found while no other note was queued are not
+searched again. A search still running when the queue empties is
+followed by this one search as soon as it returns. Such a list is not kept as
+final either: reopening the note after the queue empties searches again
+instead of showing the shorter list first.
 
 The pending count is published as soon as the startup queue is filled, before
 the indexing loop starts (which waits for the model, possibly a first
