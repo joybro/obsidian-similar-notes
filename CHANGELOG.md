@@ -2,36 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
-### Added
-
--   **Link similar notes**: Enable **Show link button on results** in Display settings to add a Link button to unlinked results in the sidebar and bottom panel. The button appends a link to the current note.
--   **Sidebar toolbar with Expand all and Semantic search**: the Similar notes sidebar has two buttons under its header. **Expand all** opens every result's preview and keeps them open as you move between notes and after you restart Obsidian, until you choose **Collapse all**; a single row's arrow still opens or closes just that row. **Semantic search…** opens the semantic search box, same as the command. The panel under a note is unchanged.
--   **README tip: keep the similar notes list in view** (#4): a CSS snippet that pins the list at the bottom of the editor while you scroll through a long note.
-
-### Fixed
-
--   **Similar notes fill in when indexing finishes, even if a few already show**: on a large vault's first index, the panel could find one or two similar notes partway through and then stay at that short list until you reopened the note. When indexing finishes it now searches once more, and reopening the note no longer brings back the short list.
--   **Notes in a split pane that you haven't selected no longer say they are looking for similar notes**: when Obsidian starts or the plugin is turned back on, the bottom panel of a note you haven't selected yet leaves its status line empty. It shows a status or results once you select that note.
--   **The note already open when Obsidian starts, or when the plugin is updated or turned on, now refreshes its similar notes without opening another note**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
--   **The panel no longer says "No similar notes found." before it has looked**: for the first few seconds after Obsidian starts or the plugin is turned on or updated, it now says "Looking for similar notes…" until the first results arrive.
--   **While the built-in model downloads, the panel says so**: on a first install it now shows "Downloading the model: 45%. Similar notes will appear when it's ready." instead of "Looking for similar notes…", and a note opened during the download waits on that line instead of showing "Couldn't analyze this note." in red. If the model fails to load, the panel says why instead of staying on "Looking for similar notes…": "Couldn't download the model. Check your connection, then reopen the note." when the download could not reach the server (opening a note then tries again), and "Couldn't load the model. Check the model in Settings." otherwise.
--   **The status bar no longer flashes a download percent at every start**: reading a model that is already on disk was shown as a download for a moment. A percent now appears only for a real download. A model already on disk is not called a download however long reading it takes.
--   **The sidebar no longer says "No similar notes found." when there is no note to compare**: with every note closed, or with a canvas, PDF or image as the tab you used last, it now says "Open a note and similar notes will appear here."
--   **The plugin no longer hangs on load after it was turned off with the sidebar open**: the instance that was turned off kept its index database connections open, so deleting the index or a later database upgrade waited forever and the plugin loaded with no status bar. It now closes them when it is turned off and whenever another connection needs the database.
-
-### Changed
-
--   **Smaller plugin download**: the plugin no longer bundles the LangChain library, which it used only to split notes into chunks. `main.js` is about 380 KB smaller. Notes are split exactly as before, so your existing index stays valid.
-
--   **Title search gives a small boost to titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title shares character pairs with what you typed now gets a small ranking boost among the search candidates, so it can rank above a note whose title only means something similar when their scores are close. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.
-
 ## [1.8.0] - 2026-11-19
 
 ### Added
 
 -   **Searching by part of a note's title finds the note** (#26): semantic search and the `;;` link suggestion now also match against each note's title on its own, so a query with a few words of the title ranks that note near the top even in long notes. When a note matches by its title, the preview shows the start of the note. The Similar notes panel is unchanged. After updating, existing notes get their title indexed in the background (one short embedding per note; with a cloud provider that is one short text per note).
+-   **Link similar notes**: Enable **Show link button on results** in Display settings to add a Link button to unlinked results in the sidebar and bottom panel. The button appends a link to the current note.
+-   **Sidebar toolbar with Expand all and Semantic search**: the Similar notes sidebar has two buttons under its header. **Expand all** opens every result's preview and keeps them open as you move between notes and after you restart Obsidian, until you choose **Collapse all**; a single row's arrow still opens or closes just that row. **Semantic search…** opens the semantic search box, same as the command. The panel under a note is unchanged.
+-   **README tip: keep the similar notes list in view** (#4): a CSS snippet that pins the list at the bottom of the editor while you scroll through a long note.
 
 ### Fixed
 
@@ -51,6 +29,14 @@ All notable changes to this project will be documented in this file.
 -   **Ollama's Test connection checks what you just picked**: after you choose a model or edit the server URL, **Test** now tests that model at that URL. Before, it could say "Please select a model first" or test the previous model, and its message showed the old URL.
 -   **The status bar menu names the right provider**: the Model line in the status bar menu now shows the provider you picked in settings (Built-in Models, Ollama, OpenAI / Compatible or Google Gemini). Before, OpenAI and Gemini models were labeled "Built-in".
 -   **nomic-embed-text's model details are read correctly**: the Ollama model description in settings now shows its dimensions (768-dim), and its context length (2048) now caps the embedding input size as intended.
+-   **Similar notes fill in when indexing finishes, even if a few already show**: on a large vault's first index, the panel could find one or two similar notes partway through and then stay at that short list until you reopened the note. When indexing finishes it now searches once more, and reopening the note no longer brings back the short list.
+-   **Notes in a split pane that you haven't selected no longer say they are looking for similar notes**: when Obsidian starts or the plugin is turned back on, the bottom panel of a note you haven't selected yet leaves its status line empty. It shows a status or results once you select that note.
+-   **The note already open when Obsidian starts, or when the plugin is updated or turned on, now refreshes its similar notes without opening another note**: before, the bottom panel was missing and the sidebar said "No similar notes found." for that note until you opened another one.
+-   **The panel no longer says "No similar notes found." before it has looked**: for the first few seconds after Obsidian starts or the plugin is turned on or updated, it now says "Looking for similar notes…" until the first results arrive.
+-   **While the built-in model downloads, the panel says so**: on a first install it now shows "Downloading the model: 45%. Similar notes will appear when it's ready." instead of "Looking for similar notes…", and a note opened during the download waits on that line instead of showing "Couldn't analyze this note." in red. If the model fails to load, the panel says why instead of staying on "Looking for similar notes…": "Couldn't download the model. Check your connection, then reopen the note." when the download could not reach the server (opening a note then tries again), and "Couldn't load the model. Check the model in Settings." otherwise.
+-   **The status bar no longer flashes a download percent at every start**: reading a model that is already on disk was shown as a download for a moment. A percent now appears only for a real download. A model already on disk is not called a download however long reading it takes.
+-   **The sidebar no longer says "No similar notes found." when there is no note to compare**: with every note closed, or with a canvas, PDF or image as the tab you used last, it now says "Open a note and similar notes will appear here."
+-   **The plugin no longer hangs on load after it was turned off with the sidebar open**: the instance that was turned off kept its index database connections open, so deleting the index or a later database upgrade waited forever and the plugin loaded with no status bar. It now closes them when it is turned off and whenever another connection needs the database.
 
 ### Changed
 
@@ -62,6 +48,8 @@ All notable changes to this project will be documented in this file.
 -   **The Similar notes sidebar stays where you put it when the plugin reloads**: disabling or updating the plugin no longer closes the sidebar view, so Obsidian puts it back in the same place when the plugin loads again (Obsidian's plugin guidelines).
 -   **Settings and dialog text describe what actually happens**: the OpenAI-compatible **Max tokens** setting now says it is the model's maximum input tokens (not tokens per chunk). When the GPU fails and a built-in model loads on CPU, the dialog now says only that load fell back to CPU and that the next load tries the GPU again, instead of claiming GPU acceleration was turned off for the session.
 -   **Settings labels use sentence case**: Apply rules, Copy to clipboard, API key, Debug and support, and the GPU dialog's buttons.
+-   **Smaller plugin download**: the plugin no longer bundles the LangChain library, which it used only to split notes into chunks. `main.js` is about 380 KB smaller. Notes are split exactly as before, so your existing index stays valid.
+-   **Title search gives a small boost to titles that share your query's letters**: in semantic search and the `;;` link suggestion, a note whose title shares character pairs with what you typed now gets a small ranking boost among the search candidates, so it can rank above a note whose title only means something similar when their scores are close. This mostly helps short queries and languages such as Korean, where a few typed syllables used to lose to other, similar-sounding titles. The score shown next to each result is unchanged, and the Similar notes panel is unaffected.
 
 ## [1.7.0] - 2026-09-05
 
