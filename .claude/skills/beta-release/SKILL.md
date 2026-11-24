@@ -13,7 +13,7 @@ Pair skill: `bump-version` handles the *stable* bump that closes out the beta cy
 
 ## The pattern this repo uses
 
-The **default-branch** `manifest.json` stays at the previous stable. `package.json` carries the `X.Y.Z-beta.N` semver-prerelease. A tag `X.Y.Z-beta.N` triggers `release.yml`, which auto-creates a draft release whose **asset `manifest.json` is version-synced to the tag** and is **auto-marked pre-release** for `-beta`/`-alpha`/`-rc` tags; the maintainer just reviews and publishes.
+The **default-branch** `manifest.json` stays at the previous stable. `package.json` carries the `X.Y.Z-beta.N` semver-prerelease. A tag `X.Y.Z-beta.N` triggers `release.yml`, which auto-creates a draft release whose **asset `manifest.json` is version-synced to the tag** (and, for a pre-release tag, takes `minAppVersion` from the `X.Y.Z` entry of the root `versions.json` when there is one, so a beta that needs a newer Obsidian declares it while the committed manifest keeps the stable's value) and is **auto-marked pre-release** for `-beta`/`-alpha`/`-rc` tags; the maintainer just reviews and publishes.
 
 The key insight: the **default-branch** `manifest.json` and the **release-asset** `manifest.json` are different copies and are *meant* to differ during a beta — branch stays at stable (store-safe), asset matches the tag (BRAT-correct).
 

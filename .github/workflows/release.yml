@@ -51,6 +51,12 @@ jobs:
                   # unaffected. No-op for stable tags (manifest already matches).
                   node -e "const f='manifest.json',m=require('./'+f);m.version=process.argv[1];require('fs').writeFileSync(f,JSON.stringify(m,null,4)+'\n')" "$tag"
 
+                  # A pre-release tag (X.Y.Z-beta.N) also takes X.Y.Z's minAppVersion
+                  # from versions.json, so BRAT testers on an older Obsidian are not
+                  # offered a build that needs a newer one. The committed manifest
+                  # keeps the previous stable's minAppVersion until the stable bump.
+                  node -e "const fs=require('fs'),f='manifest.json',m=require('./'+f),base=process.argv[1].split('-')[0];if(base!==process.argv[1]&&fs.existsSync('versions.json')){const v=JSON.parse(fs.readFileSync('versions.json','utf8'))[base];if(v){m.minAppVersion=v;fs.writeFileSync(f,JSON.stringify(m,null,4)+'\n')}}" "$tag"
+
                   # Auto-mark beta/alpha/rc tags as a GitHub pre-release so the
                   # maintainer no longer has to tick the checkbox before publishing.
                   prerelease=""
