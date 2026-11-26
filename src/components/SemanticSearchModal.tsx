@@ -125,6 +125,10 @@ function useSemanticSearch(textSearchService: TextSearchService) {
     const [results, setResults] = useState<SimilarNote[]>([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isSearching, setIsSearching] = useState(false);
+    // The query whose search last finished. "No similar notes found" is only
+    // true for that query; while a newer query waits for its debounced search,
+    // nothing is known about it yet.
+    const [searchedQuery, setSearchedQuery] = useState<string | null>(null);
     const [tokenWarning, setTokenWarning] = useState<string | null>(null);
     const debounceRef = useRef<number | null>(null);
 
@@ -154,6 +158,7 @@ function useSemanticSearch(textSearchService: TextSearchService) {
                 console.error("Search error:", error);
                 setResults([]);
             } finally {
+                setSearchedQuery(searchQuery);
                 setIsSearching(false);
             }
         },
@@ -168,7 +173,7 @@ function useSemanticSearch(textSearchService: TextSearchService) {
         };
     }, [query, performSearch]);
 
-    return { query, setQuery, results, selectedIndex, setSelectedIndex, isSearching, tokenWarning };
+    return { query, setQuery, results, selectedIndex, setSelectedIndex, isSearching, searchedQuery, tokenWarning };
 }
 
 const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
@@ -178,7 +183,7 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
     onClose,
     onDismiss,
 }) => {
-    const { query, setQuery, results, selectedIndex, setSelectedIndex, isSearching, tokenWarning } =
+    const { query, setQuery, results, selectedIndex, setSelectedIndex, isSearching, searchedQuery, tokenWarning } =
         useSemanticSearch(textSearchService);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -276,6 +281,7 @@ const SemanticSearchContent: React.FC<SemanticSearchContentProps> = ({
                 )}
                 {query.length >= MIN_SEARCH_LENGTH &&
                     !isSearching &&
+                    searchedQuery === query &&
                     results.length === 0 && (
                     <div className="prompt-empty-state">No similar notes found</div>
                 )}
