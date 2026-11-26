@@ -1,6 +1,6 @@
 # Similar Notes for Obsidian
 
-When you open a note, similar notes appear at the bottom of it, and they refresh as you edit.
+When you open a note, similar notes appear at the bottom of it, and they refresh a few seconds after you edit.
 
 Find semantically similar notes using AI. Choose local models for privacy or cloud APIs for flexibility.
 
@@ -18,12 +18,12 @@ Press `Cmd+Shift+O` (or `Ctrl+Shift+O`) to search your vault by meaning, not jus
 
 ## Features
 
-- **Flexible Options**: Run locally (100% private) or use cloud APIs like OpenAI
-- **Mobile & Desktop**: Works on iOS, Android, and all desktop platforms (on mobile, a cloud API is the default; see Getting Started)
-- **OpenAI Support**: Use OpenAI embedding models or any OpenAI-compatible API
-- **Gemini Support**: Use Google's Gemini embedding API on mobile or desktop
-- **Ollama Support**: Connect to custom models via Ollama (desktop; on mobile only with an Ollama server your phone can reach over the network)
-- **No Setup Required on Desktop**: Built-in models work out of the box, no API keys needed
+- **Similar notes while you write**: notes you didn't think to look for show at the bottom of the note and in a sidebar view, and refresh a few seconds after you edit
+- **Link what you find**: type `;;` in the editor to pick a note by meaning and insert a link, or turn on **Show link button on results** in Settings → Display to link a result with one click
+- **Search by meaning**: open semantic search from the command palette or the sidebar toolbar; typing part of a note's title finds it too
+- **Private by default on desktop**: the built-in model runs on your computer, with no API key and no note text leaving it
+- **Or bring your own model**: Ollama (desktop), any OpenAI-compatible API, or Google Gemini
+- **Mobile & Desktop**: works on iOS, Android, and all desktop platforms (on mobile, a cloud API is the default; see Getting Started)
 
 ## Getting Started
 
