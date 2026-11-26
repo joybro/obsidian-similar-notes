@@ -76,6 +76,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
   - 무엇을 보여주나: query box and results ranked by meaning
   - 행동: type, move selection, open, create a note from the query
   - 오류에서: Notice, the modal stays open; edit the query or close
+  - empty-no-results shows only after the search for the current query has finished; while a newer query waits for its search, the previous results (or nothing) stay
   - → search-modal (back): Esc
   - → sidebar (back): Esc when opened from the sidebar button; focus returns to that button
 
