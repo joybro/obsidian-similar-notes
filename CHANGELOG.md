@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+-   **Semantic search no longer flashes "No similar notes found" while you type**: the message now appears only after the query you typed has actually been searched and found nothing. Before, from the third character on, it showed after each keystroke while the search was still waiting to start.
+-   **`;;` link suggestions no longer offer the note you are editing**: the current note is left out of the suggestions, so you can't insert a link to the note itself by accident.
+
 ## [1.8.0] - 2026-11-27
 
 ### Added
