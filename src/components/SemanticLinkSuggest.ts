@@ -76,7 +76,7 @@ export class SemanticLinkSuggest
         super(app);
         this.debouncedSearch = debounce(
             (context: EditorSuggestContext, cb: (suggestions: SimilarNote[]) => void) => {
-                void this.runSearch(context.query).then(cb);
+                void this.runSearch(context.query, context.file?.path ?? null).then(cb);
             },
             DEBOUNCE_MS,
             true
@@ -113,10 +113,11 @@ export class SemanticLinkSuggest
         });
     }
 
-    private async runSearch(query: string): Promise<SimilarNote[]> {
+    private async runSearch(query: string, sourcePath: string | null): Promise<SimilarNote[]> {
         try {
             const result = await this.textSearchService.findSimilarNotesFromText(query);
-            return result.similarNotes;
+            // The note being edited is never a useful link target for itself.
+            return result.similarNotes.filter((note) => note.path !== sourcePath);
         } catch (error) {
             log.error("[SemanticLinkSuggest] search failed", error);
             return [];
