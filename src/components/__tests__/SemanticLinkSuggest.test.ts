@@ -109,8 +109,27 @@ describe("SemanticLinkSuggest.getSuggestions (spec item 2)", () => {
         const suggest = makeSuggest({ service });
         const p = suggest.getSuggestions({ query: "frank" } as never);
         await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
-        expect(await p).toBe(notes);
+        expect(await p).toEqual(notes);
         expect(service.findSimilarNotesFromText).toHaveBeenCalledWith("frank");
+    });
+
+    it("leaves out the note being edited (a link to itself is never wanted)", async () => {
+        vi.useFakeTimers();
+        const service = {
+            findSimilarNotesFromText: vi.fn(async () => ({
+                similarNotes: [makeNote("Rome"), makeNote("Fall of Rome"), makeNote("Byzantium")],
+                tokenCount: 0,
+                maxTokens: 0,
+                isOverLimit: false,
+            })),
+        };
+        const suggest = makeSuggest({ service });
+        const p = suggest.getSuggestions({
+            query: "eastern capital",
+            file: { path: "Fall of Rome.md" },
+        } as never);
+        await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+        expect((await p).map((n) => n.title)).toEqual(["Rome", "Byzantium"]);
     });
 
     it("cancels the superseded search and only runs the latest query", async () => {
