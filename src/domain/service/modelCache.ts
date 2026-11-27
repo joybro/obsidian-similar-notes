@@ -13,7 +13,8 @@ const WORKER_WEIGHTS_FILE = "/onnx/model.onnx";
 
 export async function isModelCached(
     modelId: string,
-    cacheStorage: CacheStorage | undefined = globalThis.caches
+    // `self`, not `window`: this runs in the embedding worker, which has no window.
+    cacheStorage: CacheStorage | undefined = self.caches
 ): Promise<boolean> {
     if (!cacheStorage) {
         return false;

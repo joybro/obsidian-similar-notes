@@ -11,7 +11,7 @@ const testFiles = [
     "src/**/__mocks__/**",
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
-    "src/test-setup.ts",
+    "src/__tests__/setup.ts",
 ];
 
 export default defineConfig([

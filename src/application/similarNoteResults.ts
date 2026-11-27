@@ -31,10 +31,10 @@ export class SimilarNoteCache {
     set(path: string, entry: SimilarNoteCacheEntry) {
         this.entries.set(path, entry);
         if (this.entries.size > MAX_CACHE_SIZE) {
-            const oldestKey = this.entries.keys().next().value as
-                | string
-                | undefined;
-            if (oldestKey !== undefined) this.entries.delete(oldestKey);
+            // Narrow through the iterator result rather than a cast: no
+            // assertion, and `value` is a string whatever lib types apply.
+            const oldest = this.entries.keys().next();
+            if (!oldest.done) this.entries.delete(oldest.value);
         }
     }
 
