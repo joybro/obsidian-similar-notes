@@ -95,13 +95,32 @@ describe("isNetworkError", () => {
 describe("describeSearchFailure", () => {
     // The exact messages our adapters throw: OpenAI and Gemini put the status
     // right after the colon, Ollama writes "HTTP <status>".
+    const KEY = "the API key was rejected. Check it in settings.";
+    const AUTH = "the provider couldn't authenticate the request. Check your API key in settings.";
+    const ACCESS = "the provider refused access. Check your account's access settings with the provider.";
+    const USAGE = "the provider's usage limit was reached. Check your plan and usage limits with the provider.";
+    const RATE = "the provider's rate limit was reached. Wait a moment and try again.";
+    const MODEL = "the model wasn't found. Check the model name in settings.";
+    const MODEL_OR_URL = "the model or API address wasn't found. Check the model name and server URL in settings.";
+
     test.each([
-        ["Failed to generate embedding: 401. {\"error\":{\"message\":\"Incorrect API key provided: sk-abc\"}}", "the API key was rejected. Check it in settings."],
-        ["Failed to generate embedding: 403. PERMISSION_DENIED", "the API key was rejected. Check it in settings."],
-        ["Failed to generate embedding: 400. {\"error\":{\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"reason\":\"API_KEY_INVALID\"}]}}", "the API key was rejected. Check it in settings."],
-        ["Failed to generate embedding: 429. quota", "the provider's rate limit or quota was reached. Wait a moment and try again."],
-        ["Failed to generate embedding: HTTP 404. {\"error\":\"model \\\"nomic-embed-text\\\" not found, try pulling it first\"}", "the model wasn't found. Check the model name in settings."],
-        ["Failed to generate embeddings: 404. The model does not exist", "the model wasn't found. Check the model name in settings."],
+        // Explicit invalid-key answers keep the key sentence.
+        ["Failed to generate embedding: 401. {\"error\":{\"message\":\"Incorrect API key provided: sk-abc\",\"code\":\"invalid_api_key\"}}", KEY],
+        ["Failed to generate embedding: 400. {\"error\":{\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"reason\":\"API_KEY_INVALID\"}]}}", KEY],
+        // A bare 401 is an authentication failure, not necessarily the key.
+        ["Failed to generate embedding: 401. {\"error\":{\"message\":\"Your IP is not authorized to make requests for this organization.\"}}", AUTH],
+        // 403 is refused access (region, permission), never "key rejected".
+        ["Failed to generate embedding: 403. {\"error\":{\"code\":\"unsupported_country_region_territory\",\"message\":\"Country, region, or territory not supported\"}}", ACCESS],
+        ["Failed to generate embedding: 403. PERMISSION_DENIED", ACCESS],
+        // 429 without a rate-limit code may be a quota: no "wait and retry".
+        ["Failed to generate embedding: 429. {\"error\":{\"code\":\"insufficient_quota\",\"message\":\"You exceeded your current quota, please check your plan and billing details.\"}}", USAGE],
+        ["Failed to generate embedding: 429. {\"error\":{\"status\":\"RESOURCE_EXHAUSTED\"}}", USAGE],
+        ["Failed to generate embedding: 429. {\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"Rate limit reached for requests\"}}", RATE],
+        // 404 names the model only when the body says the model is missing.
+        ["Failed to generate embedding: HTTP 404. {\"error\":\"model \\\"nomic-embed-text\\\" not found, try pulling it first\"}", MODEL],
+        ["Failed to generate embeddings: 404. {\"error\":{\"code\":\"model_not_found\",\"message\":\"The model `text-embedding-4` does not exist\"}}", MODEL],
+        ["Failed to generate embedding: 404. {\"error\":{\"code\":404,\"message\":\"models/embedding-002 is not found for API version v1beta\",\"status\":\"NOT_FOUND\"}}", MODEL],
+        ["Failed to generate embedding: 404. 404 page not found", MODEL_OR_URL],
         ["net::ERR_CONNECTION_REFUSED", "couldn't reach the model server. If you use Ollama, check that it's running."],
     ])("%s", (message, expected) => {
         expect(describeSearchFailure(new Error(message))).toBe(expected);

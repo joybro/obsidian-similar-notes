@@ -98,24 +98,48 @@ export const GEMINI_ERROR_PATTERNS: ErrorPattern[] = [
  * "...: HTTP <status>." for Ollama), so a number elsewhere is not a status.
  * Obsidian's requestUrl rejects with Chromium's net error name when nothing
  * listens on the server's port (Ollama not running).
+ *
+ * A status alone says less than it seems, so its sentence stays as wide as
+ * the status: 401 is an authentication failure (a bad key, but also e.g. an
+ * IP allowlist), 403 is any refused access (a region or project permission,
+ * not only a key), 404 may be a wrong server URL as well as a missing model,
+ * and 429 covers both a short rate limit and an exhausted quota or spending
+ * cap, where waiting does not help. Only an explicit code or message in the
+ * response body narrows it (API_KEY_INVALID, model_not_found,
+ * rate_limit_exceeded, ...).
  */
 export function describeSearchFailure(error: unknown): string | null {
     if (!(error instanceof Error)) return null;
     const message = error.message;
 
     const status = /^Failed to generate embeddings?: (?:HTTP )?(\d{3})\b/.exec(message)?.[1];
-    // Gemini answers a bad key with 400 INVALID_ARGUMENT, not 401.
-    if (status === "400" && /API_KEY_INVALID|API key not valid/.test(message)) {
-        return "the API key was rejected. Check it in settings.";
-    }
-    switch (status) {
-        case "401":
-        case "403":
+    if (status) {
+        // Explicit invalid-key answers: Gemini's 400 API_KEY_INVALID, OpenAI's
+        // invalid_api_key / "Incorrect API key provided".
+        if (/API_KEY_INVALID|API key not valid|invalid_api_key|Incorrect API key/.test(message)) {
             return "the API key was rejected. Check it in settings.";
-        case "404":
-            return "the model wasn't found. Check the model name in settings.";
-        case "429":
-            return "the provider's rate limit or quota was reached. Wait a moment and try again.";
+        }
+        switch (status) {
+            case "401":
+                return "the provider couldn't authenticate the request. Check your API key in settings.";
+            case "403":
+                return "the provider refused access. Check your account's access settings with the provider.";
+            case "404":
+                // Ollama: model \"x\" not found (JSON-escaped); OpenAI: model_not_found;
+                // Gemini: models/x is not found.
+                if (/model_not_found|\bmodels?\b.*\bnot found|\bmodel\b.*\bdoes not exist/i.test(message)) {
+                    return "the model wasn't found. Check the model name in settings.";
+                }
+                return "the model or API address wasn't found. Check the model name and server URL in settings.";
+            case "429":
+                // OpenAI's rate_limit_exceeded is the short-lived limit;
+                // insufficient_quota and Gemini's RESOURCE_EXHAUSTED may not
+                // clear by waiting.
+                if (/rate_limit_exceeded/.test(message)) {
+                    return "the provider's rate limit was reached. Wait a moment and try again.";
+                }
+                return "the provider's usage limit was reached. Check your plan and usage limits with the provider.";
+        }
     }
 
     if (message.includes("ERR_CONNECTION_REFUSED")) {

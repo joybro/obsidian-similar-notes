@@ -140,7 +140,7 @@ describe("SemanticSearchModal empty state", () => {
         notices.length = 0;
         const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
         const findSimilarNotesFromText = vi.fn(async () => {
-            throw new Error("Failed to generate embedding: 401. invalid key");
+            throw new Error("Failed to generate embedding: 401. unauthorized");
         });
         const modal = new SemanticSearchModal(
             { vault: { getAbstractFileByPath: () => null } } as unknown as App,
@@ -158,7 +158,7 @@ describe("SemanticSearchModal empty state", () => {
             await vi.advanceTimersByTimeAsync(300);
         });
         expect(notices).toEqual([
-            "Similar Notes: search failed: the API key was rejected. Check it in settings.",
+            "Similar Notes: search failed: the provider couldn't authenticate the request. Check your API key in settings.",
         ]);
         consoleError.mockRestore();
     });
