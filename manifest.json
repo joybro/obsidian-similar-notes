@@ -3,7 +3,7 @@
     "name": "Similar Notes",
     "version": "1.8.0",
     "minAppVersion": "1.11.0",
-    "description": "Find semantically similar notes using AI. On-device local models, or cloud APIs (recommended on mobile).",
+    "description": "Find semantically similar notes using AI. A built-in model on desktop, Ollama, or cloud APIs like OpenAI and Gemini.",
     "author": "Young Lee",
     "authorUrl": "https://github.com/joybro",
     "fundingUrl": "https://buymeacoffee.com/joybro",
