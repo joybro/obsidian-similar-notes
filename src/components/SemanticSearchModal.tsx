@@ -131,6 +131,12 @@ function useSemanticSearch(textSearchService: TextSearchService) {
     const [searchedQuery, setSearchedQuery] = useState<string | null>(null);
     const [tokenWarning, setTokenWarning] = useState<string | null>(null);
     const debounceRef = useRef<number | null>(null);
+    // A provider that is down fails every debounced search, so a notice per
+    // failure would stack while the user types. Say it once per open modal
+    // (this hook's state dies with the modal), and again only after a search
+    // succeeds. No global cooldown: reopening after a settings change must be
+    // able to say it again.
+    const failureNoticeShownRef = useRef(false);
 
     const performSearch = useCallback(
         async (searchQuery: string) => {
@@ -155,6 +161,7 @@ function useSemanticSearch(textSearchService: TextSearchService) {
                 setResults(searchResult.similarNotes);
                 setSelectedIndex(0);
                 setSearchedQuery(searchQuery);
+                failureNoticeShownRef.current = false;
             } catch (error) {
                 console.error("Search error:", error);
                 setResults([]);
@@ -162,9 +169,12 @@ function useSemanticSearch(textSearchService: TextSearchService) {
                 // must not read as "No similar notes found": leave
                 // searchedQuery unset for it and say the search failed.
                 setSearchedQuery(null);
-                new Notice(
-                    "Similar Notes: search failed. Check your model settings and try again."
-                );
+                if (!failureNoticeShownRef.current) {
+                    failureNoticeShownRef.current = true;
+                    new Notice(
+                        "Similar Notes: search failed. Check your model settings and try again."
+                    );
+                }
             } finally {
                 setIsSearching(false);
             }

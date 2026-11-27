@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 -   **Semantic search no longer flashes "No similar notes found" while you type**: the message now appears only after the query you typed has actually been searched and found nothing. Before, from the third character on, it showed after each keystroke while the search was still waiting to start.
--   **A failed semantic search now says so**: when the search itself fails (for example, the model provider can't be reached), a notice says the search failed instead of showing "No similar notes found", and the modal stays open so you can try again.
+-   **A failed semantic search now says so**: when the search itself fails (for example, the model provider can't be reached), a notice says the search failed (once while the modal is open, not once per keystroke pause) instead of showing "No similar notes found", and the modal stays open so you can try again.
 -   **`;;` link suggestions no longer offer the note you are editing**: the current note is left out of the suggestions, so you can't insert a link to the note itself by accident.
 
 ## [1.8.0] - 2026-11-27

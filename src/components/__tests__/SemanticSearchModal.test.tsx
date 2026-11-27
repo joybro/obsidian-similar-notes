@@ -134,4 +134,57 @@ describe("SemanticSearchModal empty state", () => {
         expect(input.value).toBe("city");
         consoleError.mockRestore();
     });
+
+    test("a provider that keeps failing shows one notice per open, again after a search succeeds or on reopen", async () => {
+        vi.useFakeTimers();
+        notices.length = 0;
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        let failing = true;
+        const findSimilarNotesFromText = vi.fn(async () => {
+            if (failing) throw new Error("provider unavailable");
+            return { similarNotes: [], tokenCount: 0, maxTokens: 0, isOverLimit: false };
+        });
+        const service = { findSimilarNotesFromText } as unknown as TextSearchService;
+        const app = { vault: { getAbstractFileByPath: () => null } } as unknown as App;
+        const open = () => {
+            const modal = new SemanticSearchModal(app, service, "title");
+            withObsidianHelpers(modal.modalEl);
+            withObsidianHelpers(modal.contentEl);
+            document.body.appendChild(modal.modalEl);
+            act(() => modal.onOpen());
+            return modal;
+        };
+        const type = async (input: HTMLInputElement, value: string) => {
+            act(() => {
+                fireEvent.change(input, { target: { value } });
+            });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(300);
+            });
+        };
+        const FAILED = "Similar Notes: search failed. Check your model settings and try again.";
+
+        const modal = open();
+        const input = modal.modalEl.querySelector("input")!;
+        // Pausing between words runs a search per pause; each one fails.
+        await type(input, "city");
+        await type(input, "city on");
+        await type(input, "city on a hill");
+        expect(findSimilarNotesFromText).toHaveBeenCalledTimes(3);
+        expect(notices).toEqual([FAILED]);
+
+        // Once a search succeeds, a later failure is news again.
+        failing = false;
+        await type(input, "city on a hil");
+        failing = true;
+        await type(input, "city on a hi");
+        expect(notices).toEqual([FAILED, FAILED]);
+
+        // Reopening the modal (say, after fixing the settings) can show it again.
+        act(() => modal.onClose());
+        const reopened = open();
+        await type(reopened.modalEl.querySelector("input")!, "river");
+        expect(notices).toEqual([FAILED, FAILED, FAILED]);
+        consoleError.mockRestore();
+    });
 });
