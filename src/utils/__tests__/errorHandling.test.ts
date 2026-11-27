@@ -116,6 +116,10 @@ describe("describeSearchFailure", () => {
         ["Failed to generate embedding: 429. {\"error\":{\"code\":\"insufficient_quota\",\"message\":\"You exceeded your current quota, please check your plan and billing details.\"}}", USAGE],
         ["Failed to generate embedding: 429. {\"error\":{\"status\":\"RESOURCE_EXHAUSTED\"}}", USAGE],
         ["Failed to generate embedding: 429. {\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"Rate limit reached for requests\"}}", RATE],
+        ["Failed to generate embedding: 429. {\"error\":{\"type\":\"rate_limit_error\",\"code\":\"slow_down\",\"message\":\"Slow down\"}}", RATE],
+        ["Failed to generate embedding: 429. {\"error\":{\"message\":\"Rate limit reached for requests\"}}", RATE],
+        ["Failed to generate embedding: 429. {\"error\":{\"code\":\"organization_spend_limit_exceeded\",\"message\":\"Organization spend limit reached\"}}", USAGE],
+        ["Failed to generate embedding: 429. {\"error\":{\"code\":\"credit_balance_exhausted\",\"message\":\"Credit balance exhausted\"}}", USAGE],
         // 404 names the model only when the body says the model is missing.
         ["Failed to generate embedding: HTTP 404. {\"error\":\"model \\\"nomic-embed-text\\\" not found, try pulling it first\"}", MODEL],
         ["Failed to generate embeddings: 404. {\"error\":{\"code\":\"model_not_found\",\"message\":\"The model `text-embedding-4` does not exist\"}}", MODEL],

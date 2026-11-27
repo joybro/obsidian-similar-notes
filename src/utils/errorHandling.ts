@@ -132,10 +132,12 @@ export function describeSearchFailure(error: unknown): string | null {
                 }
                 return "the model or API address wasn't found. Check the model name and server URL in settings.";
             case "429":
-                // OpenAI's rate_limit_exceeded is the short-lived limit;
-                // insufficient_quota and Gemini's RESOURCE_EXHAUSTED may not
-                // clear by waiting.
-                if (/rate_limit_exceeded/.test(message)) {
+                // Short-lived limits: OpenAI's "Rate limit reached for
+                // requests" and slow_down (its error-codes guide), and the
+                // rate_limit_exceeded code its responses carry. Spend, credit
+                // and usage limits, insufficient_quota and Gemini's
+                // RESOURCE_EXHAUSTED may not clear by waiting.
+                if (/rate_limit_exceeded|"slow_down"|Rate limit reached for requests/.test(message)) {
                     return "the provider's rate limit was reached. Wait a moment and try again.";
                 }
                 return "the provider's usage limit was reached. Check your plan and usage limits with the provider.";
