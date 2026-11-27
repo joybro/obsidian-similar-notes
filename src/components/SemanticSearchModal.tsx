@@ -11,6 +11,7 @@ import {
     insertLinkForNote,
 } from "./semanticSearchActions";
 import { logRejection } from "@/utils/logRejection";
+import { describeSearchFailure } from "@/utils/errorHandling";
 
 const MIN_SEARCH_LENGTH = 3;
 const DEBOUNCE_MS = 300;
@@ -171,8 +172,11 @@ function useSemanticSearch(textSearchService: TextSearchService) {
                 setSearchedQuery(null);
                 if (!failureNoticeShownRef.current) {
                     failureNoticeShownRef.current = true;
+                    const cause = describeSearchFailure(error);
                     new Notice(
-                        "Similar Notes: search failed. Check your model settings and try again."
+                        cause
+                            ? `Similar Notes: search failed: ${cause}`
+                            : "Similar Notes: search failed. Check your model settings and try again."
                     );
                 }
             } finally {

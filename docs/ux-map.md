@@ -75,7 +75,7 @@ Obsidian CLI (`CLAUDE.md` § Manual Verification), and each pair is marked
 - screen: search-modal | states: empty, partial-short-query, loading, ideal, empty-no-results, error-search
   - 무엇을 보여주나: query box and results ranked by meaning
   - 행동: type, move selection, open, create a note from the query
-  - 오류에서 (error-search): Notice "Similar Notes: search failed. Check your model settings and try again." once per open modal (again after a search succeeds or on reopen, never a global cooldown), the modal stays open; edit the query or close. empty-no-results does not show for a query whose search failed
+  - 오류에서 (error-search): Notice "Similar Notes: search failed. Check your model settings and try again." (or, when describeSearchFailure knows the cause, "Similar Notes: search failed: <cause>") once per open modal (again after a search succeeds or on reopen, never a global cooldown), the modal stays open; edit the query or close. empty-no-results does not show for a query whose search failed
   - empty-no-results shows only after the search for the current query has finished; while a newer query waits for its search, the previous results (or nothing) stay
   - → search-modal (back): Esc
   - → sidebar (back): Esc when opened from the sidebar button; focus returns to that button

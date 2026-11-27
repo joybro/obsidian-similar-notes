@@ -135,6 +135,34 @@ describe("SemanticSearchModal empty state", () => {
         consoleError.mockRestore();
     });
 
+    test("a failed search with a known cause names it in the notice", async () => {
+        vi.useFakeTimers();
+        notices.length = 0;
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const findSimilarNotesFromText = vi.fn(async () => {
+            throw new Error("Failed to generate embedding: 401. invalid key");
+        });
+        const modal = new SemanticSearchModal(
+            { vault: { getAbstractFileByPath: () => null } } as unknown as App,
+            { findSimilarNotesFromText } as unknown as TextSearchService,
+            "title"
+        );
+        withObsidianHelpers(modal.modalEl);
+        withObsidianHelpers(modal.contentEl);
+        document.body.appendChild(modal.modalEl);
+        act(() => modal.onOpen());
+        act(() => {
+            fireEvent.change(modal.modalEl.querySelector("input")!, { target: { value: "city" } });
+        });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(300);
+        });
+        expect(notices).toEqual([
+            "Similar Notes: search failed: the API key was rejected. Check it in settings.",
+        ]);
+        consoleError.mockRestore();
+    });
+
     test("a provider that keeps failing shows one notice per open, again after a search succeeds or on reopen", async () => {
         vi.useFakeTimers();
         notices.length = 0;

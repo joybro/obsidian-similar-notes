@@ -89,6 +89,42 @@ export const GEMINI_ERROR_PATTERNS: ErrorPattern[] = [
 ];
 
 /**
+ * Name the cause of a failed search when it is one we know for sure, else null.
+ *
+ * Unlike extractUserFriendlyMessage, this never falls back to the raw error
+ * text: an unknown failure keeps the generic "check your model settings"
+ * notice. Statuses are read only from the messages our embedding adapters
+ * throw ("Failed to generate embedding(s): <status>." for OpenAI and Gemini,
+ * "...: HTTP <status>." for Ollama), so a number elsewhere is not a status.
+ * Obsidian's requestUrl rejects with Chromium's net error name when nothing
+ * listens on the server's port (Ollama not running).
+ */
+export function describeSearchFailure(error: unknown): string | null {
+    if (!(error instanceof Error)) return null;
+    const message = error.message;
+
+    const status = /^Failed to generate embeddings?: (?:HTTP )?(\d{3})\b/.exec(message)?.[1];
+    // Gemini answers a bad key with 400 INVALID_ARGUMENT, not 401.
+    if (status === "400" && /API_KEY_INVALID|API key not valid/.test(message)) {
+        return "the API key was rejected. Check it in settings.";
+    }
+    switch (status) {
+        case "401":
+        case "403":
+            return "the API key was rejected. Check it in settings.";
+        case "404":
+            return "the model wasn't found. Check the model name in settings.";
+        case "429":
+            return "the provider's rate limit or quota was reached. Wait a moment and try again.";
+    }
+
+    if (message.includes("ERR_CONNECTION_REFUSED")) {
+        return "couldn't reach the model server. If you use Ollama, check that it's running.";
+    }
+    return null;
+}
+
+/**
  * Extract a user-friendly error message from the original error
  */
 export function extractUserFriendlyMessage(

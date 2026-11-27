@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+    describeSearchFailure,
     extractUserFriendlyMessage,
     isNetworkError,
     TRANSFORMERS_ERROR_PATTERNS,
@@ -88,5 +89,37 @@ describe("isNetworkError", () => {
                 )
             )
         ).toBe(false);
+    });
+});
+
+describe("describeSearchFailure", () => {
+    // The exact messages our adapters throw: OpenAI and Gemini put the status
+    // right after the colon, Ollama writes "HTTP <status>".
+    test.each([
+        ["Failed to generate embedding: 401. {\"error\":{\"message\":\"Incorrect API key provided: sk-abc\"}}", "the API key was rejected. Check it in settings."],
+        ["Failed to generate embedding: 403. PERMISSION_DENIED", "the API key was rejected. Check it in settings."],
+        ["Failed to generate embedding: 400. {\"error\":{\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"reason\":\"API_KEY_INVALID\"}]}}", "the API key was rejected. Check it in settings."],
+        ["Failed to generate embedding: 429. quota", "the provider's rate limit or quota was reached. Wait a moment and try again."],
+        ["Failed to generate embedding: HTTP 404. {\"error\":\"model \\\"nomic-embed-text\\\" not found, try pulling it first\"}", "the model wasn't found. Check the model name in settings."],
+        ["Failed to generate embeddings: 404. The model does not exist", "the model wasn't found. Check the model name in settings."],
+        ["net::ERR_CONNECTION_REFUSED", "couldn't reach the model server. If you use Ollama, check that it's running."],
+    ])("%s", (message, expected) => {
+        expect(describeSearchFailure(new Error(message))).toBe(expected);
+    });
+
+    test.each([
+        "Failed to generate embedding: 500. internal error",
+        "Failed to generate embedding: 400. {\"error\":{\"message\":\"Request payload size exceeds the limit\"}}",
+        "Invalid embedding response from OpenAI: missing data array",
+        "something unexpected",
+        // A status-like number elsewhere in the text is not a status.
+        "Invalid embedding response: expected 401 values",
+    ])("unknown cause stays unnamed: %s", (message) => {
+        expect(describeSearchFailure(new Error(message))).toBeNull();
+    });
+
+    test("a non-Error value is unknown", () => {
+        expect(describeSearchFailure("Failed to generate embedding: 401.")).toBeNull();
+        expect(describeSearchFailure(undefined)).toBeNull();
     });
 });
