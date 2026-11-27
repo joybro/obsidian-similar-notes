@@ -125,8 +125,8 @@ function useSemanticSearch(textSearchService: TextSearchService) {
     const [results, setResults] = useState<SimilarNote[]>([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isSearching, setIsSearching] = useState(false);
-    // The query whose search last finished. "No similar notes found" is only
-    // true for that query; while a newer query waits for its debounced search,
+    // The query whose search last finished without error. "No similar notes
+    // found" is only true for that query; while a newer query waits for its debounced search,
     // nothing is known about it yet.
     const [searchedQuery, setSearchedQuery] = useState<string | null>(null);
     const [tokenWarning, setTokenWarning] = useState<string | null>(null);
@@ -154,11 +154,18 @@ function useSemanticSearch(textSearchService: TextSearchService) {
                 }
                 setResults(searchResult.similarNotes);
                 setSelectedIndex(0);
+                setSearchedQuery(searchQuery);
             } catch (error) {
                 console.error("Search error:", error);
                 setResults([]);
+                // A failed search found nothing out about this query, so it
+                // must not read as "No similar notes found": leave
+                // searchedQuery unset for it and say the search failed.
+                setSearchedQuery(null);
+                new Notice(
+                    "Similar Notes: search failed. Check your model settings and try again."
+                );
             } finally {
-                setSearchedQuery(searchQuery);
                 setIsSearching(false);
             }
         },

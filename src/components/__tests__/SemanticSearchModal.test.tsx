@@ -5,6 +5,19 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { TextSearchService } from "@/domain/service/TextSearchService";
 import { SemanticSearchModal } from "../SemanticSearchModal";
 
+const notices = vi.hoisted(() => [] as string[]);
+vi.mock("obsidian", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("obsidian")>();
+    return {
+        ...actual,
+        Notice: class {
+            constructor(message: string) {
+                notices.push(message);
+            }
+        },
+    };
+});
+
 // Obsidian's element helpers used by the modal, missing from jsdom.
 const withObsidianHelpers = (el: HTMLElement) =>
     Object.assign(el, {
@@ -89,5 +102,36 @@ describe("SemanticSearchModal empty state", () => {
             fireEvent.change(input, { target: { value: "city on" } });
         });
         expect(modal.modalEl.textContent).not.toContain("No similar notes found");
+    });
+    test("a failed search shows a notice, not 'No similar notes found'", async () => {
+        vi.useFakeTimers();
+        notices.length = 0;
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const findSimilarNotesFromText = vi.fn(async () => {
+            throw new Error("provider unavailable");
+        });
+        const modal = new SemanticSearchModal(
+            { vault: { getAbstractFileByPath: () => null } } as unknown as App,
+            { findSimilarNotesFromText } as unknown as TextSearchService,
+            "title"
+        );
+        withObsidianHelpers(modal.modalEl);
+        withObsidianHelpers(modal.contentEl);
+        document.body.appendChild(modal.modalEl);
+        act(() => modal.onOpen());
+        const input = modal.modalEl.querySelector("input")!;
+
+        act(() => {
+            fireEvent.change(input, { target: { value: "city" } });
+        });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(300);
+        });
+        expect(findSimilarNotesFromText).toHaveBeenCalledWith("city");
+        expect(modal.modalEl.textContent).not.toContain("No similar notes found");
+        expect(notices).toEqual(["Similar Notes: search failed. Check your model settings and try again."]);
+        // The modal stays open with the query, so the user can edit it.
+        expect(input.value).toBe("city");
+        consoleError.mockRestore();
     });
 });
